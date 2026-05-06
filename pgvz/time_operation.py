@@ -1,4 +1,3 @@
-import Lawn
 import Sexy
 from .global_var import gvar
 

@@ -6,7 +6,7 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 import Lawn
-from pyvz import *
+from pgvz import *
 
 # 自动锤僵尸
 def WhackZombie():

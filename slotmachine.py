@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(__file__))
 import LawnMod
 import Lawn
 import Sexy
-from pyvz import *
+from pgvz import *
 
 # 老虎机永远三阳光。必须要用完整的SeedType类型、不能用int。类方法、第一个参数是对象
 # 理论上可以通过操纵随机数，或者凭运气达到同样的效果，这里就直接设置卡片了

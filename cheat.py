@@ -10,7 +10,7 @@ import Lawn
 import LawnMod
 import Sexy
 import Sexy.TodLib
-from pyvz import *
+from pgvz import *
 
 # 免费用卡
 @LawnMod.MonoModUtils.HookTo(Lawn.Plant.GetCost)

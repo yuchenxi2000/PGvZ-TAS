@@ -12,7 +12,7 @@ from .time_operation import Delay, Prejudge, Until
 from .util import *
 import LawnMod
 
-pyvz_version = (1, 0, 0)
+pgvz_version = (1, 0, 0)
 
 script_manager = ScriptManager()
 # 默认注册一个自动收集（可收集盆栽），要关掉就调用auto_collector.Off()方法
@@ -46,5 +46,5 @@ __all__ = [
     "ScriptManager", "ScriptRunMode", "ScriptType", "ScriptObj", "ScriptConf",
     "Delay", "Prejudge", "Until",
     "PixelToGrid", "GridToPixel", "MouseDragGrid", "SeedTypeNone", "SetPlantOnBoard", "IterAliveZombies", "IterAlivePlants", "IterAliveCoins",
-    "pyvz_version", "script_manager", "auto_collector",
+    "pgvz_version", "script_manager", "auto_collector",
 ]

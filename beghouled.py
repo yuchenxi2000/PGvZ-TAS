@@ -6,7 +6,7 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 import Lawn
-from pyvz import *
+from pgvz import *
 
 # 宝石迷阵自动操作类
 class Beghouled:

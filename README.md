@@ -12,17 +12,17 @@ by yuchenxi2000
 
 ## 使用方法
 
-把本仓库下载下来，然后把里面的所有文件放到游戏的mods目录下。注意游戏只会加载mods目录下以.py作为后缀的文件，因此脚本必须直接放mods目录下。pyvz文件夹直接放mods目录下，里面文件不要动。
+把本仓库下载下来，然后把里面的所有文件放到游戏的mods目录下。注意游戏只会加载mods目录下以.py作为后缀的文件，因此脚本必须直接放mods目录下。pgvz文件夹直接放mods目录下，里面文件不要动。
 
 对于PC版游戏，默认的mods目录是C:\\Users\\你的用户名\\AppData\\Roaming\\ZBC\\PlantGirlsVsZombies\\mods
 
 如果不生效，可能的原因是没有开启模组功能，你需要编辑一下配置文件C:\\Users\\你的用户名\\AppData\\Roaming\\ZBC\\PlantGirlsVsZombies\\user_config.json，把ironpython_enabled这个选项改成true
 
-本仓库包含键控框架模块`pyvz`，以及几个可直接作为模组加载的示例脚本。
+本仓库包含键控框架模块`pgvz`，以及几个可直接作为模组加载的示例脚本。
 
 ## 脚本编写教程
 
-TAS框架的模块是pyvz，编写脚本先要import这个模块。
+TAS框架的模块是pgvz，编写脚本先要import这个模块。
 
 接口和植物大战僵尸原版的[pyvz](https://pvz.tools/scripts/)、[AvZ](https://github.com/vector-wlc/AsmVsZombies)框架类似，如果熟悉这两个框架会容易一些。因为接口类似，建议先阅读[pyvz](https://pvz.tools/scripts/)的教程。
 
@@ -32,7 +32,7 @@ TAS框架的模块是pyvz，编写脚本先要import这个模块。
 
 1. PvZ基类、主类的访问通过全局对象`gvar`，`gvar.glawnapp`就是其他框架的`PvzBase`，`gvar.gboard`就是其他框架的`MainObject`
 
-2. 脚本在引入pyvz模块前，必须设置加载路径为脚本所在目录，如下所示。这个是游戏本身的锅，我也没办法
+2. 脚本在引入pgvz模块前，必须设置加载路径为脚本所在目录，如下所示。这个是游戏本身的锅，我也没办法
 
     ```python
     # 先设置加载路径
@@ -40,7 +40,7 @@ TAS框架的模块是pyvz，编写脚本先要import这个模块。
     import os
     sys.path.append(os.path.dirname(__file__))
     # 然后再引入模块
-    from pyvz import *
+    from pgvz import *
     ```
 
 3. 不同于pyvz直接写脚本和AvZ需要写在AScript函数里面，本框架的脚本可以写在任意无参数函数里面，且一个脚本可以写任意数量的脚本。但是脚本需要注册到`script_manager`：
@@ -75,6 +75,8 @@ TAS框架的模块是pyvz，编写脚本先要import这个模块。
 
 可以参考本仓库的示例脚本，`pe12.py`是泳池无尽的经典十二炮脚本（阻塞脚本），`beghouled.py`是宝石迷阵系列的自动脚本（非阻塞），`whackazombie.py`是锤僵尸自动脚本（非阻塞）。
 
+如果需要调试，可以运行`Lawn.Console.exe`，这是包含命令行界面的游戏版本。在脚本里使用`Sexy.Debug.Log`在命令行输出调试信息。
+
 可以将`typings`目录加到类型检查器的路径里面，比如VS Code的pylance插件默认python存根文件目录`typings`。需要调用游戏内部函数时，`typings`目录下的pyi可以提供类型提示。
 
 ## 进阶教程
@@ -89,7 +91,7 @@ TAS框架的模块是pyvz，编写脚本先要import这个模块。
 
 注意被包装函数的第一个参数是原方法。如果是成员方法，第二个参数是对象，后续是类方法的参数；如果是静态方法，则没有对象参数。
 
-具体写法详见`cheat.py`以及`pyvz/__init__.py`。
+具体写法详见`cheat.py`以及`pgvz/__init__.py`。
 
 ## 参考资料
 
