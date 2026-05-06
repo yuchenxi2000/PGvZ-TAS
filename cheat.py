@@ -13,8 +13,12 @@ import Sexy.TodLib
 from pgvz import *
 
 # 免费用卡
+# 第二个hook为了让无尽里紫卡阳光仍为0
 @LawnMod.MonoModUtils.HookTo(Lawn.Plant.GetCost)
 def hook_plant_getcost(orig, plantType: Lawn.SeedType, plantImitaterType: Lawn.SeedType):
+    return 0
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.GetCurrentPlantCost)
+def hook_board_GetCurrentPlantCost(orig, board: Lawn.Board, plantType: Lawn.SeedType, plantImitaterType: Lawn.SeedType):
     return 0
 
 # 满阳光+无冷却
@@ -28,8 +32,16 @@ script_manager.Register(CheatSunMoney)
 def hook_board_canplantat(orig, board: Lawn.Board, gridX: int, gridY: int, seedtype: Lawn.SeedType, ismove: bool):
     return Lawn.PlantingReason.Ok
 
-# 更好的自动收集，包括盆栽。PGvZ-TAS自带，只需引入pyvz模块。如果不需要这个功能，把下面一句取消注释。
+# 更好的自动收集，包括盆栽。PGvZ-TAS自带，只需引入pgvz模块。如果不需要这个功能，把下面一句取消注释。
 # auto_collector.Off()
+
+# 传送带无冷却
+# 相关函数 Lawn.Challenge.UpdateConveyorBelt, Lawn.SeedBank.UpdateConveyorBelt
+@LawnMod.MonoModUtils.HookTo(Lawn.SeedBank.UpdateConveyorBelt)
+def hook_seedbank_UpdateConveyorBelt(orig, seedbank: Lawn.SeedBank):
+    seedbank.mConveyorBeltCounter = 0
+    for i in range(seedbank.mNumPackets):
+        seedbank.mSeedPackets[i].mOffsetY = 0
 
 # 植物免疫啃食
 @LawnMod.MonoModUtils.HookTo(Lawn.Plant.Update)
@@ -64,6 +76,14 @@ def hook_plant_Squish(orig, plant: Lawn.Plant):
 @LawnMod.MonoModUtils.HookTo(Lawn.Zombie.BungeeStealTarget)
 def hook_zombie_BungeeStealTarget(orig, zombie: Lawn.Zombie):
     zombie.PlayZombieReanim(Lawn.GlobalMembersReanimIds.ReanimTrackId_anim_grab, Sexy.TodLib.ReanimLoopType.PlayOnceAndHold, 20, 24.0)
+
+# 植物不能被墓碑顶掉
+@LawnMod.MonoModUtils.HookTo(Lawn.Challenge.GraveDangerSpawnGraveAt)
+def hook_challenge_GraveDangerSpawnGraveAt(orig, challenge: Lawn.Challenge, x: int, y: int):
+    challenge.mBoard.mEnableGraveStones = True
+    grave_stone = challenge.mBoard.AddAGraveStone(x, y)
+    if grave_stone is not None:
+        grave_stone.AddGraveStoneParticles()
 
 # 玉米炮无冷却
 @LawnMod.MonoModUtils.HookTo(Lawn.Plant.UpdateCobCannon)
