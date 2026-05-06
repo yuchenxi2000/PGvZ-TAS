@@ -18,6 +18,8 @@ by yuchenxi2000
 
 如果不生效，可能的原因是没有开启模组功能，你需要编辑一下配置文件C:\\Users\\你的用户名\\AppData\\Roaming\\ZBC\\PlantGirlsVsZombies\\user_config.json，把ironpython_enabled这个选项改成true
 
+本仓库包含键控框架模块`pyvz`，以及几个可直接作为模组加载的示例脚本。
+
 ## 脚本编写教程
 
 TAS框架的模块是pyvz，编写脚本先要import这个模块。
@@ -26,7 +28,7 @@ TAS框架的模块是pyvz，编写脚本先要import这个模块。
 
 由于时间精力关系，本模块没有实现所有功能。本模块实现的主要功能有种植物`Card`、铲植物`Shovel`、发射玉米炮`CobManager.Fire`、时间相关操作`Delay``Prejudge``Until`，以及一些常用操作，比如迭代所有存活植物/僵尸/物品`IterAliveZombies``IterAlivePlants``IterAliveCoins`。
 
-下面介绍和pyvz、avz的异同：
+下面介绍和pyvz、AvZ的异同：
 
 1. PvZ基类、主类的访问通过全局对象`gvar`，`gvar.glawnapp`就是其他框架的`PvzBase`，`gvar.gboard`就是其他框架的`MainObject`
 
@@ -52,7 +54,9 @@ TAS框架的模块是pyvz，编写脚本先要import这个模块。
     script_manager.Register(ScriptPE12, gamemode=Lawn.GameMode.SurvivalEndlessStage3)
     ```
 
-4. 本框架的脚本函数分为阻塞和非阻塞两种。阻塞（类似协程）用生成器函数实现，函数内有`yield`关键字；非阻塞脚本函数每个游戏帧被调用一次。所有时间相关操作都是阻塞操作，因此都需要在前面加`yield from`：
+4. 本框架允许多个`.py`脚本文件共存，各脚本互不影响。
+
+5. 本框架的脚本函数分为阻塞和非阻塞两种。阻塞（类似协程）用生成器函数实现，函数内有`yield`关键字，按时间顺序执行；非阻塞脚本函数每个游戏帧被调用一次。所有时间相关操作都是阻塞操作，因此都需要在前面加`yield from`：
 
     ```python
     def ScriptPE12():
@@ -67,11 +71,25 @@ TAS框架的模块是pyvz，编写脚本先要import这个模块。
         ...
     ```
 
-5. 不同于pyvz和AvZ，本框架可以调用任意游戏内部函数。内部函数可以通过反编译得到（比如用ILSpy），也可以参考`typings`目录下的存根文件，它们列出了所有游戏内部C#对象/方法的Python对应。所以要使用左键点击直接调用`Lawn.Board.MouseDown`（用全局对象获取游戏`Board`对象，`gvar.gboard`），本框架不再提供此类接口
+6. 不同于pyvz和AvZ，本框架可以调用任意游戏内部函数。内部函数可以通过反编译得到（比如用ILSpy），也可以参考`typings`目录下的`.pyi`存根文件，它们列出了所有游戏内部C#对象/方法的Python对应。所以要使用左键点击直接调用`Lawn.Board.MouseDown`（用全局对象获取游戏`Board`对象，`gvar.gboard`），本框架不再提供此类接口
 
-可以参考本仓库的示例脚本，`pe12.py`是泳池无尽的经典十二炮脚本（阻塞脚本），`beghouled.py`是宝石迷阵系列的自动脚本（非阻塞）。
+可以参考本仓库的示例脚本，`pe12.py`是泳池无尽的经典十二炮脚本（阻塞脚本），`beghouled.py`是宝石迷阵系列的自动脚本（非阻塞），`whackazombie.py`是锤僵尸自动脚本（非阻塞）。
 
 可以将`typings`目录加到类型检查器的路径里面，比如VS Code的pylance插件默认python存根文件目录`typings`。需要调用游戏内部函数时，`typings`目录下的pyi可以提供类型提示。
+
+## 进阶教程
+
+一些功能的实现可能需要hook游戏内部函数，游戏自带的`LawnMod`可实现这个功能。
+
+主要有两种方式：
+
+1. 使用`LawnMod.MonoModUtils.HookTo`装饰器，此时游戏会调用被装饰的Python函数而不是内部函数。此类钩子只能挂一次
+
+2. 使用`LawnMod.MonoModUtils.AsAction`装饰器，作用是把函数转为类方法，然后用`LawnMod.MonoModUtils.On`的+运算符。这类钩子能挂多次
+
+注意被包装函数的第一个参数是原方法。如果是成员方法，第二个参数是对象，后续是类方法的参数；如果是静态方法，则没有对象参数。
+
+具体写法详见`cheat.py`以及`pyvz/__init__.py`。
 
 ## 参考资料
 
@@ -79,9 +97,15 @@ TAS框架的模块是pyvz，编写脚本先要import这个模块。
 
 1. 游戏实现python模组的代码 https://github.com/rspforhp/PVZdotnet-ready-to-mod/blob/master/LawnModExtension/MonoModUtils.cs
 
-2. 游戏脚本语言IronPython的文档 https://ironpython.pythonlang.cn/documentation/dotnet/
+2. 游戏模组脚本语言IronPython的文档 https://ironpython.pythonlang.cn/documentation/dotnet/
 
 3. 游戏实现模组对游戏内容修改的框架MonoMod https://github.com/MonoMod/MonoMod/tree/reorganize
 
 4. C#反编译工具ILSpy https://github.com/icsharpcode/ILSpy
+
+5. 从C#动态库生成Python存根文件的工具PythonNetStubGenerator https://www.nuget.org/packages/PythonNetStubGenerator.Tool/
+
+6. 植物大战僵尸原版键控框架AvZ https://github.com/vector-wlc/AsmVsZombies
+
+7. 植物大战僵尸原版键控框架pyvz https://pvz.tools/scripts/
 

@@ -1,5 +1,6 @@
 """
 自动通关老虎机
+理论上只需要转出四个三阳光便可通关
 """
 import sys
 import os
@@ -11,6 +12,7 @@ import Sexy
 from pyvz import *
 
 # 老虎机永远三阳光。必须要用完整的SeedType类型、不能用int。类方法、第一个参数是对象
+# 理论上可以通过操纵随机数，或者凭运气达到同样的效果，这里就直接设置卡片了
 @LawnMod.MonoModUtils.HookTo(Lawn.SeedPacket.PickNextSlotMachineSeed)
 def hook_seedpacket_picknextslotmachineseed(action, seed_packet: Lawn.SeedPacket):
     seed_packet.mSlotMachiningNextSeed = Lawn.SeedType.SlotMachineSun

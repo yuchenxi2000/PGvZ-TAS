@@ -20,15 +20,15 @@ auto_collector = script_manager.Register(AutoCollect, runmode=ScriptRunMode.FORE
 
 # 键控钩子。每帧运行一次
 # @LawnMod.MonoModUtils.HookTo(Lawn.LawnApp.UpdateFrames)
-# def hook_lawnapp_updateframes(action, lawnapp: Lawn.LawnApp):
+# def hook_lawnapp_updateframes(orig, lawnapp: Lawn.LawnApp):
 #     # 设置全局变量
 #     gvar.Set(lawnapp)
 #     # 管理脚本
 #     script_manager.Manage()
 #     # 原先调用
-#     action(lawnapp)
+#     orig(lawnapp)
 
-# 这种更好些，相互不冲突。LawnMod.MonoModUtils.HookTo不能挂多个钩子
+# 下面这种实现方式更好些，相互不冲突。用LawnMod.MonoModUtils.HookTo，就不能挂多个钩子
 @LawnMod.MonoModUtils.AsAction(Lawn.LawnApp)  # type: ignore
 def hook_lawnapp_updateframes(orig, lawnapp: Lawn.LawnApp):
     # 设置全局变量
