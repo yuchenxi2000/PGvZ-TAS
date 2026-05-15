@@ -36,24 +36,24 @@
                     <el-col :span="8">
                         <el-card shadow="hover" class="command-card">
                             <template #header>阳光金币</template>
-                            <!-- <el-button type="primary" @click="send('player.set_health(999)')">生命 +999</el-button>
-                            <el-button type="warning" @click="send('player.add_gold(5000)')">金币 +5000</el-button> -->
-                            <!-- <el-divider /> -->
                             <el-row>
                                 <el-button type="primary" style="margin-top:8px"
                                     @click="send(`gvar.gboard.mSunMoney = ${sunValue}`)">设置阳光</el-button>
                                 <el-input-number v-model="sunValue" :min="0" :max="9990" size="small" />
                             </el-row>
                             <el-row>
-                                <el-button type="warning"
+                                <el-button type="warning" style="margin-top:8px"
                                     @click="send(`gvar.glawnapp.mPlayerInfo.mCoins = ${moneyValue}`)">设置金币</el-button>
                                 <el-input-number v-model="moneyValue" :min="0" :max="999999" size="small" />
                             </el-row>
                             <el-row>
-                                <el-button type="primary" @click="send('gvar.glawnapp.KillDialog(19)\ngvar.gboard.FadeOutLevel()')">直接过关</el-button>
+                                <el-button type="warning" style="margin-top:8px"
+                                    @click="send(`gvar.glawnapp.mPlayerInfo.mChallengeRecords[48] = ${treeHeight}`)">智慧树高度</el-button>
+                                <el-input-number v-model="treeHeight" :min="0" :max="2147483647" size="small" />
                             </el-row>
                             <el-row>
-                                <el-button type="primary" @click="send('cheat_option.FailImmediately(Lawn.ZombieType.Normal)')">直接失败</el-button>
+                                <el-button type="primary" style="margin-top:8px" @click="send('gvar.glawnapp.KillDialog(19)\ngvar.gboard.FadeOutLevel()')">直接过关</el-button>
+                                <el-button type="primary" style="margin-top:8px" @click="send('cheat_option.FailImmediately(Lawn.ZombieType.Normal)')">直接失败</el-button>
                             </el-row>
                         </el-card>
                     </el-col>
@@ -65,15 +65,23 @@
                             <el-checkbox v-model="freePlant" @change="SetFreePlant">植物免费</el-checkbox>
                             <el-checkbox v-model="noCooldown" @change="SetNoCooldown">无冷却种植</el-checkbox>
                             <el-checkbox v-model="plantAnyWhere" @change="SetPlantAnyWhere">随意种植</el-checkbox>
+                            <el-checkbox v-model="conveyorNoCooling" @change="SetConveyorNoCooling">连续传送带</el-checkbox>
                             <el-checkbox v-model="plantNoDie" @change="SetPlantNoDie">植物无敌</el-checkbox>
+                            <el-checkbox v-model="zombieNoDie" @change="SetZombieNoDie">僵尸无敌</el-checkbox>
                             <el-checkbox v-model="wontLose" @change="SetWontLose">房主无敌</el-checkbox>
                         </el-card>
                     </el-col>
                     <el-col :span="8">
                         <el-card shadow="hover" class="command-card">
-                            <template #header>常用修改2</template>
+                            <template #header>特性修改</template>
                             <el-checkbox v-model="disableTalisman" @change="DisableTalisman">天尸不得施法</el-checkbox>
                             <el-checkbox v-model="disableNinja" @change="DisableNinja">女忍者显形</el-checkbox>
+                            <el-checkbox v-model="diamondPhonograph" @change="SetDiamondPhonograph">全屏留声机</el-checkbox>
+                            <el-checkbox v-model="cobNoCooling" @change="SetCobNoCooling">玉米炮无冷却</el-checkbox>
+                            <el-checkbox v-model="featureThreePeater" @change="SetFeatureThreePeater">三线边路加强</el-checkbox>
+                            <el-checkbox v-model="butterPult" @change="SetButterPult">黄油投手</el-checkbox>
+                            <el-checkbox v-model="doubleGatlingpea" @change="SetDoubleGatlingpea">机枪八颗豆</el-checkbox>
+                            <el-checkbox v-model="fullAreaGloomshroom" @change="SetFullAreaGloomshroom">全屏忧郁菇</el-checkbox>
                         </el-card>
                     </el-col>
                 </el-row>
@@ -202,6 +210,7 @@
                         <el-card shadow="hover" class="command-card">
                             <template #header>关卡修改</template>
                             <el-checkbox v-model="noFog" @change="SetNoFog">移除迷雾</el-checkbox>
+                            <el-checkbox v-model="transScaryPot" @change="SetTransScaryPot">罐子透视</el-checkbox>
                             <el-checkbox v-model="visibleGhoul" @change="SetVisibleGhoul">隐形僵尸显形</el-checkbox>
                             <el-checkbox v-model="noThunder" @change="SetNoThunder">暴风雨不瞎眼</el-checkbox>
                         </el-card>
@@ -315,7 +324,7 @@
                     { label: '泡椒', value: 'PickledPepper' },
                     { label: '火蘑菇', value: 'FireShroom' },
                     { label: '龙舌兰', value: 'Agave' },
-                    { label: '女王', value: 'Endoflame' },
+                    { label: '火红莲', value: 'Endoflame' },
                     { label: '模仿者', value: 'Imitater' },
                     { label: '爆炸坚果', value: 'ExplodeONut' },
                     // { label: '', value: 'SeedsInChooserCount' },
@@ -434,6 +443,8 @@
                 const noCooldown = ref(false);
                 const sunValue = ref(9990);
                 const moneyValue = ref(999999);
+                const treeHeight = ref(1000);
+                const conveyorNoCooling = ref(false);
                 const visibleGhoul = ref(false);
                 const noThunder = ref(false);
                 const noFog = ref(false);
@@ -441,8 +452,16 @@
                 const disableNinja = ref(false);
                 const freePlant = ref(false);
                 const plantNoDie = ref(false);
+                const zombieNoDie = ref(false);
                 const plantAnyWhere = ref(false);
                 const wontLose = ref(false);
+                const cobNoCooling = ref(false);
+                const transScaryPot = ref(false);
+                const diamondPhonograph = ref(false);
+                const featureThreePeater = ref(false);
+                const butterPult = ref(false);
+                const doubleGatlingpea = ref(false);
+                const fullAreaGloomshroom = ref(false);
                 const selectedSeedType = ref(seedTypes[0].value);
                 const selectedZombieType = ref(zombieTypes[0].value);
                 const selectedPacketIdx = ref(packetIdx[0].value);
@@ -450,17 +469,9 @@
                 const selectedCol = ref(-1);
                 const isImitater = ref(false);
                 const autoCollect = ref(true);
-                // const selectedTime = ref('morning');
                 const lastResult = reactive({ ok: true, text: '等待指令...' });
-
                 const customCode = ref('');
                 const customCodeError = ref('');
-
-                // const quickItems = [
-                //     { label: '黄金剑', code: '黄金剑' },
-                //     { label: '治疗药水', code: '治疗药水' },
-                //     { label: '魔法卷轴', code: '魔法卷轴' },
-                // ];
 
                 let ws = null;
 
@@ -488,7 +499,6 @@
                             if (data.statuscode === 0) {
                                 lastResult.ok = true;
                                 lastResult.text = data.result || '执行成功';
-                                // lastResult.text = event.data;
                             } else {
                                 lastResult.ok = false;
                                 lastResult.text = data.errortype || '未知错误';
@@ -526,11 +536,20 @@
                 function SetPlantNoDie(val) {
                     send(`cheat_option.plantNoDie = ${val ? 'True' : 'False'}`);
                 }
+                function SetZombieNoDie(val) {
+                    send(`cheat_option.zombieNoDie = ${val ? 'True' : 'False'}`);
+                }
                 function SetPlantAnyWhere(val) {
                     send(`cheat_option.plantAnyWhere = ${val ? 'True' : 'False'}`);
                 }
                 function SetWontLose(val) {
                     send(`cheat_option.wontLose = ${val ? 'True' : 'False'}`);
+                }
+                function SetConveyorNoCooling(val) {
+                    send(`cheat_option.conveyorNoCooling = ${val ? 'True' : 'False'}`)
+                }
+                function SetCobNoCooling(val) {
+                    send(`cheat_option.cobNoCooling = ${val ? 'True' : 'False'}`)
                 }
                 function DisableTalisman(val) {
                     send(`cheat_option.disableTalisman = ${val ? 'True' : 'False'}`);
@@ -544,14 +563,29 @@
                 function SetNoThunder(val) {
                     send(`cheat_option.noThunder = ${val ? 'True' : 'False'}`);
                 }
-                // function setTime(val) {
-                //     send(`world.set_time('${val}')`);
-                // }
                 function SetNoCooldown(val) {
                     send(`gvar.glawnapp.mEasyPlantingCheat = ${val ? 'True' : 'False'}`);
                 }
                 function SetNoFog(val) {
                     send(`cheat_option.noFog = ${val ? 'True' : 'False'}`);
+                }
+                function SetTransScaryPot(val) {
+                    send(`cheat_option.transScaryPot = ${val ? 'True' : 'False'}`)
+                }
+                function SetDiamondPhonograph(val) {
+                    send(`cheat_option.diamondPhonograph = ${val ? 'True' : 'False'}`)
+                }
+                function SetFeatureThreePeater(val) {
+                    send(`cheat_option.featureThreePeater = ${val ? 'True' : 'False'}`)
+                }
+                function SetButterPult(val) {
+                    send(`cheat_option.butterPult = ${val ? 'True' : 'False'}`)
+                }
+                function SetDoubleGatlingpea(val) {
+                    send(`cheat_option.doubleGatlingpea = ${val ? 'True' : 'False'}`)
+                }
+                function SetFullAreaGloomshroom(val) {
+                    send(`cheat_option.fullAreaGloomshroom = ${val ? 'True' : 'False'}`)
                 }
                 function sendCustomCode() {
                     if (!customCode.value.trim()) {
@@ -572,6 +606,8 @@
                     connected,
                     statusText,
                     activeTab,
+                    treeHeight,
+                    cobNoCooling,
                     autoCollect,
                     runBackground,
                     seedTypes,
@@ -593,13 +629,19 @@
                     sunValue,
                     moneyValue,
                     plantNoDie,
+                    zombieNoDie,
                     plantAnyWhere,
                     wontLose,
+                    transScaryPot,
+                    conveyorNoCooling,
+                    diamondPhonograph,
+                    featureThreePeater,
+                    butterPult,
+                    doubleGatlingpea,
+                    fullAreaGloomshroom,
                     selectedSeedType,
                     selectedZombieType,
-                    // selectedTime,
                     lastResult,
-                    // quickItems,
                     send,
                     SetAutoCollect,
                     SetRunBackground,
@@ -608,13 +650,20 @@
                     SetFreePlant,
                     SetNoCooldown,
                     SetPlantNoDie,
+                    SetZombieNoDie,
                     SetPlantAnyWhere,
                     SetWontLose,
+                    SetCobNoCooling,
                     SetVisibleGhoul,
                     SetNoThunder,
                     SetNoFog,
-                    // selectPlant,
-                    // setTime,
+                    SetTransScaryPot,
+                    SetConveyorNoCooling,
+                    SetDiamondPhonograph,
+                    SetFeatureThreePeater,
+                    SetButterPult,
+                    SetDoubleGatlingpea,
+                    SetFullAreaGloomshroom,
                     customCode,
                     customCodeError,
                     sendCustomCode,

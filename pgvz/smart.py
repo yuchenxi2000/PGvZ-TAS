@@ -10,6 +10,9 @@ def AutoCollect():
     cursor_obj = board.mCursorObject.mCursorType
     if cursor_obj == Lawn.CursorType.Normal or cursor_obj == Lawn.CursorType.Hammer:
         for coin in IterAliveCoins():
+            # 避免一直点掉落的卡片，真的很吵！
+            if coin.mType == Lawn.CoinType.UsableSeedPacket:
+                continue
             # 计算点击位置，根据Lawn.Coin.MouseHitTest
             num = -60 if coin.mType == Lawn.CoinType.AwardPresent or coin.IsPresentWithAdvice() or coin.mType == Lawn.CoinType.PresentPlant else 0
             mX = coin.mPosX + coin.mWidth / Sexy.Constants.BoardCameraScaleMultiplier / 2.0

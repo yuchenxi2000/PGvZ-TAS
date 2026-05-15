@@ -12,12 +12,18 @@ import Sexy
 import Sexy.TodLib
 from pgvz import *
 
+# 关闭assertion，不然启动带命令行的游戏（Lawn.Console.exe）在输出过多时会卡死
+@LawnMod.MonoModUtils.HookTo(Sexy.Debug.ASSERT)
+def Debug__ASSERT(orig, value: bool):
+    return
+
 class CheatOption:
     def __init__(self) -> None:
         self.wontLose = False
         self.freePlant = False
         self.plantAnyWhere = False
         self.plantNoDie = False
+        self.zombieNoDie = False
         self.cobNoCooling = False
         self.disableTalisman = False
         self.disableNinja = False
@@ -25,6 +31,12 @@ class CheatOption:
         self.noThunder = False
         self.diamondPhonograph = False
         self.noFog = False
+        self.transScaryPot = False
+        self.conveyorNoCooling = False
+        self.featureThreePeater = False
+        self.butterPult = False
+        self.doubleGatlingpea = False
+        self.fullAreaGloomshroom = False
 
     def ConvertRange(self, row: int, col: int):
         NRow = 6 if gvar.gboard.StageHas6Rows() else 5
@@ -218,13 +230,36 @@ def Board__CanPlantAt(orig, board: Lawn.Board, gridX: int, gridY: int, seedtype:
 # 更好的自动收集，包括盆栽。PGvZ-TAS自带，只需引入pgvz模块。关闭只需把下面一句取消注释。
 # auto_collector.Off()
 
-# 传送带无冷却 TODO: 目前不太行，等我更新
-# 相关函数 Lawn.Challenge.UpdateConveyorBelt, Lawn.SeedBank.UpdateConveyorBelt
-# @LawnMod.MonoModUtils.HookTo(Lawn.SeedBank.UpdateConveyorBelt)
-# def hook_seedbank_UpdateConveyorBelt(orig, seedbank: Lawn.SeedBank):
-#     seedbank.mConveyorBeltCounter = 0
-#     for i in range(seedbank.mNumPackets):
-#         seedbank.mSeedPackets[i].mOffsetY = 0
+# 传送带无冷却
+@LawnMod.MonoModUtils.HookTo(Lawn.Challenge.UpdateConveyorBelt)
+def Challenge__UpdateConveyorBelt(orig, challenge: Lawn.Challenge):
+    if cheat_option.conveyorNoCooling:
+        challenge.mConveyorBeltCounter = 0
+        orig(challenge)
+        seedbank = challenge.mBoard.mSeedBank
+        for i in range(seedbank.mNumPackets):
+            seedbank.mSeedPackets[i].mOffsetY = 0
+    else:
+        orig(challenge)
+
+# 僵尸无敌
+# 魅惑不算僵尸死了所以不管
+@LawnMod.MonoModUtils.HookTo(Lawn.Zombie.TakeDamage)
+def Zombie__TakeDamage(orig, zombie: Lawn.Zombie, theDamage: int, theDamageFlags: int):
+    if not cheat_option.zombieNoDie:
+        orig(zombie, theDamage, theDamageFlags)
+@LawnMod.MonoModUtils.HookTo(Lawn.Zombie.ApplyBurn)
+def Zombie__ApplyBurn(orig, zombie: Lawn.Zombie):
+    if not cheat_option.zombieNoDie:
+        orig(zombie)
+@LawnMod.MonoModUtils.HookTo(Lawn.Zombie.DieWithLoot)
+def Zombie__DieWithLoot(orig, zombie: Lawn.Zombie):
+    if cheat_option.zombieNoDie:
+        if zombie.draggedByTangleKelp:
+            zombie.draggedByTangleKelp = False
+            zombie.mZombieHeight = Lawn.ZombieHeight.InToPool
+    else:
+        orig(zombie)
 
 # 植物免疫啃食
 @LawnMod.MonoModUtils.HookTo(Lawn.Zombie.EatPlant)
@@ -280,11 +315,74 @@ def Challenge__GraveDangerSpawnGraveAt(orig, challenge: Lawn.Challenge, x: int, 
     else:
         orig(challenge, x, y)
 
-# 玉米炮无冷却
-@LawnMod.MonoModUtils.HookTo(Lawn.Plant.UpdateCobCannon)
-def Plant__UpdateCobCannon(orig, plant: Lawn.Plant):
+# 钢地刺不死
+@LawnMod.MonoModUtils.HookTo(Lawn.Plant.SpikeRockTakeDamage)
+def Plant__SpikeRockTakeDamage(orig, plant: Lawn.Plant):
+    if cheat_option.plantNoDie:
+        plant.mApp.ReanimationGet(plant.mBodyReanimID)
+        plant.SpikeweedAttack()
+    else:
+        orig(plant)
+
+# 1. 地刺不死
+# 2. 全屏忧郁菇
+@LawnMod.MonoModUtils.HookTo(Lawn.Plant.DoRowAreaDamage)
+def Plant__DoRowAreaDamage(orig, plant: Lawn.Plant, theDamage: int, theDamageFlags: int):
+    if plant.mSeedType == Lawn.SeedType.Spikeweed and cheat_option.plantNoDie:
+        damageRangeFlags = plant.GetDamageRangeFlags(Lawn.PlantWeapon.Primary)
+        plantAttackRect = plant.GetPlantAttackRect(Lawn.PlantWeapon.Primary)
+        for i in range(plant.mBoard.mZombies.Count):
+            zombie = plant.mBoard.mZombies[i]
+            if zombie.mDead:
+                continue
+            num = zombie.mRow - plant.mRow
+            if zombie.mZombieType == Lawn.ZombieType.Boss:
+                num = 0
+            if num != 0:
+                continue
+            if zombie.mOnHighGround != plant.IsOnHighGround() or not zombie.EffectedByDamage(damageRangeFlags):
+                continue
+            zombieRect = zombie.GetZombieRect()
+            if Lawn.GameConstants.GetRectOverlap(plantAttackRect, zombieRect) <= 0:
+                continue
+            theDamage2 = theDamage
+            if zombie.mZombieType in [Lawn.ZombieType.Zamboni, Lawn.ZombieType.Catapult] and Sexy.TodLib.TodCommon.TestBit(theDamageFlags, 5):
+                theDamage2 = 1800
+            zombie.TakeDamage(theDamage2, theDamageFlags)
+            plant.mApp.PlayFoley(Sexy.TodLib.FoleyType.Splat)
+        return
+    elif plant.mSeedType == Lawn.SeedType.Gloomshroom and cheat_option.fullAreaGloomshroom:
+        for i in range(plant.mBoard.mZombies.Count):
+            zombie = plant.mBoard.mZombies[i]
+            if zombie.mDead:
+                continue
+            zombie.TakeDamage(theDamage, theDamageFlags)
+            plant.mApp.PlayFoley(Sexy.TodLib.FoleyType.Splat)
+        return
+    orig(plant, theDamage, theDamageFlags)
+
+# 全屏忧郁菇
+@LawnMod.MonoModUtils.HookTo(Lawn.Plant.FindTargetZombie)
+def Plant__FindTargetZombie(orig, plant: Lawn.Plant, theRow: int, thePlantWeapon: Lawn.PlantWeapon):
+    if plant.mSeedType == Lawn.SeedType.Gloomshroom and cheat_option.fullAreaGloomshroom:
+        damageRangeFlags = plant.GetDamageRangeFlags(thePlantWeapon)
+        for i in range(plant.mBoard.mZombies.Count):
+            theZombieItem = plant.mBoard.mZombies[i]
+            if theZombieItem.mDead:
+                continue
+            if not theZombieItem.EffectedByDamage(damageRangeFlags):
+                continue
+            return theZombieItem
+        return None
+    return orig(plant, theRow, thePlantWeapon)
+
+# 玉米炮无冷却, 僵尸无敌修改大嘴花
+@LawnMod.MonoModUtils.HookTo(Lawn.Plant.Update)
+def Plant__Update(orig, plant: Lawn.Plant):
     if plant.mState == Lawn.PlantState.CobcannonArming and cheat_option.cobNoCooling:
         plant.mStateCountdown = 0
+    elif plant.mState == Lawn.PlantState.ChomperBitingGotOne and cheat_option.zombieNoDie:
+        plant.mState = Lawn.PlantState.ChomperBitingMissed
     orig(plant)
 
 # 天尸不得施法
@@ -327,7 +425,7 @@ def Challenge__IsStormyNightPitchBlack(orig, challenge: Lawn.Challenge):
 # 全屏留声机
 @LawnMod.MonoModUtils.HookTo(Lawn.ZenGarden.DoFeedingTool)
 def ZenGarden__DoFeedingTool(orig, zengarden: Lawn.ZenGarden, x: int, y: int, theToolType: Lawn.GridItemState):
-    if theToolType == Lawn.GridItemState.ZenToolPhonograph:
+    if theToolType == Lawn.GridItemState.ZenToolPhonograph and cheat_option.diamondPhonograph:
         for i in range(zengarden.mBoard.mPlants.Count):
             plant = zengarden.mBoard.mPlants[i]
             if not plant.mDead and zengarden.mBoard.GetTopPlantAt(plant.mPlantCol, plant.mRow, Lawn.TopPlant.ZenToolOrder) == plant:
@@ -342,3 +440,96 @@ def ZenGarden__DoFeedingTool(orig, zengarden: Lawn.ZenGarden, x: int, y: int, th
 def Board__DrawFog(orig, board: Lawn.Board, graphics: Sexy.Graphics):
     if not cheat_option.noFog:
         orig(board, graphics)
+
+# 罐子透视
+@LawnMod.MonoModUtils.HookTo(Lawn.GridItem.UpdateScaryPot)
+def GridItem__UpdateScaryPot(orig, griditem: Lawn.GridItem):
+    orig(griditem)
+    if cheat_option.transScaryPot:
+        griditem.mTransparentCounter = 50
+
+# 三线射手不浪费子弹
+
+# 设置子弹偏移量，否则两个叠一起看不清
+def ThreePeaterAddProjectile(plant: Lawn.Plant, theRow: int, offset: int):
+    projectileType = Lawn.ProjectileType.Pea
+    plant.mApp.PlayFoley(Sexy.TodLib.FoleyType.Throw)
+    num2 = plant.mY + 10
+    num = plant.mX + 45
+    if plant.mBoard.GetFlowerPotAt(plant.mPlantCol, plant.mRow) is not None:
+        num2 -= 5
+    num2 += offset
+    projectile = plant.mBoard.AddProjectile(num, num2, plant.mRenderOrder + -1, theRow, projectileType)
+    projectile.mDamageRangeFlags = plant.GetDamageRangeFlags(Lawn.PlantWeapon.Primary)
+    projectile.mFromPlant = plant.mSeedType
+
+# 不论上下行有无僵尸，都播放射击动画。否则无法射击
+@LawnMod.MonoModUtils.HookTo(Lawn.Plant.LaunchThreepeater)
+def Plant__LaunchThreepeater(orig, plant: Lawn.Plant):
+    if cheat_option.featureThreePeater:
+        theRow = plant.mRow - 1
+        theRow2 = plant.mRow + 1
+        flag = False
+        if plant.FindTargetZombie(plant.mRow, Lawn.PlantWeapon.Primary) is not None:
+            flag = True
+        elif plant.mBoard.RowCanHaveZombies(theRow) and plant.FindTargetZombie(theRow, Lawn.PlantWeapon.Primary) is not None:
+            flag = True
+        elif plant.mBoard.RowCanHaveZombies(theRow2) and plant.FindTargetZombie(theRow2, Lawn.PlantWeapon.Primary) is not None:
+            flag = True
+        if flag:
+            reanimation = plant.mApp.ReanimationGet(plant.mHeadReanimID)
+            reanimation2 = plant.mApp.ReanimationGet(plant.mHeadReanimID2)
+            reanimation3 = plant.mApp.ReanimationGet(plant.mHeadReanimID3)
+            # if plant.mBoard.RowCanHaveZombies(theRow2):
+            reanimation.StartBlend(10)
+            reanimation.mLoopType = Sexy.TodLib.ReanimLoopType.PlayOnceAndHold
+            reanimation.mAnimRate = 20.0
+            reanimation.SetFramesForLayer(Lawn.GlobalMembersReanimIds.ReanimTrackId_anim_shooting1)
+            reanimation2.StartBlend(10)
+            reanimation2.mLoopType = Sexy.TodLib.ReanimLoopType.PlayOnceAndHold
+            reanimation2.mAnimRate = 20.0
+            reanimation2.SetFramesForLayer(Lawn.GlobalMembersReanimIds.ReanimTrackId_anim_shooting2)
+            # if plant.mBoard.RowCanHaveZombies(theRow):
+            reanimation3.StartBlend(10)
+            reanimation3.mLoopType = Sexy.TodLib.ReanimLoopType.PlayOnceAndHold
+            reanimation3.mAnimRate = 20.0
+            reanimation3.SetFramesForLayer(Lawn.GlobalMembersReanimIds.ReanimTrackId_anim_shooting3)
+            plant.mShootingCounter = 35
+    else:
+        orig(plant)
+
+# 1. 三线射手加强：如果上下行不能出僵尸，子弹设置到本行
+# 2. 玉米锁黄油
+# 3. 机枪射手8颗豌豆
+@LawnMod.MonoModUtils.HookTo(Lawn.Plant.UpdateShooting)
+def Plant__UpdateShooting(orig, plant: Lawn.Plant):
+    if plant.mSeedType == Lawn.SeedType.Threepeater and cheat_option.featureThreePeater:
+        if plant.mShootingCounter - 1 == 1:
+            theRow = plant.mRow - 1
+            theRow2 = plant.mRow + 1
+            aLevelRow = 6 if plant.mBoard.StageHas6Rows() else 5
+            reanimation = plant.mApp.ReanimationTryToGet(plant.mHeadReanimID)
+            reanimation2 = plant.mApp.ReanimationTryToGet(plant.mHeadReanimID2)
+            reanimation3 = plant.mApp.ReanimationTryToGet(plant.mHeadReanimID3)
+            if reanimation.mLoopType == Sexy.TodLib.ReanimLoopType.PlayOnceAndHold:
+                if theRow2 < aLevelRow:
+                    plant.Fire(None, theRow2, Lawn.PlantWeapon.Primary)  # type: ignore
+                else:
+                    ThreePeaterAddProjectile(plant, plant.mRow, 20)
+            if reanimation2.mLoopType == Sexy.TodLib.ReanimLoopType.PlayOnceAndHold:
+                plant.Fire(None, plant.mRow, Lawn.PlantWeapon.Primary)  # type: ignore
+            if reanimation3.mLoopType == Sexy.TodLib.ReanimLoopType.PlayOnceAndHold:
+                if theRow >= 0:
+                    plant.Fire(None, theRow, Lawn.PlantWeapon.Primary)  # type: ignore
+                else:
+                    ThreePeaterAddProjectile(plant, plant.mRow, -20)
+            plant.mShootingCounter -= 1
+            return
+    elif plant.mSeedType == Lawn.SeedType.Kernelpult and cheat_option.butterPult:
+        plant.mState = Lawn.PlantState.KernelpultButter
+    elif plant.mSeedType == Lawn.SeedType.Gatlingpea and cheat_option.doubleGatlingpea:
+        if plant.mShootingCounter - 1 in [18, 26, 35, 43, 51, 60, 68, 76]:
+            plant.Fire(None, plant.mRow, Lawn.PlantWeapon.Primary)  # type: ignore
+            plant.mShootingCounter -= 1
+            return
+    orig(plant)
