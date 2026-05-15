@@ -19,25 +19,15 @@ script_manager = ScriptManager()
 auto_collector = script_manager.Register(AutoCollect, runmode=ScriptRunMode.FOREVER)
 
 # 键控钩子。每帧运行一次
-# @LawnMod.MonoModUtils.HookTo(Lawn.LawnApp.UpdateFrames)
-# def hook_lawnapp_updateframes(orig, lawnapp: Lawn.LawnApp):
-#     # 设置全局变量
-#     gvar.Set(lawnapp)
-#     # 管理脚本
-#     script_manager.Manage()
-#     # 原先调用
-#     orig(lawnapp)
-
-# 下面这种实现方式更好些，相互不冲突。用LawnMod.MonoModUtils.HookTo，就不能挂多个钩子
-@LawnMod.MonoModUtils.AsAction(Lawn.LawnApp)  # type: ignore
-def hook_lawnapp_updateframes(orig, lawnapp: Lawn.LawnApp):
+@LawnMod.MonoModUtils.As(Lawn.LawnApp.UpdateFrames)
+def LawnApp__UpdateFrames(orig, lawnapp: Lawn.LawnApp):
     # 设置全局变量
     gvar.Set(lawnapp)
     # 管理脚本
     script_manager.Manage()
-    return orig(lawnapp)
+    orig(lawnapp)
 
-LawnMod.MonoModUtils.On.Lawn.LawnApp.UpdateFrames += hook_lawnapp_updateframes  # type: ignore
+LawnMod.MonoModUtils.On.Lawn.LawnApp.UpdateFrames += LawnApp__UpdateFrames  # type: ignore
 
 __all__ = [
     "Card", "Shovel",
@@ -45,6 +35,7 @@ __all__ = [
     "gvar",
     "ScriptManager", "ScriptRunMode", "ScriptType", "ScriptObj", "ScriptConf",
     "Delay", "Prejudge", "Until",
-    "PixelToGrid", "GridToPixel", "MouseDragGrid", "SeedTypeNone", "SetPlantOnBoard", "IterAliveZombies", "IterAlivePlants", "IterAliveCoins",
+    "PixelToGrid", "GridToPixel", "MouseDragGrid", "SeedTypeNone", "SetPlantOnBoard", 
+    "IterAliveZombies", "IterAlivePlants", "IterAliveCoins", "IterAliveGridItems",
     "pgvz_version", "script_manager", "auto_collector",
 ]

@@ -1,6 +1,6 @@
 # PGvZ-TAS
 
-植物娘大战僵尸键控框架 Tool-Assisted Superplay framework for PlantsGirls vs. Zombies
+植物娘大战僵尸键控框架 Tool-Assisted Superplay framework for PlantGirls vs. Zombies，以及简易修改器
 
 by yuchenxi2000
 
@@ -12,13 +12,17 @@ by yuchenxi2000
 
 ## 使用方法
 
-把本仓库下载下来，然后把里面的所有文件放到游戏的mods目录下。注意游戏只会加载mods目录下以.py作为后缀的文件，因此脚本必须直接放mods目录下。pgvz文件夹直接放mods目录下，里面文件不要动。
+把本仓库下载下来，然后把里面的所有文件放到游戏的`mods`目录下。注意游戏只会加载`mods`目录下以`.py`作为后缀的文件，因此脚本必须直接放`mods`目录下。`pgvz`文件夹直接放`mods`目录下，里面文件不要动。
 
-对于PC版游戏，默认的mods目录是C:\\Users\\你的用户名\\AppData\\Roaming\\ZBC\\PlantGirlsVsZombies\\mods
+对于PC版游戏，默认的`mods`目录是`C:\Users\你的用户名\AppData\Roaming\ZBC\PlantGirlsVsZombies\mods`
 
-如果不生效，可能的原因是没有开启模组功能，你需要编辑一下配置文件C:\\Users\\你的用户名\\AppData\\Roaming\\ZBC\\PlantGirlsVsZombies\\user_config.json，把ironpython_enabled这个选项改成true
+如果不生效，可能的原因是没有开启模组功能，你需要编辑一下配置文件`C:\Users\你的用户名\AppData\Roaming\ZBC\PlantGirlsVsZombies\user_config.json`，把`ironpython_enabled`这个选项改成`true`
 
 本仓库包含键控框架模块`pgvz`，以及几个可直接作为模组加载的示例脚本。
+
+## 修改器使用方法
+
+按上节方法，将`pgvz`文件夹和`cheat.py`放到`mods`目录下，然后双击`cheat-gui.html`开始使用
 
 ## 脚本编写教程
 
@@ -26,7 +30,7 @@ TAS框架的模块是pgvz，编写脚本先要import这个模块。
 
 接口和植物大战僵尸原版的[pyvz](https://pvz.tools/scripts/)、[AvZ](https://github.com/vector-wlc/AsmVsZombies)框架类似，如果熟悉这两个框架会容易一些。因为接口类似，建议先阅读[pyvz](https://pvz.tools/scripts/)的教程。
 
-由于时间精力关系，本模块没有实现所有功能。本模块实现的主要功能有种植物`Card`、铲植物`Shovel`、发射玉米炮`CobManager.Fire`、时间相关操作`Delay``Prejudge``Until`，以及一些常用操作，比如迭代所有存活植物/僵尸/物品`IterAliveZombies``IterAlivePlants``IterAliveCoins`。
+由于时间精力关系，本模块没有实现所有功能。本模块实现的主要功能有种植物`Card`、铲植物`Shovel`、发射玉米炮`CobManager.Fire`、时间相关操作`Delay`,`Prejudge`,`Until`，以及一些常用操作，比如迭代所有存活植物/僵尸/物品`IterAliveZombies`,`IterAlivePlants`,`IterAliveCoins`等。
 
 下面介绍和pyvz、AvZ的异同：
 
@@ -85,9 +89,9 @@ TAS框架的模块是pgvz，编写脚本先要import这个模块。
 
 主要有两种方式：
 
-1. 使用`LawnMod.MonoModUtils.HookTo`装饰器，此时游戏会调用被装饰的Python函数而不是内部函数。此类钩子只能挂一次
+1. 使用`LawnMod.MonoModUtils.HookTo`装饰器
 
-2. 使用`LawnMod.MonoModUtils.AsAction`装饰器，作用是把函数转为类方法，然后用`LawnMod.MonoModUtils.On`的+运算符。这类钩子能挂多次
+2. 使用`LawnMod.MonoModUtils.As`装饰器，然后用`LawnMod.MonoModUtils.On`的+运算符
 
 注意被包装函数的第一个参数是原方法。如果是成员方法，第二个参数是对象，后续是类方法的参数；如果是静态方法，则没有对象参数。
 

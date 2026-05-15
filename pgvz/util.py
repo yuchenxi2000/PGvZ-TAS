@@ -54,3 +54,10 @@ def IterAliveCoins():
         coin = board.mCoins[i]
         if not coin.mDead and not coin.mIsBeingCollected:
             yield coin
+
+def IterAliveGridItems():
+    board = gvar.gboard
+    for i in range(board.mGridItems.Count):
+        grid_item = board.mGridItems[i]
+        if not grid_item.mDead:
+            yield grid_item

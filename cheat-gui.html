@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>植物娘修改器</title>
+    <!-- Element Plus CSS -->
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/element-plus/2.9.1/index.css">
+    <style>
+        body {
+            margin: 20px;
+            background: #f5f7fa;
+        }
+
+        .status-bar {
+            margin-bottom: 16px;
+        }
+
+        .command-card {
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <!-- 连接状态栏 -->
+        <el-alert :title="statusText" :type="connected ? 'success' : 'error'" :closable="false" show-icon
+            class="status-bar" />
+
+        <!-- 使用标签页分类功能 -->
+        <el-tabs v-model="activeTab" type="border-card">
+            <!-- 角色修改 -->
+            <el-tab-pane label="👤 基础" name="player">
+                <el-row :gutter="12">
+                    <el-col :span="8">
+                        <el-card shadow="hover" class="command-card">
+                            <template #header>阳光金币</template>
+                            <!-- <el-button type="primary" @click="send('player.set_health(999)')">生命 +999</el-button>
+                            <el-button type="warning" @click="send('player.add_gold(5000)')">金币 +5000</el-button> -->
+                            <!-- <el-divider /> -->
+                            <el-row>
+                                <el-button type="primary" style="margin-top:8px"
+                                    @click="send(`gvar.gboard.mSunMoney = ${sunValue}`)">设置阳光</el-button>
+                                <el-input-number v-model="sunValue" :min="0" :max="9990" size="small" />
+                            </el-row>
+                            <el-row>
+                                <el-button type="warning"
+                                    @click="send(`gvar.glawnapp.mPlayerInfo.mCoins = ${moneyValue}`)">设置金币</el-button>
+                                <el-input-number v-model="moneyValue" :min="0" :max="999999" size="small" />
+                            </el-row>
+                            <el-row>
+                                <el-button type="primary" @click="send('gvar.glawnapp.KillDialog(19)\ngvar.gboard.FadeOutLevel()')">直接过关</el-button>
+                            </el-row>
+                            <el-row>
+                                <el-button type="primary" @click="send('cheat_option.FailImmediately(Lawn.ZombieType.Normal)')">直接失败</el-button>
+                            </el-row>
+                        </el-card>
+                    </el-col>
+                    <el-col :span="8">
+                        <el-card shadow="hover" class="command-card">
+                            <template #header>常用修改</template>
+                            <el-checkbox v-model="autoCollect" @change="SetAutoCollect">自动收集</el-checkbox>
+                            <el-checkbox v-model="runBackground" @change="SetRunBackground">后台运行</el-checkbox>
+                            <el-checkbox v-model="freePlant" @change="SetFreePlant">植物免费</el-checkbox>
+                            <el-checkbox v-model="noCooldown" @change="SetNoCooldown">无冷却种植</el-checkbox>
+                            <el-checkbox v-model="plantAnyWhere" @change="SetPlantAnyWhere">随意种植</el-checkbox>
+                            <el-checkbox v-model="plantNoDie" @change="SetPlantNoDie">植物无敌</el-checkbox>
+                            <el-checkbox v-model="wontLose" @change="SetWontLose">房主无敌</el-checkbox>
+                        </el-card>
+                    </el-col>
+                    <el-col :span="8">
+                        <el-card shadow="hover" class="command-card">
+                            <template #header>常用修改2</template>
+                            <el-checkbox v-model="disableTalisman" @change="DisableTalisman">天尸不得施法</el-checkbox>
+                            <el-checkbox v-model="disableNinja" @change="DisableNinja">女忍者显形</el-checkbox>
+                        </el-card>
+                    </el-col>
+                </el-row>
+            </el-tab-pane>
+
+            <!-- 世界修改 -->
+            <el-tab-pane label="🌍 场地" name="world">
+                <el-row :gutter="12">
+                    <el-col :span="8">
+                        <el-card shadow="hover" class="command-card">
+                            <template #header>类型选择</template>
+                            <el-text class="mx-1">植物类型</el-text>
+                            <el-select v-model="selectedSeedType" filterable placeholder="选择植物">
+                                <el-option 
+                                    v-for="item in seedTypes"
+                                    :key="item.value"
+                                    :label="item.label"
+                                    :value="item.value"
+                                />
+                            </el-select>
+                            <el-text class="mx-1">僵尸类型</el-text>
+                            <el-select v-model="selectedZombieType" filterable placeholder="选择僵尸">
+                                <el-option 
+                                    v-for="item in zombieTypes"
+                                    :key="item.value"
+                                    :label="item.label"
+                                    :value="item.value"
+                                />
+                            </el-select>
+                            <el-text class="mx-1">行</el-text>
+                            <el-select v-model="selectedRow" filterable placeholder="行">
+                                <el-option 
+                                    v-for="item in selectRows"
+                                    :key="item.value"
+                                    :label="item.label"
+                                    :value="item.value"
+                                />
+                            </el-select>
+                            <el-text class="mx-1">列</el-text>
+                            <el-select v-model="selectedCol" filterable placeholder="列">
+                                <el-option 
+                                    v-for="item in selectCols"
+                                    :key="item.value"
+                                    :label="item.label"
+                                    :value="item.value"
+                                />
+                            </el-select>
+                            <el-text class="mx-1">卡槽编号</el-text>
+                            <el-select v-model="selectedPacketIdx" filterable placeholder="卡槽">
+                                <el-option 
+                                    v-for="item in packetIdx"
+                                    :key="item.value"
+                                    :label="item.label"
+                                    :value="item.value"
+                                />
+                            </el-select>
+                            <el-checkbox v-model="isImitater">模仿者</el-checkbox>
+                        </el-card>
+                    </el-col>
+                    <el-col :span="8">
+                        <el-card shadow="hover" class="command-card">
+                            <template #header>场地放置</template>
+                            <!-- <el-divider /> -->
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.PlantOnBoard(${selectedRow}, ${selectedCol}, Lawn.SeedType.${selectedSeedType}, ${isImitater ? 'True' : 'False'})`)">种植植物</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.ZombieOnBoard(${selectedRow}, ${selectedCol}, Lawn.ZombieType.${selectedZombieType})`)">召唤僵尸</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.SetSeedPacket(${selectedPacketIdx}, Lawn.SeedType.${selectedSeedType}, ${isImitater ? 'True' : 'False'})`)">换种子</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.LadderOnBoard(${selectedRow}, ${selectedCol})`)">放置梯子</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.GraveOnBoard(${selectedRow}, ${selectedCol})`)">放置墓碑</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.RakeOnBoard(${selectedRow}, ${selectedCol})`)">放置钉耙</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.GivePottedPlant(Lawn.SeedType.${selectedSeedType})`)">获得花园盆栽</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.AddLawnMower()`)">放置割草机</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.StartLawnMower()`)">启动割草机</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`gvar.gboard.mBonusLawnMowersRemaining = 2147483647`)">无限割草机</el-button>
+                        </el-card>
+                    </el-col>
+                    <el-col :span="8">
+                        <el-card shadow="hover" class="command-card">
+                            <template #header>场地移除</template>
+                            <!-- <el-divider /> -->
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.RemovePlantOnBoard()`)">移除植物</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.RemoveZombieOnBoard()`)">杀死僵尸</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.RemoveGridItemOnBoard(Lawn.GridItemType.Ladder)`)">移除梯子</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.RemoveGridItemOnBoard(Lawn.GridItemType.Gravestone)`)">移除墓碑</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.RemoveGridItemOnBoard(Lawn.GridItemType.Rake)`)">移除钉耙</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.RemoveGridItemOnBoard(Lawn.GridItemType.Crater)`)">移除弹坑</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.RemoveLawnMower()`)">移除割草机</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.OpenScaryPotterOnBoard()`)">砸开罐子</el-button>
+                            <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.RemoveGridItemOnBoard(Lawn.GridItemType.ScaryPot)`)">移除罐子</el-button>
+                        </el-card>
+                    </el-col>
+                </el-row>
+                <!-- <el-card shadow="hover" class="command-card">
+                    <template #header>时间控制</template>
+                    <el-radio-group v-model="selectedTime" @change="setTime">
+                        <el-radio-button label="morning">早晨</el-radio-button>
+                        <el-radio-button label="noon">正午</el-radio-button>
+                        <el-radio-button label="evening">傍晚</el-radio-button>
+                        <el-radio-button label="night">深夜</el-radio-button>
+                    </el-radio-group>
+                </el-card> -->
+            </el-tab-pane>
+
+            <!-- 物品生成 -->
+            <el-tab-pane label="🎒 关卡" name="items">
+                <el-row :gutter="12">
+                    <el-col :span="8">
+                        <el-card shadow="hover" class="command-card">
+                            <template #header>关卡修改</template>
+                            <el-checkbox v-model="noFog" @change="SetNoFog">移除迷雾</el-checkbox>
+                            <el-checkbox v-model="visibleGhoul" @change="SetVisibleGhoul">隐形僵尸显形</el-checkbox>
+                            <el-checkbox v-model="noThunder" @change="SetNoThunder">暴风雨不瞎眼</el-checkbox>
+                        </el-card>
+                    </el-col>
+                </el-row>
+            </el-tab-pane>
+
+            <!-- 自定义代码 -->
+            <el-tab-pane label="✏️ 自定义" name="custom">
+                <el-card shadow="hover" class="command-card">
+                    <template #header>输入 Python 代码</template>
+                    <el-row>
+                        <el-input
+                        v-model="customCode"
+                        type="textarea"
+                        :rows="5"
+                        placeholder=""
+                        clearable
+                        />
+                    </el-row>
+                    <el-row>
+                        <div style="margin-top: 12px; display: flex; align-items: center; gap: 12px;">
+                            <el-button type="primary" @click="sendCustomCode">🚀 发送执行</el-button>
+                            <el-button @click="customCode = ''">清空</el-button>
+                        </div>
+                        <div v-if="customCodeError" style="color: #f56c6c; margin-top: 8px;">
+                            ⚠️ {{ customCodeError }}
+                        </div>
+                    </el-row>
+                </el-card>
+            </el-tab-pane>
+
+        </el-tabs>
+
+        <!-- 执行反馈区 -->
+        <el-card>
+            <template #header>
+                <span>📋 执行结果</span>
+                <el-tag style="margin-left:10px" :type="lastResult.ok ? 'success' : 'danger'">
+                    {{ lastResult.ok ? '成功' : '失败' }}
+                </el-tag>
+            </template>
+            <pre>{{ lastResult.text || '等待指令...' }}</pre>
+        </el-card>
+    </div>
+
+    <!-- Vue 3 + Element Plus CDN -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/vue/3.3.4/vue.global.prod.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/element-plus/2.9.1/index.full.min.js"></script>
+
+    <script>
+        const { createApp, ref, reactive, onMounted } = Vue;
+
+        const app = createApp({
+            // 让所有组件使用中文
+            setup() {
+                // ========== 配置区 ==========
+                const SERVER_URL = 'ws://localhost:8080/Py'; // 改为你的游戏 WebSocket 地址
+
+                // ========== 状态 ==========
+                const seedTypes = [
+                    { label: '豌豆射手', value: 'Peashooter' },
+                    { label: '向日葵', value: 'Sunflower' },
+                    { label: '樱桃炸弹', value: 'Cherrybomb' },
+                    { label: '坚果墙', value: 'Wallnut' },
+                    { label: '土豆雷', value: 'Potatomine' },
+                    { label: '雪花豌豆', value: 'Snowpea' },
+                    { label: '大嘴花', value: 'Chomper' },
+                    { label: '双发射手', value: 'Repeater' },
+                    { label: '小喷菇', value: 'Puffshroom' },
+                    { label: '阳光菇', value: 'Sunshroom' },
+                    { label: '大喷菇', value: 'Fumeshroom' },
+                    { label: '墓碑吞噬者', value: 'Gravebuster' },
+                    { label: '魅惑菇', value: 'Hypnoshroom' },
+                    { label: '胆小菇', value: 'Scaredyshroom' },
+                    { label: '寒冰菇', value: 'Iceshroom' },
+                    { label: '毁灭菇', value: 'Doomshroom' },
+                    { label: '睡莲', value: 'Lilypad' },
+                    { label: '窝瓜', value: 'Squash' },
+                    { label: '三线射手', value: 'Threepeater' },
+                    { label: '缠绕水草', value: 'Tanglekelp' },
+                    { label: '火爆辣椒', value: 'Jalapeno' },
+                    { label: '地刺', value: 'Spikeweed' },
+                    { label: '火炬树桩', value: 'Torchwood' },
+                    { label: '高坚果', value: 'Tallnut' },
+                    { label: '海蘑菇', value: 'Seashroom' },
+                    { label: '路灯花', value: 'Plantern' },
+                    { label: '仙人掌', value: 'Cactus' },
+                    { label: '三叶草', value: 'Blover' },
+                    { label: '裂荚射手', value: 'Splitpea' },
+                    { label: '杨桃', value: 'Starfruit' },
+                    { label: '南瓜头', value: 'Pumpkinshell' },
+                    { label: '磁力菇', value: 'Magnetshroom' },
+                    { label: '卷心菜投手', value: 'Cabbagepult' },
+                    { label: '花盆', value: 'Flowerpot' },
+                    { label: '玉米投手', value: 'Kernelpult' },
+                    { label: '咖啡豆', value: 'InstantCoffee' },
+                    { label: '大蒜', value: 'Garlic' },
+                    { label: '莴苣', value: 'Umbrella' },
+                    { label: '金盏花', value: 'Marigold' },
+                    { label: '西瓜投手', value: 'Melonpult' },
+                    { label: '机枪射手', value: 'Gatlingpea' },
+                    { label: '双子向日葵', value: 'Twinsunflower' },
+                    { label: '忧郁蘑菇', value: 'Gloomshroom' },
+                    { label: '猫尾草', value: 'Cattail' },
+                    { label: '冰瓜', value: 'Wintermelon' },
+                    { label: '吸金磁', value: 'GoldMagnet' },
+                    { label: '钢地刺', value: 'Spikerock' },
+                    { label: '玉米加农炮', value: 'Cobcannon' },
+                    { label: '超级大嘴花', value: 'SuperChomper' },
+                    { label: '泡椒', value: 'PickledPepper' },
+                    { label: '火蘑菇', value: 'FireShroom' },
+                    { label: '龙舌兰', value: 'Agave' },
+                    { label: '女王', value: 'Endoflame' },
+                    { label: '模仿者', value: 'Imitater' },
+                    { label: '爆炸坚果', value: 'ExplodeONut' },
+                    // { label: '', value: 'SeedsInChooserCount' },
+                    { label: '巨型坚果', value: 'GiantWallnut' },
+                    // { label: '', value: 'Sprout' },
+                    { label: '反向双发射手', value: 'Leftpeater' },
+                    { label: '随机植物', value: 'ImitaterRandomPlant' },
+                    { label: '随机僵尸', value: 'ImitaterRandomZombie' },
+                    // { label: '', value: 'SeedTypeCount' },
+                    // { label: '', value: 'BeghouledButtonShuffle' },
+                    // { label: '', value: 'BeghouledButtonCrater' },
+                    // { label: '', value: 'SlotMachineSun' },
+                    // { label: '', value: 'SlotMachineDiamond' },
+                    // { label: '', value: 'ZombiquariumSnorkel' },
+                    // { label: '', value: 'ZombiquariumTrophy' },
+                    // { label: '', value: 'ZombieNormal' },
+                    // { label: '', value: 'ZombieTrafficCone' },
+                    // { label: '', value: 'ZombiePolevaulter' },
+                    // { label: '', value: 'ZombiePail' },
+                    // { label: '', value: 'ZombieLadder' },
+                    // { label: '', value: 'ZombieDigger' },
+                    // { label: '', value: 'ZombieBungee' },
+                    // { label: '', value: 'ZombieFootball' },
+                    // { label: '', value: 'ZombieBalloon' },
+                    // { label: '', value: 'ZombieScreenDoor' },
+                    // { label: '', value: 'Zomboni' },
+                    // { label: '', value: 'ZombiePogo' },
+                    // { label: '', value: 'ZombieDancer' },
+                    // { label: '', value: 'ZombieGargantuar' },
+                    // { label: '', value: 'ZombieImp' },
+                ];
+
+                const zombieTypes = [
+                    { label: '普通僵尸', value: 'Normal' },
+                    { label: '旗帜僵尸', value: 'Flag' },
+                    { label: '路障僵尸', value: 'TrafficCone' },
+                    { label: '撑杆僵尸', value: 'Polevaulter' },
+                    { label: '铁桶僵尸', value: 'Pail' },
+                    { label: '读报僵尸', value: 'Newspaper' },
+                    { label: '铁栅门僵尸', value: 'Door' },
+                    { label: '橄榄球僵尸', value: 'Football' },
+                    { label: '舞王僵尸', value: 'Dancer' },
+                    { label: '伴舞僵尸', value: 'BackupDancer' },
+                    { label: '救生圈僵尸', value: 'DuckyTube' },
+                    { label: '潜水僵尸', value: 'Snorkel' },
+                    { label: '冰车僵尸', value: 'Zamboni' },
+                    { label: '雪橇小队', value: 'Bobsled' },
+                    { label: '海豚僵尸', value: 'DolphinRider' },
+                    { label: '玩偶匣僵尸', value: 'JackInTheBox' },
+                    { label: '气球僵尸', value: 'Balloon' },
+                    { label: '矿工僵尸', value: 'Digger' },
+                    { label: '跳跳僵尸', value: 'Pogo' },
+                    { label: '雪人僵尸', value: 'Yeti' },
+                    { label: '蹦极僵尸', value: 'Bungee' },
+                    { label: '扶梯僵尸', value: 'Ladder' },
+                    { label: '投石车僵尸', value: 'Catapult' },
+                    { label: '巨人僵尸', value: 'Gargantuar' },
+                    { label: '小鬼僵尸', value: 'Imp' },
+                    { label: '僵王博士', value: 'Boss' },
+                    { label: '豌豆僵尸', value: 'PeaHead' },
+                    { label: '坚果僵尸', value: 'WallnutHead' },
+                    { label: '辣椒僵尸', value: 'JalapenoHead' },
+                    { label: '机枪豌豆僵尸', value: 'GatlingHead' },
+                    { label: '窝瓜僵尸', value: 'SquashHead' },
+                    { label: '高坚果僵尸', value: 'TallnutHead' },
+                    { label: '红眼巨人僵尸', value: 'RedeyeGargantuar' },
+                    { label: '机械巨人僵尸', value: 'RobotTitan' },
+                    { label: '红眼机械巨人僵尸', value: 'RedeyeRobotTitan' },
+                    { label: '武僧僵尸', value: 'Monk' },
+                    { label: '黑橄榄僵尸', value: 'FootballPremium' },
+                    { label: '女忍者僵尸', value: 'Ninja' },
+                    { label: '天尸', value: 'Talisman' },
+                    { label: '螺旋桨僵尸', value: 'Propeller' },
+                ];
+
+                const selectRows = [
+                    { label: '全部', value: -1 },
+                    { label: '1', value: 0 },
+                    { label: '2', value: 1 },
+                    { label: '3', value: 2 },
+                    { label: '4', value: 3 },
+                    { label: '5', value: 4 },
+                    { label: '6', value: 5 },
+                ];
+
+                const selectCols = [
+                    { label: '全部', value: -1 },
+                    { label: '1', value: 0 },
+                    { label: '2', value: 1 },
+                    { label: '3', value: 2 },
+                    { label: '4', value: 3 },
+                    { label: '5', value: 4 },
+                    { label: '6', value: 5 },
+                    { label: '7', value: 6 },
+                    { label: '8', value: 7 },
+                    { label: '9', value: 8 },
+                ];
+
+                const packetIdx = [
+                    { label: '1', value: 0 },
+                    { label: '2', value: 1 },
+                    { label: '3', value: 2 },
+                    { label: '4', value: 3 },
+                    { label: '5', value: 4 },
+                    { label: '6', value: 5 },
+                    { label: '7', value: 6 },
+                    { label: '8', value: 7 },
+                    { label: '9', value: 8 },
+                    { label: '10', value: 9 },
+                ];
+
+                const connected = ref(false);
+                const statusText = ref('未连接');
+                const activeTab = ref('player');
+                const runBackground = ref(false);
+                const noCooldown = ref(false);
+                const sunValue = ref(9990);
+                const moneyValue = ref(999999);
+                const visibleGhoul = ref(false);
+                const noThunder = ref(false);
+                const noFog = ref(false);
+                const disableTalisman = ref(false);
+                const disableNinja = ref(false);
+                const freePlant = ref(false);
+                const plantNoDie = ref(false);
+                const plantAnyWhere = ref(false);
+                const wontLose = ref(false);
+                const selectedSeedType = ref(seedTypes[0].value);
+                const selectedZombieType = ref(zombieTypes[0].value);
+                const selectedPacketIdx = ref(packetIdx[0].value);
+                const selectedRow = ref(-1);
+                const selectedCol = ref(-1);
+                const isImitater = ref(false);
+                const autoCollect = ref(true);
+                // const selectedTime = ref('morning');
+                const lastResult = reactive({ ok: true, text: '等待指令...' });
+
+                const customCode = ref('');
+                const customCodeError = ref('');
+
+                // const quickItems = [
+                //     { label: '黄金剑', code: '黄金剑' },
+                //     { label: '治疗药水', code: '治疗药水' },
+                //     { label: '魔法卷轴', code: '魔法卷轴' },
+                // ];
+
+                let ws = null;
+
+                // ========== 发送代码 ==========
+                function send(code) {
+                    if (!ws || ws.readyState !== WebSocket.OPEN) {
+                        ElementPlus.ElMessage.error('未连接到服务器');
+                        return;
+                    }
+                    ws.send(code);
+                    lastResult.text = '⏳ 已发送，等待结果...';
+                }
+
+                // ========== WebSocket 连接 ==========
+                function connect() {
+                    ws = new WebSocket(SERVER_URL);
+                    ws.onopen = () => {
+                        connected.value = true;
+                        statusText.value = '✅ 已连接到游戏服务器';
+                        send('from pgvz import *\nfrom cheat import cheat_option\nimport Lawn\nimport Sexy\nimport Sexy.TodLib\nimport LawnMod');
+                    };
+                    ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            if (data.statuscode === 0) {
+                                lastResult.ok = true;
+                                lastResult.text = data.result || '执行成功';
+                                // lastResult.text = event.data;
+                            } else {
+                                lastResult.ok = false;
+                                lastResult.text = data.errortype || '未知错误';
+                            }
+                        } catch {
+                            lastResult.ok = true;
+                            lastResult.text = event.data;
+                        }
+                    };
+                    ws.onclose = () => {
+                        connected.value = false;
+                        statusText.value = '❌ 连接已断开，3秒后重连...';
+                        setTimeout(connect, 3000);
+                    };
+                    ws.onerror = () => {
+                        connected.value = false;
+                        statusText.value = '❌ 连接错误';
+                    };
+                }
+
+                // ========== 复选框联动 ==========
+                function SetAutoCollect(val) {
+                    if (val) {
+                        send(`auto_collector.On()`);
+                    } else {
+                        send(`auto_collector.Off()`);
+                    }
+                }
+                function SetRunBackground(val) {
+                    send(`Sexy.Main.RunWhenLocked = ${val ? 'True' : 'False'}`);
+                }
+                function SetFreePlant(val) {
+                    send(`cheat_option.freePlant = ${val ? 'True' : 'False'}`);
+                }
+                function SetPlantNoDie(val) {
+                    send(`cheat_option.plantNoDie = ${val ? 'True' : 'False'}`);
+                }
+                function SetPlantAnyWhere(val) {
+                    send(`cheat_option.plantAnyWhere = ${val ? 'True' : 'False'}`);
+                }
+                function SetWontLose(val) {
+                    send(`cheat_option.wontLose = ${val ? 'True' : 'False'}`);
+                }
+                function DisableTalisman(val) {
+                    send(`cheat_option.disableTalisman = ${val ? 'True' : 'False'}`);
+                }
+                function DisableNinja(val) {
+                    send(`cheat_option.disableNinja = ${val ? 'True' : 'False'}`);
+                }
+                function SetVisibleGhoul(val) {
+                    send(`cheat_option.visibleGhoul = ${val ? 'True' : 'False'}`);
+                }
+                function SetNoThunder(val) {
+                    send(`cheat_option.noThunder = ${val ? 'True' : 'False'}`);
+                }
+                // function setTime(val) {
+                //     send(`world.set_time('${val}')`);
+                // }
+                function SetNoCooldown(val) {
+                    send(`gvar.glawnapp.mEasyPlantingCheat = ${val ? 'True' : 'False'}`);
+                }
+                function SetNoFog(val) {
+                    send(`cheat_option.noFog = ${val ? 'True' : 'False'}`);
+                }
+                function sendCustomCode() {
+                    if (!customCode.value.trim()) {
+                        customCodeError.value = '代码不能为空';
+                        return;
+                    }
+                    customCodeError.value = '';
+                    send(customCode.value.trim());
+                }
+
+                // ========== 启动 ==========
+                onMounted(() => {
+                    connect();
+                });
+
+                // 暴露给模板
+                return {
+                    connected,
+                    statusText,
+                    activeTab,
+                    autoCollect,
+                    runBackground,
+                    seedTypes,
+                    zombieTypes,
+                    selectedRow,
+                    selectedCol,
+                    selectRows,
+                    selectCols,
+                    packetIdx,
+                    selectedPacketIdx,
+                    isImitater,
+                    disableTalisman,
+                    disableNinja,
+                    visibleGhoul,
+                    noThunder,
+                    noFog,
+                    noCooldown,
+                    freePlant,
+                    sunValue,
+                    moneyValue,
+                    plantNoDie,
+                    plantAnyWhere,
+                    wontLose,
+                    selectedSeedType,
+                    selectedZombieType,
+                    // selectedTime,
+                    lastResult,
+                    // quickItems,
+                    send,
+                    SetAutoCollect,
+                    SetRunBackground,
+                    DisableTalisman,
+                    DisableNinja,
+                    SetFreePlant,
+                    SetNoCooldown,
+                    SetPlantNoDie,
+                    SetPlantAnyWhere,
+                    SetWontLose,
+                    SetVisibleGhoul,
+                    SetNoThunder,
+                    SetNoFog,
+                    // selectPlant,
+                    // setTime,
+                    customCode,
+                    customCodeError,
+                    sendCustomCode,
+                };
+            }
+        });
+
+        // 使用 Element Plus
+        app.use(ElementPlus, { locale: ElementPlus.localeZhCn });
+        app.mount('#app');
+    </script>
+</body>
+
+</html>
