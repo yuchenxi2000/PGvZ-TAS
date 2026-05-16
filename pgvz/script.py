@@ -11,6 +11,7 @@ class ScriptType(enum.Enum):
 class ScriptRunMode(enum.Enum):
     FOREVER = 0
     ONCE = 1
+    GLOBAL = 2
 
 class ScriptConf:
     def __init__(self, runmode: ScriptRunMode, canRunFunc) -> None:
@@ -45,10 +46,10 @@ class ScriptObj:
     
     def Run(self) -> bool:
         if not self.enabled:
-            return False
+            return True
         if not self.conf.canRunFunc():
             self.Reset()
-            return False
+            return True
         if self.scriptType == ScriptType.COROUTINE:
             if self.scriptGen is None:
                 return False
@@ -67,6 +68,7 @@ class ScriptManager:
     def __init__(self) -> None:
         self.loaded = False
         self.scriptList = []
+        self.globalScriptList = []
         self.prev_scene: Lawn.GameScenes = None  # type: ignore
     
     def Register(self, scriptGenFunc, gamemode: Lawn.GameMode = None, runmode: ScriptRunMode = ScriptRunMode.FOREVER, conf: ScriptConf = None) -> ScriptObj:  # type: ignore
@@ -78,7 +80,11 @@ class ScriptManager:
             else:
                 runconf = ScriptConf(runmode, lambda: gvar.glawnapp.mGameMode == gamemode)
         scriptObj = ScriptObj(scriptGenFunc, runconf)
-        self.scriptList.append(scriptObj)
+        if runconf.runmode == ScriptRunMode.GLOBAL:
+            scriptObj.Start()
+            self.globalScriptList.append(scriptObj)
+        else:
+            self.scriptList.append(scriptObj)
         Sexy.Debug.Log(f'registered script func: {scriptGenFunc}')
         return scriptObj
     
@@ -95,6 +101,13 @@ class ScriptManager:
     
     def Manage(self):
         lawnapp = gvar.glawnapp
+        # run global scripts
+        finishedGlobalScripts = []
+        for scriptObj in self.globalScriptList:
+            if not scriptObj.Run():
+                finishedGlobalScripts.append(scriptObj)
+        for scriptObj in finishedGlobalScripts:
+            self.globalScriptList.remove(scriptObj)
         # 退出战斗界面时卸载被设置为只运行一次的脚本
         if self.prev_scene == Lawn.GameScenes.Playing and lawnapp.mGameScene != Lawn.GameScenes.Playing:
             if self.loaded:

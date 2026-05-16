@@ -30,7 +30,7 @@
 
         <!-- 使用标签页分类功能 -->
         <el-tabs v-model="activeTab" type="border-card">
-            <!-- 角色修改 -->
+            <!-- 基础修改 -->
             <el-tab-pane label="👤 基础" name="player">
                 <el-row :gutter="12">
                     <el-col :span="8">
@@ -54,6 +54,7 @@
                             <el-row>
                                 <el-button type="primary" style="margin-top:8px" @click="send('gvar.glawnapp.KillDialog(19)\ngvar.gboard.FadeOutLevel()')">直接过关</el-button>
                                 <el-button type="primary" style="margin-top:8px" @click="send('cheat_option.FailImmediately(Lawn.ZombieType.Normal)')">直接失败</el-button>
+                                <el-button type="primary" style="margin-top:8px" @click="send('cheat_option.GetFinishedAccount()')">通关存档</el-button>
                             </el-row>
                         </el-card>
                     </el-col>
@@ -87,7 +88,7 @@
                 </el-row>
             </el-tab-pane>
 
-            <!-- 世界修改 -->
+            <!-- 场地修改 -->
             <el-tab-pane label="🌍 场地" name="world">
                 <el-row :gutter="12">
                     <el-col :span="8">
@@ -144,7 +145,6 @@
                     <el-col :span="8">
                         <el-card shadow="hover" class="command-card">
                             <template #header>场地放置</template>
-                            <!-- <el-divider /> -->
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.PlantOnBoard(${selectedRow}, ${selectedCol}, Lawn.SeedType.${selectedSeedType}, ${isImitater ? 'True' : 'False'})`)">种植植物</el-button>
                             <el-button type="primary" style="margin-top:8px"
@@ -170,7 +170,6 @@
                     <el-col :span="8">
                         <el-card shadow="hover" class="command-card">
                             <template #header>场地移除</template>
-                            <!-- <el-divider /> -->
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.RemovePlantOnBoard()`)">移除植物</el-button>
                             <el-button type="primary" style="margin-top:8px"
@@ -192,27 +191,55 @@
                         </el-card>
                     </el-col>
                 </el-row>
-                <!-- <el-card shadow="hover" class="command-card">
-                    <template #header>时间控制</template>
-                    <el-radio-group v-model="selectedTime" @change="setTime">
-                        <el-radio-button label="morning">早晨</el-radio-button>
-                        <el-radio-button label="noon">正午</el-radio-button>
-                        <el-radio-button label="evening">傍晚</el-radio-button>
-                        <el-radio-button label="night">深夜</el-radio-button>
-                    </el-radio-group>
-                </el-card> -->
             </el-tab-pane>
 
-            <!-- 物品生成 -->
+            <!-- 关卡修改 -->
             <el-tab-pane label="🎒 关卡" name="items">
                 <el-row :gutter="12">
                     <el-col :span="8">
                         <el-card shadow="hover" class="command-card">
-                            <template #header>关卡修改</template>
+                            <template #header>场景修改</template>
                             <el-checkbox v-model="noFog" @change="SetNoFog">移除迷雾</el-checkbox>
                             <el-checkbox v-model="transScaryPot" @change="SetTransScaryPot">罐子透视</el-checkbox>
                             <el-checkbox v-model="visibleGhoul" @change="SetVisibleGhoul">隐形僵尸显形</el-checkbox>
                             <el-checkbox v-model="noThunder" @change="SetNoThunder">暴风雨不瞎眼</el-checkbox>
+                        </el-card>
+                    </el-col>
+                    <el-col :span="8">
+                        <el-card shadow="hover" class="command-card">
+                            <template #header>速度控制</template>
+                            <el-radio-group v-model="speed" @change="SetSpeed">
+                                <el-radio-button :label="0.1">0.1</el-radio-button>
+                                <el-radio-button :label="0.2">0.2</el-radio-button>
+                                <el-radio-button :label="0.5">0.5</el-radio-button>
+                                <el-radio-button :label="1">1</el-radio-button>
+                                <el-radio-button :label="2">2</el-radio-button>
+                                <el-radio-button :label="5">5</el-radio-button>
+                                <el-radio-button :label="10">10</el-radio-button>
+                            </el-radio-group>
+                        </el-card>
+                    </el-col>
+                    <el-col :span="8">
+                        <el-card shadow="hover" class="command-card">
+                            <template #header>关卡修改</template>
+                            <el-text class="mx-1">关卡</el-text>
+                            <el-row>
+                                <el-select v-model="selectedLevel" filterable placeholder="选择关卡">
+                                    <el-option 
+                                        v-for="item in gameModes"
+                                        :key="item.value"
+                                        :label="item.label"
+                                        :value="item.value"
+                                    />
+                                </el-select>
+                                <el-button type="primary" style="margin-top:8px"
+                                    @click="send(`cheat_option.EnterNewGame(Lawn.GameMode.${selectedLevel})`)">进入关卡</el-button>
+                            </el-row>
+                            <el-row>
+                                <el-button type="primary" style="margin-top:8px"
+                                    @click="send(`gvar.gboard.mChallenge.mSurvivalStage = ${numSurvivalStage}`)">生存模式轮数</el-button>
+                                <el-input-number v-model="numSurvivalStage" :min="0" size="small" />
+                            </el-row>
                         </el-card>
                     </el-col>
                 </el-row>
@@ -268,7 +295,7 @@
             // 让所有组件使用中文
             setup() {
                 // ========== 配置区 ==========
-                const SERVER_URL = 'ws://localhost:8080/Py'; // 改为你的游戏 WebSocket 地址
+                const SERVER_URL = 'ws://localhost:8080/Py'; // 游戏 WebSocket 地址
 
                 // ========== 状态 ==========
                 const seedTypes = [
@@ -327,34 +354,25 @@
                     { label: '火红莲', value: 'Endoflame' },
                     { label: '模仿者', value: 'Imitater' },
                     { label: '爆炸坚果', value: 'ExplodeONut' },
-                    // { label: '', value: 'SeedsInChooserCount' },
                     { label: '巨型坚果', value: 'GiantWallnut' },
-                    // { label: '', value: 'Sprout' },
                     { label: '反向双发射手', value: 'Leftpeater' },
                     { label: '随机植物', value: 'ImitaterRandomPlant' },
                     { label: '随机僵尸', value: 'ImitaterRandomZombie' },
-                    // { label: '', value: 'SeedTypeCount' },
-                    // { label: '', value: 'BeghouledButtonShuffle' },
-                    // { label: '', value: 'BeghouledButtonCrater' },
-                    // { label: '', value: 'SlotMachineSun' },
-                    // { label: '', value: 'SlotMachineDiamond' },
-                    // { label: '', value: 'ZombiquariumSnorkel' },
-                    // { label: '', value: 'ZombiquariumTrophy' },
-                    // { label: '', value: 'ZombieNormal' },
-                    // { label: '', value: 'ZombieTrafficCone' },
-                    // { label: '', value: 'ZombiePolevaulter' },
-                    // { label: '', value: 'ZombiePail' },
-                    // { label: '', value: 'ZombieLadder' },
-                    // { label: '', value: 'ZombieDigger' },
-                    // { label: '', value: 'ZombieBungee' },
-                    // { label: '', value: 'ZombieFootball' },
-                    // { label: '', value: 'ZombieBalloon' },
-                    // { label: '', value: 'ZombieScreenDoor' },
-                    // { label: '', value: 'Zomboni' },
-                    // { label: '', value: 'ZombiePogo' },
-                    // { label: '', value: 'ZombieDancer' },
-                    // { label: '', value: 'ZombieGargantuar' },
-                    // { label: '', value: 'ZombieImp' },
+                    { label: '普通僵尸', value: 'ZombieNormal' },
+                    { label: '路障僵尸', value: 'ZombieTrafficCone' },
+                    { label: '撑杆僵尸', value: 'ZombiePolevaulter' },
+                    { label: '铁桶僵尸', value: 'ZombiePail' },
+                    { label: '扶梯僵尸', value: 'ZombieLadder' },
+                    { label: '矿工僵尸', value: 'ZombieDigger' },
+                    { label: '蹦极僵尸', value: 'ZombieBungee' },
+                    { label: '橄榄球僵尸', value: 'ZombieFootball' },
+                    { label: '气球僵尸', value: 'ZombieBalloon' },
+                    { label: '铁栅门僵尸', value: 'ZombieScreenDoor' },
+                    { label: '冰车僵尸', value: 'Zomboni' },
+                    { label: '跳跳僵尸', value: 'ZombiePogo' },
+                    { label: '舞王僵尸', value: 'ZombieDancer' },
+                    { label: '巨人僵尸', value: 'ZombieGargantuar' },
+                    { label: '小鬼僵尸', value: 'ZombieImp' },
                 ];
 
                 const zombieTypes = [
@@ -436,14 +454,167 @@
                     { label: '10', value: 9 },
                 ];
 
+                const gameModes = [
+                    { label: '冒险模式', value: 'Adventure' },
+                    { label: '生存白天', value: 'SurvivalNormalStage1' },
+                    { label: '生存黑夜', value: 'SurvivalNormalStage2' },
+                    { label: '生存泳池', value: 'SurvivalNormalStage3' },
+                    { label: '生存雾夜', value: 'SurvivalNormalStage4' },
+                    { label: '生存屋顶', value: 'SurvivalNormalStage5' },
+                    { label: '生存白天（困难）', value: 'SurvivalHardStage1' },
+                    { label: '生存黑夜（困难）', value: 'SurvivalHardStage2' },
+                    { label: '生存泳池（困难）', value: 'SurvivalHardStage3' },
+                    { label: '生存雾夜（困难）', value: 'SurvivalHardStage4' },
+                    { label: '生存屋顶（困难）', value: 'SurvivalHardStage5' },
+                    { label: '生存白天（无尽）', value: 'SurvivalEndlessStage1' },
+                    { label: '生存黑夜（无尽）', value: 'SurvivalEndlessStage2' },
+                    { label: '生存泳池（无尽）', value: 'SurvivalEndlessStage3' },
+                    { label: '生存雾夜（无尽）', value: 'SurvivalEndlessStage4' },
+                    { label: '生存屋顶（无尽）', value: 'SurvivalEndlessStage5' },
+                    { label: '植物僵尸', value: 'ChallengeWarAndPeas' },
+                    { label: '坚果保龄球', value: 'ChallengeWallnutBowling' },
+                    { label: '老虎机', value: 'ChallengeSlotMachine' },
+                    { label: '种子雨', value: 'ChallengeRainingSeeds' },
+                    { label: '宝石迷阵', value: 'ChallengeBeghouled' },
+                    { label: '隐形战争', value: 'ChallengeInvisighoul' },
+                    { label: '看星星', value: 'ChallengeSeeingStars' },
+                    { label: '宝石迷阵旋风', value: 'ChallengeBeghouledTwist' },
+                    { label: '小僵尸大麻烦', value: 'ChallengeLittleTrouble' },
+                    { label: '传送门', value: 'ChallengePortalCombat' },
+                    { label: '排山倒海', value: 'ChallengeColumn' },
+                    { label: '雪橇区', value: 'ChallengeBobsledBonanza' },
+                    { label: '僵尸快跑', value: 'ChallengeSpeed' },
+                    { label: '锤僵尸', value: 'ChallengeWhackAZombie' },
+                    { label: '坚不可摧', value: 'ChallengeLastStand' },
+                    { label: '植物僵尸2', value: 'ChallengeWarAndPeas2' },
+                    { label: '坚果保龄球2', value: 'ChallengeWallnutBowling2' },
+                    { label: '跳跳舞会', value: 'ChallengePogoParty' },
+                    { label: '僵王博士的复仇', value: 'ChallengeFinalBoss' },
+                    { label: '艺术锦标赛', value: 'ChallengeArtChallenge1' },
+                    { label: '晴天', value: 'ChallengeSunnyDay' },
+                    { label: '无草皮之地', value: 'ChallengeResodded' },
+                    { label: '重要时间', value: 'ChallengeBigTime' },
+                    { label: '艺术锦标赛2', value: 'ChallengeArtChallenge2' },
+                    { label: '空袭', value: 'ChallengeAirRaid' },
+                    { label: '冰冻关卡', value: 'ChallengeIce' },
+                    { label: '禅境花园', value: 'ChallengeZenGarden' },
+                    { label: '牛顿的力量', value: 'ChallengeHighGravity' },
+                    { label: '坟墓危险', value: 'ChallengeGraveDanger' },
+                    { label: '地道战', value: 'ChallengeShovel' },
+                    { label: '暴风雨夜', value: 'ChallengeStormyNight' },
+                    { label: '蹦极闪电战', value: 'ChallengeBungeeBlitz' },
+                    { label: '松鼠', value: 'ChallengeSquirrel' },
+                    { label: '智慧树', value: 'TreeOfWisdom' },
+                    { label: '砸罐子1', value: 'ScaryPotter1' },
+                    { label: '砸罐子2', value: 'ScaryPotter2' },
+                    { label: '砸罐子3', value: 'ScaryPotter3' },
+                    { label: '砸罐子4', value: 'ScaryPotter4' },
+                    { label: '砸罐子5', value: 'ScaryPotter5' },
+                    { label: '砸罐子6', value: 'ScaryPotter6' },
+                    { label: '砸罐子7', value: 'ScaryPotter7' },
+                    { label: '砸罐子8', value: 'ScaryPotter8' },
+                    { label: '砸罐子9', value: 'ScaryPotter9' },
+                    { label: '砸罐子（无尽）', value: 'ScaryPotterEndless' },
+                    { label: '我是僵尸1', value: 'PuzzleIZombie1' },
+                    { label: '我是僵尸2', value: 'PuzzleIZombie2' },
+                    { label: '我是僵尸3', value: 'PuzzleIZombie3' },
+                    { label: '我是僵尸4', value: 'PuzzleIZombie4' },
+                    { label: '我是僵尸5', value: 'PuzzleIZombie5' },
+                    { label: '我是僵尸6', value: 'PuzzleIZombie6' },
+                    { label: '我是僵尸7', value: 'PuzzleIZombie7' },
+                    { label: '我是僵尸8', value: 'PuzzleIZombie8' },
+                    { label: '我是僵尸9', value: 'PuzzleIZombie9' },
+                    { label: '我是僵尸（无尽）', value: 'PuzzleIZombieEndless' },
+                    { label: '购买完整版', value: 'Upsell' },
+                    { label: '介绍', value: 'Intro' },
+                    { label: '快速游戏1', value: 'Quickplay1' },
+                    { label: '快速游戏2', value: 'Quickplay2' },
+                    { label: '快速游戏3', value: 'Quickplay3' },
+                    { label: '快速游戏4', value: 'Quickplay4' },
+                    { label: '快速游戏5', value: 'Quickplay5' },
+                    { label: '快速游戏6', value: 'Quickplay6' },
+                    { label: '快速游戏7', value: 'Quickplay7' },
+                    { label: '快速游戏8', value: 'Quickplay8' },
+                    { label: '快速游戏9', value: 'Quickplay9' },
+                    { label: '快速游戏10', value: 'Quickplay10' },
+                    { label: '快速游戏11', value: 'Quickplay11' },
+                    { label: '快速游戏12', value: 'Quickplay12' },
+                    { label: '快速游戏13', value: 'Quickplay13' },
+                    { label: '快速游戏14', value: 'Quickplay14' },
+                    { label: '快速游戏15', value: 'Quickplay15' },
+                    { label: '快速游戏16', value: 'Quickplay16' },
+                    { label: '快速游戏17', value: 'Quickplay17' },
+                    { label: '快速游戏18', value: 'Quickplay18' },
+                    { label: '快速游戏19', value: 'Quickplay19' },
+                    { label: '快速游戏20', value: 'Quickplay20' },
+                    { label: '快速游戏21', value: 'Quickplay21' },
+                    { label: '快速游戏22', value: 'Quickplay22' },
+                    { label: '快速游戏23', value: 'Quickplay23' },
+                    { label: '快速游戏24', value: 'Quickplay24' },
+                    { label: '快速游戏25', value: 'Quickplay25' },
+                    { label: '快速游戏26', value: 'Quickplay26' },
+                    { label: '快速游戏27', value: 'Quickplay27' },
+                    { label: '快速游戏28', value: 'Quickplay28' },
+                    { label: '快速游戏29', value: 'Quickplay29' },
+                    { label: '快速游戏30', value: 'Quickplay30' },
+                    { label: '快速游戏31', value: 'Quickplay31' },
+                    { label: '快速游戏32', value: 'Quickplay32' },
+                    { label: '快速游戏33', value: 'Quickplay33' },
+                    { label: '快速游戏34', value: 'Quickplay34' },
+                    { label: '快速游戏35', value: 'Quickplay35' },
+                    { label: '快速游戏36', value: 'Quickplay36' },
+                    { label: '快速游戏37', value: 'Quickplay37' },
+                    { label: '快速游戏38', value: 'Quickplay38' },
+                    { label: '快速游戏39', value: 'Quickplay39' },
+                    { label: '快速游戏40', value: 'Quickplay40' },
+                    { label: '快速游戏41', value: 'Quickplay41' },
+                    { label: '快速游戏42', value: 'Quickplay42' },
+                    { label: '快速游戏43', value: 'Quickplay43' },
+                    { label: '快速游戏44', value: 'Quickplay44' },
+                    { label: '快速游戏45', value: 'Quickplay45' },
+                    { label: '快速游戏46', value: 'Quickplay46' },
+                    { label: '快速游戏47', value: 'Quickplay47' },
+                    { label: '快速游戏48', value: 'Quickplay48' },
+                    { label: '快速游戏49', value: 'Quickplay49' },
+                    { label: '快速游戏50', value: 'Quickplay50' },
+                    { label: '僵尸水族馆', value: 'ChallengeZombiquarium' },
+                    { label: '巨人之怒1', value: 'ChallengeAttackOnTitans' },
+                    { label: '巨人之怒2', value: 'ChallengeAttackOnTitans2' },
+                    { label: '巨人之怒3', value: 'ChallengeAttackOnTitans3' },
+                    { label: '奇人异尸1', value: 'MarvelousPeople' },
+                    { label: '奇人异尸2', value: 'MarvelousPeople2' },
+                    { label: '奇人异尸3', value: 'MarvelousPeople3' },
+                    { label: '随机传送带', value: 'RogueConveyorbelt' },
+                    { label: '随机传送带（无尽）', value: 'RogueConveyorbeltHard' },
+                    { label: '僵王博士的复仇2', value: 'ChallengeFinalBoss2' },
+                    { label: '随机模仿者', value: 'ImitaterRandom' },
+                    { label: '排山倒海2', value: 'ChallengeColumn2' },
+                    { label: '排山倒海3', value: 'ChallengeColumn3' },
+                    { label: '排山倒海4', value: 'ChallengeColumn4' },
+                    { label: '生存白天（地狱）', value: 'SurvivalHellStage1' },
+                    { label: '生存黑夜（地狱）', value: 'SurvivalHellStage2' },
+                    { label: '生存泳池（地狱）', value: 'SurvivalHellStage3' },
+                    { label: '生存雾夜（地狱）', value: 'SurvivalHellStage4' },
+                    { label: '生存屋顶（地狱）', value: 'SurvivalHellStage5' },
+                    { label: '奇人异尸4', value: 'MarvelousPeople4' },
+                    { label: '泳池派对', value: 'PoolParty' },
+                    { label: '雪橇区2', value: 'ChallengeBobsledBonanza2' },
+                    { label: '空袭2', value: 'ChallengeMoreAirRaid' },
+                    { label: '大泳池', value: 'BigPoolSurvivalNormalStage' },
+                    { label: '大泳池（困难）', value: 'BigPoolSurvivalHardStage' },
+                    { label: '大泳池（地狱）', value: 'BigPoolSurvivalHellStage' },
+                ];
+
                 const connected = ref(false);
                 const statusText = ref('未连接');
                 const activeTab = ref('player');
+                const speed = ref(1);
                 const runBackground = ref(false);
                 const noCooldown = ref(false);
                 const sunValue = ref(9990);
                 const moneyValue = ref(999999);
                 const treeHeight = ref(1000);
+                const numSurvivalStage = ref(2000);
                 const conveyorNoCooling = ref(false);
                 const visibleGhoul = ref(false);
                 const noThunder = ref(false);
@@ -465,6 +636,7 @@
                 const selectedSeedType = ref(seedTypes[0].value);
                 const selectedZombieType = ref(zombieTypes[0].value);
                 const selectedPacketIdx = ref(packetIdx[0].value);
+                const selectedLevel = ref(gameModes[0].value);
                 const selectedRow = ref(-1);
                 const selectedCol = ref(-1);
                 const isImitater = ref(false);
@@ -520,6 +692,9 @@
                 }
 
                 // ========== 复选框联动 ==========
+                function SetSpeed(val) {
+                    send(`cheat_option.SetSpeed(${val})`);
+                }
                 function SetAutoCollect(val) {
                     if (val) {
                         send(`auto_collector.On()`);
@@ -606,7 +781,9 @@
                     connected,
                     statusText,
                     activeTab,
+                    speed,
                     treeHeight,
+                    numSurvivalStage,
                     cobNoCooling,
                     autoCollect,
                     runBackground,
@@ -616,6 +793,7 @@
                     selectedCol,
                     selectRows,
                     selectCols,
+                    gameModes,
                     packetIdx,
                     selectedPacketIdx,
                     isImitater,
@@ -641,8 +819,10 @@
                     fullAreaGloomshroom,
                     selectedSeedType,
                     selectedZombieType,
+                    selectedLevel,
                     lastResult,
                     send,
+                    SetSpeed,
                     SetAutoCollect,
                     SetRunBackground,
                     DisableTalisman,

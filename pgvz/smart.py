@@ -6,7 +6,9 @@ from .global_var import gvar
 # 自动收集
 def AutoCollect():
     board = gvar.gboard
-    num3 = 30 if board.mApp.IsWhackAZombieLevel() else 0
+    if board is None:
+        return
+    num3 = 30 if gvar.glawnapp.IsWhackAZombieLevel() else 0
     cursor_obj = board.mCursorObject.mCursorType
     if cursor_obj == Lawn.CursorType.Normal or cursor_obj == Lawn.CursorType.Hammer:
         for coin in IterAliveCoins():

@@ -9,7 +9,6 @@ sys.path.append(os.path.dirname(__file__))
 import Lawn
 from pgvz import *
 
-# 测试脚本。写成生成器、实现类似协程的顺序执行效果
 def SetPE12():
     board = gvar.gboard
     # 放植物

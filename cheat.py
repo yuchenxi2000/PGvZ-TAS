@@ -188,6 +188,114 @@ class CheatOption:
         pottedPlant.InitializePottedPlant(seedtype)
         pottedPlant.mPlantAge = Lawn.PottedPlantAge.Full
         gvar.glawnapp.mZenGarden.AddPottedPlant(pottedPlant)
+    
+    def GetFinishedAccount(self):
+        # 解锁所有关卡
+        playerinfo = gvar.glawnapp.mPlayerInfo
+        playerinfo.mHasUnlockedMinigames = True
+        playerinfo.mHasUnlockedPuzzleMode = True
+        playerinfo.mHasNewMiniGame = False
+        playerinfo.mHasNewVasebreaker = False
+        playerinfo.mHasNewIZombie = False
+        playerinfo.mHasNewSurvival = False
+        playerinfo.mHasUnlockedSurvivalMode = True
+        playerinfo.mZenGardenTutorialComplete = True
+        playerinfo.mMiniGamesUnlocked = 20
+        playerinfo.mVasebreakerUnlocked = 10
+        playerinfo.mIZombieUnlocked = 10
+        if playerinfo.mFinishedAdventure < 2:
+            playerinfo.mFinishedAdventure = 2
+        # 完成所有关卡
+        lawnapp = gvar.glawnapp
+        for gamemode in range(1, 148):
+            if 70 <= gamemode < 122:
+                continue
+            # 当前版本无法完成
+            if 138 <= gamemode < 141 or 146 <= gamemode < 148:
+                continue
+            level = Lawn.GameMode(gamemode)
+            if lawnapp.IsSurvivalNormal(level):
+                if playerinfo.mChallengeRecords[gamemode - 1] < 5:
+                    playerinfo.mChallengeRecords[gamemode - 1] = 5
+            elif lawnapp.IsSurvivalHard(level):
+                if playerinfo.mChallengeRecords[gamemode - 1] < 10:
+                    playerinfo.mChallengeRecords[gamemode - 1] = 10
+            elif lawnapp.IsSurvivalHell(level):
+                if playerinfo.mChallengeRecords[gamemode - 1] < 10:
+                    playerinfo.mChallengeRecords[gamemode - 1] = 10
+            elif not lawnapp.IsSurvivalEndless(level) and not lawnapp.IsEndlessScaryPotter(level) and not lawnapp.IsEndlessIZombie(level):
+                if playerinfo.mChallengeRecords[gamemode - 1] < 1:
+                    playerinfo.mChallengeRecords[gamemode - 1] = 1
+        # 为了在图鉴里显示红眼巨人
+        if playerinfo.mChallengeRecords[12] < 10:
+            playerinfo.mChallengeRecords[12] = 10
+        # 紫卡
+        for i in range(9):
+            playerinfo.mPurchases[i] = 1
+        # 花园用具，注意钻石水壶需要填2
+        playerinfo.mPurchases[13] = 2
+        playerinfo.mPurchases[14] = 1020
+        playerinfo.mPurchases[15] = 1020
+        for i in range(16, 20):
+            playerinfo.mPurchases[i] = 1
+        # 蜗牛
+        playerinfo.mPurchases[20] = 1
+        # 卡槽
+        playerinfo.mPurchases[21] = 4
+        # 割草机
+        playerinfo.mPurchases[22] = 1
+        playerinfo.mPurchases[23] = 1
+        # 钉耙
+        playerinfo.mPurchases[24] = 10
+        # 水族馆
+        playerinfo.mPurchases[25] = 1
+        # 巧克力，最多999
+        playerinfo.mPurchases[26] = 1999
+        # 不知道什么
+        playerinfo.mPurchases[27] = 1
+        # 树肥
+        playerinfo.mPurchases[28] = 1010
+        # （懒得写注释了）
+        for i in range(29, 36):
+            playerinfo.mPurchases[i] = 1
+        # 卡组
+        playerinfo.mPurchases[36] = 4
+        # 夜晚绿房
+        playerinfo.mPurchases[37] = 1
+        # 刷新显示
+        gvar.glawnapp.KillGameSelector()
+        gvar.glawnapp.ShowGameSelector()
+    
+    def SetSpeed(self, speed: float):
+        fast = speed >= 1.0
+        factor = round(speed) if fast else round(1.0 / speed)
+        Sexy.GlobalStaticVars.gFastMo = fast
+        Sexy.GlobalStaticVars.gSlowMo = not fast
+        Sexy.GlobalStaticVars.gFastSlowMoNum = factor
+
+    def EnterNewGame(self, gamemode: Lawn.GameMode):
+        # 必须在主线程运行，不然会有概率崩溃
+        def ScriptEnterNewGame():
+            # 删除所有对话框
+            gvar.glawnapp.KillDialog(3)  # 图鉴
+            gvar.glawnapp.KillDialog(4)  # 商店
+            gvar.glawnapp.KillDialog(19)  # 暂停
+            gvar.glawnapp.KillDialog(37)  # 暂停
+            gvar.glawnapp.KillDialog(65)  # 钉耙
+            # 删除所有界面
+            if gvar.glawnapp.mGameScene == Lawn.GameScenes.Playing or gvar.glawnapp.mGameScene == Lawn.GameScenes.LevelIntro:
+                gvar.glawnapp.KillBoard()
+            elif gvar.glawnapp.mGameScene == Lawn.GameScenes.Menu:
+                gvar.glawnapp.KillGameSelector()
+            elif gvar.glawnapp.mGameScene == Lawn.GameScenes.Challenge:
+                gvar.glawnapp.KillChallengeScreen()
+            elif gvar.glawnapp.mGameScene == Lawn.GameScenes.Award:
+                gvar.glawnapp.KillAwardScreen()
+            # 加载新游戏
+            gvar.glawnapp.PreNewGame(gamemode, True)
+            yield
+        # 需要运行在全局模式
+        script_manager.Register(ScriptEnterNewGame, runmode=ScriptRunMode.GLOBAL)
 
 cheat_option = CheatOption()
 

@@ -1054,9 +1054,10 @@ class Array_GenericClasses(abc.ABCMeta):
 
 class Array(Array_0, metaclass =Array_GenericClasses): ...
 
-Array_1_T = typing.TypeVar('Array_1_T', covariant=True)
+Array_1_T = typing.TypeVar('Array_1_T')
 class Array_1(Array_0, typing.Generic[Array_1_T]):
     def __getitem__(self, key: int) -> Array_1_T: ...
+    def __setitem__(self, key: int, value: Array_1_T) -> None: ...
 
 
 class Array_0(IList, IStructuralEquatable, IStructuralComparable, ICloneable, abc.ABC):
