@@ -1,7 +1,7 @@
 """
 植物娘大战僵尸键控框架 PGvZ-TAS
 by yuchenxi2000
-v1.0.0 2026.05.06
+2026.05.17 PGvZ-TAS v1.1.0, PGvZ v1.0.1
 """
 from .card import Card, Shovel, SelectCards, LetsRock
 from .cob_manager import CobManager, GetCobRecoverTime
@@ -11,9 +11,6 @@ from .smart import AutoCollect
 from .time_operation import Delay, Prejudge, Until, DelayA
 from .util import *
 import LawnMod
-import Sexy
-
-pgvz_version = (1, 0, 0)
 
 script_manager = ScriptManager()
 # 默认注册一个自动收集（可收集盆栽），要关掉就调用auto_collector.Off()方法
@@ -48,5 +45,5 @@ __all__ = [
     "Delay", "Prejudge", "Until", "DelayA",
     "PixelToGrid", "GridToPixel", "MouseDragGrid", "SeedTypeNone", "SetPlantOnBoard", 
     "IterAliveZombies", "IterAlivePlants", "IterAliveCoins", "IterAliveGridItems",
-    "pgvz_version", "script_manager", "auto_collector",
+    "script_manager", "auto_collector",
 ]

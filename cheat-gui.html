@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <title>植物娘修改器</title>
     <!-- Element Plus CSS -->
-    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/element-plus/2.9.1/index.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.14.0/dist/index.min.css">
     <style>
         body {
             margin: 20px;
@@ -140,6 +140,7 @@
                                 />
                             </el-select>
                             <el-checkbox v-model="isImitater">模仿者</el-checkbox>
+                            <el-checkbox v-model="potLeft">花园盆栽反向</el-checkbox>
                         </el-card>
                     </el-col>
                     <el-col :span="8">
@@ -158,7 +159,7 @@
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.RakeOnBoard(${selectedRow}, ${selectedCol})`)">放置钉耙</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.GivePottedPlant(Lawn.SeedType.${selectedSeedType})`)">获得花园盆栽</el-button>
+                                @click="send(`cheat_option.GivePottedPlant(Lawn.SeedType.${selectedSeedType}, reverse=${potLeft ? 'True' : 'False'})`)">获得花园盆栽</el-button>
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.AddLawnMower()`)">放置割草机</el-button>
                             <el-button type="primary" style="margin-top:8px"
@@ -285,8 +286,8 @@
     </div>
 
     <!-- Vue 3 + Element Plus CDN -->
-    <script src="https://cdn.bootcdn.net/ajax/libs/vue/3.3.4/vue.global.prod.js"></script>
-    <script src="https://cdn.bootcdn.net/ajax/libs/element-plus/2.9.1/index.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.5.34/dist/vue.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/element-plus@2.14.0/dist/index.full.min.js"></script>
 
     <script>
         const { createApp, ref, reactive, onMounted } = Vue;
@@ -640,6 +641,7 @@
                 const selectedRow = ref(-1);
                 const selectedCol = ref(-1);
                 const isImitater = ref(false);
+                const potLeft = ref(false);
                 const autoCollect = ref(true);
                 const lastResult = reactive({ ok: true, text: '等待指令...' });
                 const customCode = ref('');
@@ -820,6 +822,7 @@
                     selectedSeedType,
                     selectedZombieType,
                     selectedLevel,
+                    potLeft,
                     lastResult,
                     send,
                     SetSpeed,

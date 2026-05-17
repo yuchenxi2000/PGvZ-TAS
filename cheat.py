@@ -17,6 +17,8 @@ from pgvz import *
 def Debug__ASSERT(orig, value: bool):
     return
 
+# 作弊选项，其中成员设置为True就是开启。还包括一些包装好的函数
+# 推荐配合cheat-gui.html使用
 class CheatOption:
     def __init__(self) -> None:
         self.wontLose = False
@@ -183,10 +185,11 @@ class CheatOption:
         gvar.glawnapp.KillDialog(19)
         gvar.gboard.ZombiesWon(zombie)
     
-    def GivePottedPlant(self, seedtype: Lawn.SeedType):
+    def GivePottedPlant(self, seedtype: Lawn.SeedType, reverse: bool = False):
         pottedPlant = Lawn.PottedPlant()
         pottedPlant.InitializePottedPlant(seedtype)
         pottedPlant.mPlantAge = Lawn.PottedPlantAge.Full
+        pottedPlant.mFacing = Lawn.PottedPlant.FacingDirection.Left if reverse else Lawn.PottedPlant.FacingDirection.Right
         gvar.glawnapp.mZenGarden.AddPottedPlant(pottedPlant)
     
     def GetFinishedAccount(self):
