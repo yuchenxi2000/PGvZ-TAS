@@ -44,12 +44,15 @@ def SetPE12():
             board.AddALadder(col - 1, row - 1)
     # 设置关卡数
     board.mChallenge.mSurvivalStage = 2000
+    # 清理僵尸
+    for zombie in IterAliveZombies():
+        zombie.DieNoLoot(False)
     # 直接下一关
     board.FadeOutLevel()
 
-def HasAliveZombieInFront() -> bool:
+def HasAliveZombieInFront(wave: int) -> bool:
     for zombie in IterAliveZombies():
-        if zombie.mPosX > 480:
+        if zombie.mFromWave == wave and zombie.mPosX > 480:
             return True
     return False
 
@@ -73,6 +76,20 @@ def BlowBalloonZombieBehind():
 
 def RunPE12():
     board = gvar.gboard
+
+    # 选卡
+    yield from SelectCards([
+        Lawn.SeedType.Iceshroom,
+        Lawn.SeedType.InstantCoffee,
+        Lawn.SeedType.Doomshroom,
+        Lawn.SeedType.Lilypad,
+        Lawn.SeedType.Cherrybomb,
+        Lawn.SeedType.Blover,
+        Lawn.SeedType.Kernelpult,
+        Lawn.SeedType.Cobcannon,
+        Lawn.SeedType.Pumpkinshell,
+        Lawn.SeedType.Sunflower,
+    ])
 
     # 自动吹气球
     script_manager.RunInThread(BlowBalloonZombieBehind)
@@ -109,9 +126,9 @@ def RunPE12():
         # 收尾额外多炸两轮
         if wave in (9, 19, 20):
             for _ in range(3):
-                yield from Delay(601)
+                yield from DelayA(601)
                 # 检查是否存在前场僵尸
-                if HasAliveZombieInFront():
+                if HasAliveZombieInFront(wave - 1):
                     cob_manager.Fire((2, 8.8), (5, 8.8))
                 else:
                     break

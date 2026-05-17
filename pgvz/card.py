@@ -1,6 +1,6 @@
 import Lawn
 import Sexy
-from .util import GridToPixel
+from .util import GridToPixel, SeedTypeNone
 from .global_var import gvar
 
 # 种卡
@@ -8,6 +8,8 @@ from .global_var import gvar
 # Lawn.SeedPacket.MouseDown(int x, int y, int theClickCount)
 # Lawn.Board.MouseDownWithPlant(int x, int y, int theClickCount)
 def RawCard(seedpacket: Lawn.SeedPacket, row: int, col) -> bool:
+    if gvar.opCanceled:
+        return False
     board = gvar.gboard
     col = int(col + 0.5)
     isImitater = seedpacket.mPacketType == Lawn.SeedType.Imitater
@@ -42,6 +44,8 @@ def Card(seedtype: Lawn.SeedType, row: int, col, isImitater: bool = False) -> bo
     return False
 
 def Shovel(row: int, col: int, seedtype: Lawn.SeedType = None):  # type: ignore
+    if gvar.opCanceled:
+        return
     board = gvar.gboard
     x = col * 80
     y = board.GridToPixelY(col - 1, row - 1) + 40
@@ -54,13 +58,80 @@ def Shovel(row: int, col: int, seedtype: Lawn.SeedType = None):  # type: ignore
     board.RefreshSeedPacketFromCursor()
     Sexy.Debug.Log(f'shovel plant at {row} {col}, type {seedtype}')
 
-# TODO: unfinished, DO NOT USE
-def ChooseSeed(seedtypelist):  # type: (list[Lawn.SeedType]) -> None
-    choose_screen = gvar.glawnapp.mSeedChooserScreen
-    for i in range(60):
-        chosen_seed = choose_screen.mChosenSeeds[i]
-        if chosen_seed is None:
-            continue
-        if chosen_seed.mSeedType in seedtypelist and chosen_seed.mSeedState == Lawn.ChosenSeedState.SEED_IN_CHOOSER:
-            choose_screen.ClickedSeedInChooser(chosen_seed)
-            Sexy.Debug.Log(f'choose seed success')
+def LetsRock():
+    seedChooserScreen = gvar.glawnapp.mSeedChooserScreen
+    if seedChooserScreen is None:
+        raise StopIteration
+    while seedChooserScreen.mSeedsInFlight > 0 \
+        or seedChooserScreen.mChooseState == Lawn.SeedChooserState.ViewLawn \
+            or seedChooserScreen.mSeedsInBank < gvar.gboard.mSeedBank.mNumPackets:
+        yield
+    seedChooserScreen.CloseSeedChooser()
+
+def SelectCards(seedList: list, *args, waitTime: int = 200):
+    # imitater type
+    if len(args) == 0:
+        imitaterType = SeedTypeNone
+    if len(args) == 1:
+        imitaterType = args[0]
+    elif len(args) >= 2:
+        Sexy.Debug.Log(f'SelectCards: argument error')
+        raise StopIteration
+    # cannot choose seed in fight
+    if gvar.glawnapp.mGameScene != Lawn.GameScenes.LevelIntro:
+        raise StopIteration
+    seedChooserScreen = gvar.glawnapp.mSeedChooserScreen
+    # wait until chooser screen appears
+    while not seedChooserScreen.mMouseVisible:
+        yield
+    # find seed position
+    seedsToChoose = []  # type: list[Lawn.SeedType]
+    seedsToKeep = []  # type: list[Lawn.SeedType]
+    for seedtype in seedList:
+        chosenSeed = seedChooserScreen.mChosenSeeds[int(seedtype)]
+        if chosenSeed.mSeedState in [Lawn.ChosenSeedState.SEED_IN_CHOOSER, Lawn.ChosenSeedState.SEED_FLYING_TO_CHOOSER]:
+            seedsToChoose.append(seedtype)
+        elif chosenSeed.mSeedState in [Lawn.ChosenSeedState.SEED_IN_BANK, Lawn.ChosenSeedState.SEED_FLYING_TO_BANK]:
+            if seedtype == Lawn.SeedType.Imitater and chosenSeed.mImitaterType != imitaterType:
+                seedsToChoose.append(seedtype)
+            else:
+                seedsToKeep.append(seedtype)
+        elif seedtype == Lawn.SeedType.Imitater:
+            seedsToChoose.append(seedtype)
+        else:
+            Sexy.Debug.Log(f'SelectCards: cannot choose seed {seedtype}!')
+    # drop seeds in bank but not in list
+    for i in range(54):
+        chosenSeed = seedChooserScreen.mChosenSeeds[i]
+        seedtype = Lawn.SeedType(i)
+        if chosenSeed.mSeedState in [Lawn.ChosenSeedState.SEED_IN_BANK, Lawn.ChosenSeedState.SEED_FLYING_TO_BANK]:
+            if seedtype in seedsToKeep:
+                continue
+            while seedChooserScreen.mSeedsInFlight > 0:
+                yield
+            Sexy.Debug.Log(f'drop {seedtype}')
+            seedChooserScreen.ClickedSeedInBank(chosenSeed)
+    # choose seeds in list but not in bank
+    for seedtype in seedsToChoose:
+        chosenSeed = seedChooserScreen.mChosenSeeds[int(seedtype)]
+        while seedChooserScreen.mSeedsInFlight > 0:
+            yield
+        Sexy.Debug.Log(f'choose {seedtype}')
+        if chosenSeed.mSeedType == Lawn.SeedType.Imitater:
+            chosenSeed.mSeedState = Lawn.ChosenSeedState.SEED_IN_CHOOSER
+            chosenSeed.mImitaterType = imitaterType
+            chosenSeed.mX, chosenSeed.mY = seedChooserScreen.GetSeedPositionInChooser(53, chosenSeed.mX, chosenSeed.mY)  # type: ignore
+            seedChooserScreen.ClickedSeedInChooser(chosenSeed)
+            seedChooserScreen.UpdateImitaterButton()
+        else:
+            seedChooserScreen.ClickedSeedInChooser(chosenSeed)
+            # 什么乱七八糟的不推荐变灰植物来挡我视线，西内
+            if gvar.glawnapp.GetDialog(16) is not None:
+                gvar.glawnapp.KillDialog(16)
+                seedChooserScreen.ClickedSeedInChooser(chosenSeed)
+    # 等待一段时间，然后开始游戏
+    for _ in range(waitTime):
+        if gvar.glawnapp.mGameScene != Lawn.GameScenes.Playing:
+            yield
+    # 开始游戏
+    yield from LetsRock()

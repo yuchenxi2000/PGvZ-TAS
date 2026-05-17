@@ -4,6 +4,8 @@ from .util import IterAlivePlants
 from .global_var import gvar
 
 def RawFire(cobCannon: Lawn.Plant, row: int, col: float):
+    if gvar.opCanceled:
+        return
     board = gvar.gboard
     board.RefreshSeedPacketFromCursor()
     tCol = int(col + 0.5)

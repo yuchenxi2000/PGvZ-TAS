@@ -30,7 +30,7 @@ TAS框架的模块是pgvz，编写脚本先要import这个模块。
 
 接口和植物大战僵尸原版的[pyvz](https://pvz.tools/scripts/)、[AvZ](https://github.com/vector-wlc/AsmVsZombies)框架类似，如果熟悉这两个框架会容易一些。因为接口类似，建议先阅读[pyvz](https://pvz.tools/scripts/)的教程。
 
-由于时间精力关系，本模块没有实现所有功能。本模块实现的主要功能有种植物`Card`、铲植物`Shovel`、发射玉米炮`CobManager.Fire`、时间相关操作`Delay`,`Prejudge`,`Until`，以及一些常用操作，比如迭代所有存活植物/僵尸/物品`IterAliveZombies`,`IterAlivePlants`,`IterAliveCoins`等。
+由于时间精力关系，本模块没有实现所有功能。本模块实现的主要功能有种植物`Card`、铲植物`Shovel`、选卡`SelectCards`、发射玉米炮`CobManager.Fire`、时间相关操作`Delay`,`Prejudge`,`Until`，`DelayA`，以及一些常用操作，比如迭代所有存活植物/僵尸/物品`IterAliveZombies`,`IterAlivePlants`,`IterAliveCoins`等。
 
 下面介绍和pyvz、AvZ的异同：
 
@@ -75,7 +75,21 @@ TAS框架的模块是pgvz，编写脚本先要import这个模块。
         ...
     ```
 
+    选卡函数`SelectCards`，开始游戏`LetsRock`也是阻塞操作，也需要在前面加`yield from`。或者，凡是函数内含`yield`关键字的都是生成器函数，要以类似方式调用。
+
+    选卡函数的参数是一个`Lawn.SeedType`的列表，以及一个可选参数。如果要选模仿者，那么在列表里填模仿者，然后第二个可选参数填要模仿的植物。选完卡默认等2秒开始游戏，可以改`waitTime`参数来改等待时长。
+
+    如果你的阻塞脚本没有使用任何阻塞函数，那么要在末尾加个`yield`使其成为生成器函数，不然会被认为是非阻塞。
+
 6. 不同于pyvz和AvZ，本框架可以调用任意游戏内部函数。内部函数可以通过反编译得到（比如用ILSpy），也可以参考`typings`目录下的`.pyi`存根文件，它们列出了所有游戏内部C#对象/方法的Python对应。所以要使用左键点击直接调用`Lawn.Board.MouseDown`（用全局对象获取游戏`Board`对象，`gvar.gboard`），本框架不再提供此类接口
+
+7. 不同于pyvz和AvZ，本框架支持中途退出游戏。重进以后会从原来退出的时间点继续脚本操作，过去时间点的操作会无视，不会像pyvz和AvZ一样过去时间点的堆积到现在时间点操作。
+
+    但是写脚本时必须需要用`DelayA`替换`Delay`，后者只是为了和pyvz的旧API保持一致。`DelayA`在退出重进时，能保证其行为和非中途退出重进情形一致，但Delay不行，因为Delay等待固定时长，而DelayA的参考点是刷新点。因此，`DelayA`前面一定要有`Prejudge`。
+    
+    此外，脚本编写时要注意都以刷新点为参考点，避免出现等待固定时长，或直接判断场上是否存在僵尸而不额外判断僵尸是否属于本波次等。
+
+    如果不在写脚本时注意使用绝对参考点，本框架也能在有限程度上支持退出重进，只不过仍存在一些误操作可能。因此最好关卡结束（普通关卡）或重新回到选卡界面（生存模式）后再退出。
 
 可以参考本仓库的示例脚本，`pe12.py`是泳池无尽的经典十二炮脚本（阻塞脚本），`beghouled.py`是宝石迷阵系列的自动脚本（非阻塞），`whackazombie.py`是锤僵尸自动脚本（非阻塞）。
 
@@ -91,7 +105,7 @@ TAS框架的模块是pgvz，编写脚本先要import这个模块。
 
 1. 使用`LawnMod.MonoModUtils.HookTo`装饰器
 
-2. 使用`LawnMod.MonoModUtils.As`装饰器，然后用`LawnMod.MonoModUtils.On`的+运算符
+2. 使用`LawnMod.MonoModUtils.As`装饰器，然后用`LawnMod.MonoModUtils.On`的+运算符，这样的好处是可以用-运算符卸载钩子。但注意如果用了多次+运算符挂同一个函数，该函数会被执行多次！
 
 注意被包装函数的第一个参数是原方法。如果是成员方法，第二个参数是对象，后续是类方法的参数；如果是静态方法，则没有对象参数。
 

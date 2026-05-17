@@ -280,7 +280,7 @@ class CheatOption:
             gvar.glawnapp.KillDialog(3)  # 图鉴
             gvar.glawnapp.KillDialog(4)  # 商店
             gvar.glawnapp.KillDialog(19)  # 暂停
-            gvar.glawnapp.KillDialog(37)  # 暂停
+            gvar.glawnapp.KillDialog(37)  # 继续
             gvar.glawnapp.KillDialog(65)  # 钉耙
             # 删除所有界面
             if gvar.glawnapp.mGameScene == Lawn.GameScenes.Playing or gvar.glawnapp.mGameScene == Lawn.GameScenes.LevelIntro:

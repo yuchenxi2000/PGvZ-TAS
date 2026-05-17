@@ -109,7 +109,9 @@ class ScriptManager:
         for scriptObj in finishedGlobalScripts:
             self.globalScriptList.remove(scriptObj)
         # 退出战斗界面时卸载被设置为只运行一次的脚本
-        if self.prev_scene == Lawn.GameScenes.Playing and lawnapp.mGameScene != Lawn.GameScenes.Playing:
+        leaveFight = self.prev_scene == Lawn.GameScenes.Playing and lawnapp.mGameScene != Lawn.GameScenes.Playing
+        backToMain = self.prev_scene == Lawn.GameScenes.LevelIntro and lawnapp.mGameScene not in [Lawn.GameScenes.Playing, Lawn.GameScenes.LevelIntro]
+        if leaveFight or backToMain:
             if self.loaded:
                 tmpList = []
                 for scriptObj in self.scriptList:
