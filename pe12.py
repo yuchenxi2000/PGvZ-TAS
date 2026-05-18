@@ -91,6 +91,9 @@ def RunPE12():
         Lawn.SeedType.Sunflower,
     ])
 
+    # 备份存档
+    SurvivalBackupGame()
+
     # 自动吹气球
     script_manager.RunInThread(BlowBalloonZombieBehind)
     

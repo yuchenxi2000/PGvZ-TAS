@@ -1,4 +1,6 @@
 import Lawn
+import Sexy
+import pathlib
 from .global_var import gvar
 
 # 坐标转成行列
@@ -61,3 +63,12 @@ def IterAliveGridItems():
         grid_item = board.mGridItems[i]
         if not grid_item.mDead:
             yield grid_item
+
+def SurvivalBackupGame(max_backup: int = 3):
+    savedGameName = f'docs/userdata/game{gvar.glawnapp.mPlayerInfo.mId}_{int(gvar.glawnapp.mGameMode)}_{gvar.gboard.mChallenge.mSurvivalStage}.dat'
+    gvar.gboard.SaveGame(savedGameName)
+    saveToDelete = f'docs/userdata/game{gvar.glawnapp.mPlayerInfo.mId}_{int(gvar.glawnapp.mGameMode)}_{gvar.gboard.mChallenge.mSurvivalStage - max_backup}.dat'
+    saveDir = Sexy.GlobalStaticVars.gSexyAppBase.applicationStoragePath
+    pathSaveToDelete = pathlib.Path(saveDir).joinpath(saveToDelete)
+    if pathSaveToDelete.is_file():
+        pathSaveToDelete.unlink()
