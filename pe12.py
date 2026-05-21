@@ -77,6 +77,21 @@ def BlowBalloonZombieBehind():
 def RunPE12():
     board = gvar.gboard
 
+    # 根据需要设置僵尸列表。第二个参数为True是自然出怪（调用内部出怪函数），由于自然出怪限制可能实际出怪不会包括所有设置的僵尸
+    # SetZombies([
+    #     Lawn.ZombieType.Gargantuar,
+    #     Lawn.ZombieType.RedeyeGargantuar,
+    #     Lawn.ZombieType.Polevaulter,
+    #     Lawn.ZombieType.Dancer,
+    #     Lawn.ZombieType.Zamboni,
+    #     Lawn.ZombieType.DolphinRider,
+    #     Lawn.ZombieType.Digger,
+    #     Lawn.ZombieType.Pogo,
+    #     Lawn.ZombieType.Ladder,
+    #     Lawn.ZombieType.Catapult,
+    #     Lawn.ZombieType.Bungee,
+    # ], False)
+
     # 选卡
     yield from SelectCards([
         Lawn.SeedType.Iceshroom,

@@ -30,7 +30,7 @@ TAS框架的模块是pgvz，编写脚本先要import这个模块。
 
 接口和植物大战僵尸原版的[pyvz](https://pvz.tools/scripts/)、[AvZ](https://github.com/vector-wlc/AsmVsZombies)框架类似，如果熟悉这两个框架会容易一些。因为接口类似，建议先阅读[pyvz](https://pvz.tools/scripts/)的教程。
 
-由于时间精力关系，本模块没有实现所有功能。本模块实现的主要功能有种植物`Card`、铲植物`Shovel`、选卡`SelectCards`、发射玉米炮`CobManager.Fire`、时间相关操作`Delay`,`Prejudge`,`Until`，`DelayA`，以及一些常用操作，比如迭代所有存活植物/僵尸/物品`IterAliveZombies`,`IterAlivePlants`,`IterAliveCoins`等。
+本模块基本实现所有常用功能。包括种植物`Card`、铲植物`Shovel`、选卡`SelectCards`、设置僵尸列表`SetZombies`、发射玉米炮`CobManager.Fire`、时间相关操作`Delay`,`Prejudge`,`Until`，`DelayA`，以及一些常用操作，比如迭代所有存活植物/僵尸/物品`IterAliveZombies`,`IterAlivePlants`,`IterAliveCoins`等。
 
 下面介绍和pyvz、AvZ的异同：
 
@@ -112,6 +112,16 @@ TAS框架的模块是pgvz，编写脚本先要import这个模块。
 注意被包装函数的第一个参数是原方法。如果是成员方法，第二个参数是对象，后续是类方法的参数；如果是静态方法，则没有对象参数。
 
 具体写法详见`cheat.py`以及`pgvz/__init__.py`。
+
+## 附录：进入生存月夜无尽方法
+
+要配合修改器使用，修改器使用方法在上面。
+
+1. 先进入僵王博士的复仇，开启连续传送带把传送带占满，然后修改卡槽直到不存在一样的卡片（不然无法正常选卡）
+
+2. 关闭自动收集，杀死所有僵尸，选择掉落物类型钱袋，然后清除掉落物
+
+3. 设置生存模式轮数为-1，然后点击直接过关，随后可以正常选卡游玩
 
 ## 参考资料
 
