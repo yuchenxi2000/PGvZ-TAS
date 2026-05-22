@@ -43,7 +43,7 @@ class CheatOption:
         self.disableNinja = False
         self.visibleGhoul = False
         self.noThunder = False
-        self.diamondPhonograph = False
+        self.diamondZenTools = False
         self.noFog = False
         self.transScaryPot = False
         self.conveyorNoCooling = False
@@ -51,6 +51,11 @@ class CheatOption:
         self.butterPult = False
         self.doubleGatlingpea = False
         self.fullAreaGloomshroom = False
+        self.enableGlove = False
+        self.zombieStop = False
+        self.chomperNoCooling = False
+        self.noCover = False
+        self.stopSpawning = False
 
     def ConvertRange(self, row: int, col: int):
         NRow = 6 if gvar.gboard.StageHas6Rows() else 5
@@ -87,7 +92,7 @@ class CheatOption:
             plant.Die()
     
     @main_thread
-    def ZombieOnBoard(self, row: int, col: int, zombietype: Lawn.ZombieType):
+    def ZombieOnBoard(self, row: int, col: int, zombietype: Lawn.ZombieType, mind_ctrl: bool = False):
         row_range, col_range = self.ConvertRange(row, col)
         curwave = gvar.gboard.mCurrentWave
         for row1 in row_range:
@@ -96,6 +101,7 @@ class CheatOption:
                 zombie = gvar.gboard.AddZombieInRow(zombietype, row1, curwave)
                 zombie.mPosX = xi
                 zombie.mX = xi
+                zombie.mMindControlled = mind_ctrl
                 if zombietype == Lawn.ZombieType.Bungee:
                     zombie.mTargetCol = col1
                     zombie.SetRow(row1)
@@ -413,9 +419,11 @@ def Board__GetCurrentPlantCost(orig, board: Lawn.Board, plantType: Lawn.SeedType
     else:
         return orig(board, plantType, plantImitaterType)
 
-# 满阳光+无冷却
-# gvar.gboard.mSunMoney = 9990  # 满阳光
-# gvar.glawnapp.mEasyPlantingCheat = True  # 无冷却
+# 无限阳光
+def ScriptInfSun():
+    gvar.gboard.mSunMoney = 9990
+script_inf_sun = script_manager.Register(ScriptInfSun, runmode=ScriptRunMode.FOREVER)
+script_inf_sun.Off()
 
 # 房主无敌
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.ZombiesWon)
@@ -448,6 +456,26 @@ def Challenge__UpdateConveyorBelt(orig, challenge: Lawn.Challenge):
             seedbank.mSeedPackets[i].mOffsetY = 0
     else:
         orig(challenge)
+
+# 启用手套
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.HasGlove)
+def Board__HasGlove(orig, board: Lawn.Board):
+    if cheat_option.enableGlove:
+        return board.mApp.mGameMode not in [Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom]
+    else:
+        return orig(board)
+
+# 僵尸停滞不前
+@LawnMod.MonoModUtils.HookTo(Lawn.Zombie.UpdateZombieWalking)
+def Zombie__UpdateZombieWalking(orig, zombie: Lawn.Zombie):
+    if not cheat_option.zombieStop:
+        orig(zombie)
+
+# 暂停出怪
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.UpdateZombieSpawning)
+def Board__UpdateZombieSpawning(orig, board: Lawn.Board):
+    if not cheat_option.stopSpawning:
+        orig(board)
 
 # 僵尸无敌
 # 魅惑不算僵尸死了所以不管
@@ -590,7 +618,16 @@ def Plant__Update(orig, plant: Lawn.Plant):
         plant.mStateCountdown = 0
     elif plant.mState == Lawn.PlantState.ChomperBitingGotOne and cheat_option.zombieNoDie:
         plant.mState = Lawn.PlantState.ChomperBitingMissed
+    elif plant.mState == Lawn.PlantState.ChomperDigesting and cheat_option.chomperNoCooling:
+        plant.mStateCountdown = 0
     orig(plant)
+
+# 技能无冷却
+def ScriptKillNoCooling():
+    gvar.gboard.mAgavePowerfulCountdown = 0
+    gvar.gboard.mEndoflamePowerfulCountdown = 0
+script_skill_nocooling = script_manager.Register(ScriptKillNoCooling, runmode=ScriptRunMode.FOREVER)
+script_skill_nocooling.Off()
 
 # 天尸不得施法
 @LawnMod.MonoModUtils.HookTo(Lawn.Zombie.UpdateZombieTalisman)
@@ -629,6 +666,12 @@ def Challenge__IsStormyNightPitchBlack(orig, challenge: Lawn.Challenge):
     else:
         return orig(challenge)
 
+# 去除右侧遮挡
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.DrawCoverLayer)
+def Board__DrawCoverLayer(orig, board: Lawn.Board, graphics: Sexy.Graphics, theRow: int):
+    if not cheat_option.noCover:
+        orig(board, graphics, theRow)
+
 def NewGridItemZenTool(plant: Lawn.Plant):
     gridItem = Lawn.GridItem.GetNewGridItem()
     gridItem.mGridItemType = Lawn.GridItemType.ZenTool
@@ -642,7 +685,7 @@ def NewGridItemZenTool(plant: Lawn.Plant):
 # 全屏留声机、花肥、杀虫剂
 @LawnMod.MonoModUtils.HookTo(Lawn.ZenGarden.MouseDownWithFeedingTool)
 def ZenGarden__MouseDownWithFeedingTool(orig, zenGarden: Lawn.ZenGarden, x: int, y: int, theCursorType: Lawn.CursorType, isTouch: bool):
-    if cheat_option.diamondPhonograph and theCursorType in [Lawn.CursorType.Fertilizer, Lawn.CursorType.BugSpray, Lawn.CursorType.Phonograph]:
+    if cheat_option.diamondZenTools and theCursorType in [Lawn.CursorType.Fertilizer, Lawn.CursorType.BugSpray, Lawn.CursorType.Phonograph]:
         for i in range(zenGarden.mBoard.mPlants.Count):
             plant = zenGarden.mBoard.mPlants[i]
             if not plant.mDead and zenGarden.mBoard.GetTopPlantAt(plant.mPlantCol, plant.mRow, Lawn.TopPlant.ZenToolOrder) == plant:

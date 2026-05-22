@@ -22,7 +22,9 @@ by yuchenxi2000
 
 ## 修改器使用方法
 
-按上节方法，将`pgvz`文件夹和`cheat.py`放到`mods`目录下，然后双击`cheat-gui.html`开始使用
+1. 按上节方法，将`pgvz`文件夹和`cheat.py`放到`mods`目录下；或者直接运行`cp-cheat-mods.bat`
+
+2. 双击`cheat-gui.html`开始使用
 
 ## 脚本编写教程
 

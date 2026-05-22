@@ -66,28 +66,34 @@
                     <el-col :span="8">
                         <el-card shadow="hover" class="command-card">
                             <template #header>常用修改</template>
-                            <el-checkbox v-model="autoCollect" @change="SetAutoCollect">自动收集</el-checkbox>
-                            <el-checkbox v-model="runBackground" @change="SetRunBackground">后台运行</el-checkbox>
-                            <el-checkbox v-model="freePlant" @change="SetFreePlant">植物免费</el-checkbox>
-                            <el-checkbox v-model="noCooldown" @change="SetNoCooldown">无冷却种植</el-checkbox>
-                            <el-checkbox v-model="plantAnyWhere" @change="SetPlantAnyWhere">随意种植</el-checkbox>
-                            <el-checkbox v-model="conveyorNoCooling" @change="SetConveyorNoCooling">连续传送带</el-checkbox>
-                            <el-checkbox v-model="plantNoDie" @change="SetPlantNoDie">植物无敌</el-checkbox>
-                            <el-checkbox v-model="zombieNoDie" @change="SetZombieNoDie">僵尸无敌</el-checkbox>
-                            <el-checkbox v-model="wontLose" @change="SetWontLose">房主无敌</el-checkbox>
+                            <el-checkbox v-model="cheatOption.autoCollect">自动收集</el-checkbox>
+                            <el-checkbox v-model="cheatOption.runBackground">后台运行</el-checkbox>
+                            <el-checkbox v-model="cheatOption.freePlant">植物免费</el-checkbox>
+                            <el-checkbox v-model="cheatOption.noCooldown">无冷却种植</el-checkbox>
+                            <el-checkbox v-model="cheatOption.plantAnyWhere">随意种植</el-checkbox>
+                            <el-checkbox v-model="cheatOption.infSun">无限阳光</el-checkbox>
+                            <el-checkbox v-model="cheatOption.conveyorNoCooling">连续传送带</el-checkbox>
+                            <el-checkbox v-model="cheatOption.enableGlove">启用手套</el-checkbox>
+                            <el-checkbox v-model="cheatOption.plantNoDie">植物无敌</el-checkbox>
+                            <el-checkbox v-model="cheatOption.zombieNoDie">僵尸无敌</el-checkbox>
+                            <el-checkbox v-model="cheatOption.wontLose">房主无敌</el-checkbox>
+                            <el-checkbox v-model="cheatOption.zombieStop">僵尸停滞</el-checkbox>
+                            <el-checkbox v-model="cheatOption.stopSpawning">暂停出怪</el-checkbox>
                         </el-card>
                     </el-col>
                     <el-col :span="8">
                         <el-card shadow="hover" class="command-card">
                             <template #header>特性修改</template>
-                            <el-checkbox v-model="disableTalisman" @change="DisableTalisman">天尸不得施法</el-checkbox>
-                            <el-checkbox v-model="disableNinja" @change="DisableNinja">女忍者显形</el-checkbox>
-                            <el-checkbox v-model="diamondPhonograph" @change="SetDiamondPhonograph">全屏花园工具</el-checkbox>
-                            <el-checkbox v-model="cobNoCooling" @change="SetCobNoCooling">玉米炮无冷却</el-checkbox>
-                            <el-checkbox v-model="featureThreePeater" @change="SetFeatureThreePeater">三线边路加强</el-checkbox>
-                            <el-checkbox v-model="butterPult" @change="SetButterPult">黄油投手</el-checkbox>
-                            <el-checkbox v-model="doubleGatlingpea" @change="SetDoubleGatlingpea">机枪八颗豆</el-checkbox>
-                            <el-checkbox v-model="fullAreaGloomshroom" @change="SetFullAreaGloomshroom">全屏忧郁菇</el-checkbox>
+                            <el-checkbox v-model="cheatOption.disableTalisman">天尸不得施法</el-checkbox>
+                            <el-checkbox v-model="cheatOption.disableNinja">女忍者显形</el-checkbox>
+                            <el-checkbox v-model="cheatOption.diamondZenTools">全屏花园工具</el-checkbox>
+                            <el-checkbox v-model="cheatOption.cobNoCooling">玉米炮无冷却</el-checkbox>
+                            <el-checkbox v-model="cheatOption.chomperNoCooling">大嘴花无冷却</el-checkbox>
+                            <el-checkbox v-model="cheatOption.skillNoCooling">技能无冷却</el-checkbox>
+                            <el-checkbox v-model="cheatOption.featureThreePeater">三线边路加强</el-checkbox>
+                            <el-checkbox v-model="cheatOption.butterPult">黄油投手</el-checkbox>
+                            <el-checkbox v-model="cheatOption.doubleGatlingpea">机枪八颗豆</el-checkbox>
+                            <el-checkbox v-model="cheatOption.fullAreaGloomshroom">全屏忧郁菇</el-checkbox>
                         </el-card>
                     </el-col>
                 </el-row>
@@ -145,6 +151,7 @@
                                 />
                             </el-select>
                             <el-checkbox v-model="isImitater">模仿者</el-checkbox>
+                            <el-checkbox v-model="mindCtrl">僵尸被魅惑</el-checkbox>
                             <el-checkbox v-model="potLeft">花园盆栽反向</el-checkbox>
                         </el-card>
                     </el-col>
@@ -214,7 +221,7 @@
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.PlantOnBoard(${selectedRow}, ${selectedCol}, Lawn.SeedType.${selectedSeedType}, ${isImitater ? 'True' : 'False'})`)">种植植物</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.ZombieOnBoard(${selectedRow}, ${selectedCol}, Lawn.ZombieType.${selectedZombieType})`)">召唤僵尸</el-button>
+                                @click="send(`cheat_option.ZombieOnBoard(${selectedRow}, ${selectedCol}, Lawn.ZombieType.${selectedZombieType}, mind_ctrl=${mindCtrl ? 'True' : 'False'})`)">召唤僵尸</el-button>
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.SetSeedPacket(${selectedPacketIdx}, Lawn.SeedType.${selectedSeedType}, ${isImitater ? 'True' : 'False'})`)">换卡片</el-button>
                             <el-button type="primary" style="margin-top:8px"
@@ -265,10 +272,11 @@
                     <el-col :span="8">
                         <el-card shadow="hover" class="command-card">
                             <template #header>场景修改</template>
-                            <el-checkbox v-model="noFog" @change="SetNoFog">移除迷雾</el-checkbox>
-                            <el-checkbox v-model="transScaryPot" @change="SetTransScaryPot">罐子透视</el-checkbox>
-                            <el-checkbox v-model="visibleGhoul" @change="SetVisibleGhoul">隐形僵尸显形</el-checkbox>
-                            <el-checkbox v-model="noThunder" @change="SetNoThunder">暴风雨不瞎眼</el-checkbox>
+                            <el-checkbox v-model="cheatOption.noFog">移除迷雾</el-checkbox>
+                            <el-checkbox v-model="cheatOption.transScaryPot">罐子透视</el-checkbox>
+                            <el-checkbox v-model="cheatOption.visibleGhoul">隐形僵尸显形</el-checkbox>
+                            <el-checkbox v-model="cheatOption.noThunder">暴风雨不瞎眼</el-checkbox>
+                            <el-checkbox v-model="cheatOption.noCover">去除右侧遮挡</el-checkbox>
                         </el-card>
                     </el-col>
                     <el-col :span="8">
@@ -1176,8 +1184,6 @@
                 const statusText = ref('未连接');
                 const activeTab = ref('player');
                 const speed = ref(1);
-                const runBackground = ref(false);
-                const noCooldown = ref(false);
                 const sunValue = ref(9990);
                 const moneyValue = ref(999999);
                 const treeHeight = ref(1000);
@@ -1185,24 +1191,6 @@
                 const numSurvivalStage = ref(2000);
                 const coinX = ref(400);
                 const coinY = ref(300);
-                const conveyorNoCooling = ref(false);
-                const visibleGhoul = ref(false);
-                const noThunder = ref(false);
-                const noFog = ref(false);
-                const disableTalisman = ref(false);
-                const disableNinja = ref(false);
-                const freePlant = ref(false);
-                const plantNoDie = ref(false);
-                const zombieNoDie = ref(false);
-                const plantAnyWhere = ref(false);
-                const wontLose = ref(false);
-                const cobNoCooling = ref(false);
-                const transScaryPot = ref(false);
-                const diamondPhonograph = ref(false);
-                const featureThreePeater = ref(false);
-                const butterPult = ref(false);
-                const doubleGatlingpea = ref(false);
-                const fullAreaGloomshroom = ref(false);
                 const selectedSeedType = ref(seedTypes[0].value);
                 const selectedZombieType = ref(zombieTypes[0].value);
                 const selectedPacketIdx = ref(packetIdx[0].value);
@@ -1214,8 +1202,8 @@
                 const selectedScaryPotType = ref(scaryPotType[1].value);
                 const selectedScaryPotAppearance = ref(scaryPotAppearance[0].value);
                 const isImitater = ref(false);
+                const mindCtrl = ref(false);
                 const potLeft = ref(false);
-                const autoCollect = ref(true);
                 const lastResult = reactive({ ok: true, text: '等待指令...' });
                 const customCode = ref('');
                 const customCodeError = ref('');
@@ -1236,13 +1224,107 @@
                     lastResult.text = '⏳ 已发送，等待结果...';
                 }
 
+                // ========== 修改器状态 ============
+                const optionConfig = [
+                    'autoCollect',
+                    'runBackground',
+                    'freePlant',
+                    'noCooldown',
+                    'plantAnyWhere',
+                    'infSun',
+                    'conveyorNoCooling',
+                    'enableGlove',
+                    'plantNoDie',
+                    'zombieNoDie',
+                    'zombieStop',
+                    'wontLose',
+                    'stopSpawning',
+                    'disableTalisman',
+                    'disableNinja',
+                    'diamondZenTools',
+                    'cobNoCooling',
+                    'chomperNoCooling',
+                    'skillNoCooling',
+                    'featureThreePeater',
+                    'butterPult',
+                    'doubleGatlingpea',
+                    'fullAreaGloomshroom',
+                    'noFog',
+                    'transScaryPot',
+                    'visibleGhoul',
+                    'noThunder',
+                    'noCover',
+                ];
+                const cheatOption = reactive({});
+                optionConfig.forEach(item => {
+                    cheatOption[item] = false;
+                });
+                cheatOption['autoCollect'] = true;
+                cheatOption['runBackground'] = true;
+                function setCheatOption(key, value) {
+                    switch (key) {
+                        case 'runBackground':
+                            send(`Sexy.Main.RunWhenLocked = ${value ? 'True' : 'False'}`);
+                            break;
+                        
+                        case 'autoCollect':
+                            if (value) {
+                                send(`auto_collector.On()`);
+                            } else {
+                                send(`auto_collector.Off()`);
+                            }
+                            break;
+                        
+                        case 'skillNoCooling':
+                            if (value) {
+                                send(`script_skill_nocooling.On()`);
+                            } else {
+                                send(`script_skill_nocooling.Off()`);
+                            }
+                            break;
+
+                        case 'noCooldown':
+                            send(`gvar.glawnapp.mEasyPlantingCheat = ${value ? 'True' : 'False'}`);
+                            break;
+                        
+                        case 'infSun':
+                            if (value) {
+                                send(`script_inf_sun.On()`);
+                            } else {
+                                send(`script_inf_sun.Off()`);
+                            }
+                            break;
+                        
+                        default:
+                            send(`cheat_option.${key} = ${value ? 'True' : 'False'}`);
+                            break;
+                    }
+                }
+                function syncCheatOptions() {
+                    optionConfig.forEach(item => {
+                        setCheatOption(item, cheatOption[item]);
+                    });
+                }
+                watch(
+                    () => ({ ...cheatOption }),
+                    (newVal, oldVal) => {
+                        for (const key in newVal) {
+                            if (newVal[key] !== oldVal[key]) {
+                                setCheatOption(key, newVal[key]);
+                            }
+                        }
+                    },
+                    { deep: true }
+                );
+
                 // ========== WebSocket 连接 ==========
                 function connect() {
                     ws = new WebSocket(SERVER_URL);
                     ws.onopen = () => {
                         connected.value = true;
                         statusText.value = '✅ 已连接到游戏服务器';
-                        send('from pgvz import *\nfrom cheat import cheat_option\nimport Lawn\nimport Sexy\nimport Sexy.TodLib\nimport LawnMod\nimport pgvz.lineup');
+                        send('from pgvz import *\nfrom cheat import cheat_option, script_skill_nocooling, script_inf_sun\nimport Lawn\nimport Sexy\nimport Sexy.TodLib\nimport LawnMod\nimport pgvz.lineup');
+                        syncCheatOptions();
                     };
                     ws.onmessage = (event) => {
                         try {
@@ -1273,73 +1355,6 @@
                 // ========== 复选框联动 ==========
                 function SetSpeed(val) {
                     send(`cheat_option.SetSpeed(${val})`);
-                }
-                function SetAutoCollect(val) {
-                    if (val) {
-                        send(`auto_collector.On()`);
-                    } else {
-                        send(`auto_collector.Off()`);
-                    }
-                }
-                function SetRunBackground(val) {
-                    send(`Sexy.Main.RunWhenLocked = ${val ? 'True' : 'False'}`);
-                }
-                function SetFreePlant(val) {
-                    send(`cheat_option.freePlant = ${val ? 'True' : 'False'}`);
-                }
-                function SetPlantNoDie(val) {
-                    send(`cheat_option.plantNoDie = ${val ? 'True' : 'False'}`);
-                }
-                function SetZombieNoDie(val) {
-                    send(`cheat_option.zombieNoDie = ${val ? 'True' : 'False'}`);
-                }
-                function SetPlantAnyWhere(val) {
-                    send(`cheat_option.plantAnyWhere = ${val ? 'True' : 'False'}`);
-                }
-                function SetWontLose(val) {
-                    send(`cheat_option.wontLose = ${val ? 'True' : 'False'}`);
-                }
-                function SetConveyorNoCooling(val) {
-                    send(`cheat_option.conveyorNoCooling = ${val ? 'True' : 'False'}`)
-                }
-                function SetCobNoCooling(val) {
-                    send(`cheat_option.cobNoCooling = ${val ? 'True' : 'False'}`)
-                }
-                function DisableTalisman(val) {
-                    send(`cheat_option.disableTalisman = ${val ? 'True' : 'False'}`);
-                }
-                function DisableNinja(val) {
-                    send(`cheat_option.disableNinja = ${val ? 'True' : 'False'}`);
-                }
-                function SetVisibleGhoul(val) {
-                    send(`cheat_option.visibleGhoul = ${val ? 'True' : 'False'}`);
-                }
-                function SetNoThunder(val) {
-                    send(`cheat_option.noThunder = ${val ? 'True' : 'False'}`);
-                }
-                function SetNoCooldown(val) {
-                    send(`gvar.glawnapp.mEasyPlantingCheat = ${val ? 'True' : 'False'}`);
-                }
-                function SetNoFog(val) {
-                    send(`cheat_option.noFog = ${val ? 'True' : 'False'}`);
-                }
-                function SetTransScaryPot(val) {
-                    send(`cheat_option.transScaryPot = ${val ? 'True' : 'False'}`)
-                }
-                function SetDiamondPhonograph(val) {
-                    send(`cheat_option.diamondPhonograph = ${val ? 'True' : 'False'}`)
-                }
-                function SetFeatureThreePeater(val) {
-                    send(`cheat_option.featureThreePeater = ${val ? 'True' : 'False'}`)
-                }
-                function SetButterPult(val) {
-                    send(`cheat_option.butterPult = ${val ? 'True' : 'False'}`)
-                }
-                function SetDoubleGatlingpea(val) {
-                    send(`cheat_option.doubleGatlingpea = ${val ? 'True' : 'False'}`)
-                }
-                function SetFullAreaGloomshroom(val) {
-                    send(`cheat_option.fullAreaGloomshroom = ${val ? 'True' : 'False'}`)
                 }
                 function sendCustomCode() {
                     if (!customCode.value.trim()) {
@@ -1414,9 +1429,6 @@
                     numSurvivalStage,
                     coinX,
                     coinY,
-                    cobNoCooling,
-                    autoCollect,
-                    runBackground,
                     seedTypes,
                     zombieTypes,
                     gridItemTypes,
@@ -1431,26 +1443,9 @@
                     packetIdx,
                     selectedPacketIdx,
                     isImitater,
-                    disableTalisman,
-                    disableNinja,
-                    visibleGhoul,
-                    noThunder,
-                    noFog,
-                    noCooldown,
-                    freePlant,
+                    mindCtrl,
                     sunValue,
                     moneyValue,
-                    plantNoDie,
-                    zombieNoDie,
-                    plantAnyWhere,
-                    wontLose,
-                    transScaryPot,
-                    conveyorNoCooling,
-                    diamondPhonograph,
-                    featureThreePeater,
-                    butterPult,
-                    doubleGatlingpea,
-                    fullAreaGloomshroom,
                     selectedSeedType,
                     selectedZombieType,
                     selectedLevel,
@@ -1462,27 +1457,6 @@
                     lastResult,
                     send,
                     SetSpeed,
-                    SetAutoCollect,
-                    SetRunBackground,
-                    DisableTalisman,
-                    DisableNinja,
-                    SetFreePlant,
-                    SetNoCooldown,
-                    SetPlantNoDie,
-                    SetZombieNoDie,
-                    SetPlantAnyWhere,
-                    SetWontLose,
-                    SetCobNoCooling,
-                    SetVisibleGhoul,
-                    SetNoThunder,
-                    SetNoFog,
-                    SetTransScaryPot,
-                    SetConveyorNoCooling,
-                    SetDiamondPhonograph,
-                    SetFeatureThreePeater,
-                    SetButterPult,
-                    SetDoubleGatlingpea,
-                    SetFullAreaGloomshroom,
                     customCode,
                     customCodeError,
                     sendCustomCode,
@@ -1497,6 +1471,9 @@
                     currentLineupList,
                     lineupCodeMap,
                     onSelectLineUp,
+                    optionConfig,
+                    cheatOption,
+                    syncCheatOptions,
                 };
             }
         });
