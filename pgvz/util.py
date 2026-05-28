@@ -1,7 +1,6 @@
 import Lawn
 import Sexy
 import pathlib
-from .global_var import gvar
 
 # 坐标转成行列
 def PixelToGrid(board: Lawn.Board, pixel):
@@ -30,7 +29,7 @@ def MouseDragGrid(board: Lawn.Board, grid_from, grid_to):
 SeedTypeNone: Lawn.SeedType = getattr(Lawn.SeedType, 'None')
 
 def SetPlantOnBoard(plantList: list):
-    board = gvar.gboard
+    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
     # 移除已有植物
     for i in range(board.mPlants.Count):
         plant = board.mPlants[i]
@@ -44,37 +43,37 @@ def SetPlantOnBoard(plantList: list):
             board.AddPlant(col - 1, row - 1, plant, SeedTypeNone)
 
 def IterAliveZombies():
-    board = gvar.gboard
+    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
     for i in range(board.mZombies.Count):
         zombie = board.mZombies[i]
         if zombie.mHasHead and not zombie.IsDeadOrDying() and not zombie.mMindControlled:
             yield zombie
 
 def IterAlivePlants():
-    board = gvar.gboard
+    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
     for i in range(board.mPlants.Count):
         plant = board.mPlants[i]
         if not plant.mDead:
             yield plant
 
 def IterAliveCoins():
-    board = gvar.gboard
+    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
     for i in range(board.mCoins.Count):
         coin = board.mCoins[i]
         if not coin.mDead and not coin.mIsBeingCollected:
             yield coin
 
 def IterAliveGridItems():
-    board = gvar.gboard
+    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
     for i in range(board.mGridItems.Count):
         grid_item = board.mGridItems[i]
         if not grid_item.mDead:
             yield grid_item
 
 def SurvivalBackupGame(max_backup: int = 3):
-    savedGameName = f'docs/userdata/game{gvar.glawnapp.mPlayerInfo.mId}_{int(gvar.glawnapp.mGameMode)}_{gvar.gboard.mChallenge.mSurvivalStage}.dat'
-    gvar.gboard.SaveGame(savedGameName)
-    saveToDelete = f'docs/userdata/game{gvar.glawnapp.mPlayerInfo.mId}_{int(gvar.glawnapp.mGameMode)}_{gvar.gboard.mChallenge.mSurvivalStage - max_backup}.dat'
+    savedGameName = f'docs/userdata/game{Sexy.GlobalStaticVars.gLawnApp.mPlayerInfo.mId}_{int(Sexy.GlobalStaticVars.gLawnApp.mGameMode)}_{Sexy.GlobalStaticVars.gLawnApp.mBoard.mChallenge.mSurvivalStage}.dat'
+    Sexy.GlobalStaticVars.gLawnApp.mBoard.SaveGame(savedGameName)
+    saveToDelete = f'docs/userdata/game{Sexy.GlobalStaticVars.gLawnApp.mPlayerInfo.mId}_{int(Sexy.GlobalStaticVars.gLawnApp.mGameMode)}_{Sexy.GlobalStaticVars.gLawnApp.mBoard.mChallenge.mSurvivalStage - max_backup}.dat'
     saveDir = Sexy.GlobalStaticVars.gSexyAppBase.applicationStoragePath
     pathSaveToDelete = pathlib.Path(saveDir).joinpath(saveToDelete)
     if pathSaveToDelete.is_file():

@@ -36,7 +36,7 @@ TAS框架的模块是pgvz，编写脚本先要import这个模块。
 
 下面介绍和pyvz、AvZ的异同：
 
-1. PvZ基类、主类的访问通过全局对象`gvar`，`gvar.glawnapp`就是其他框架的`PvzBase`，`gvar.gboard`就是其他框架的`MainObject`
+1. PvZ基类、主类的访问通过游戏C#静态对象`Sexy.GlobalStaticVars`，`Sexy.GlobalStaticVars.gLawnApp`就是其他框架的`PvzBase`，`Sexy.GlobalStaticVars.gLawnApp.mBoard`就是其他框架的`MainObject`
 
 2. 脚本在引入pgvz模块前，必须设置加载路径为脚本所在目录，如下所示。这个是游戏本身的锅，我也没办法
 
@@ -83,7 +83,7 @@ TAS框架的模块是pgvz，编写脚本先要import这个模块。
 
     如果你的阻塞脚本没有使用任何阻塞函数，那么要在末尾加个`yield`使其成为生成器函数，不然会被认为是非阻塞。
 
-6. 不同于pyvz和AvZ，本框架可以调用任意游戏内部函数。内部函数可以通过反编译得到（比如用ILSpy），也可以参考`typings`目录下的`.pyi`存根文件，它们列出了所有游戏内部C#对象/方法的Python对应。所以要使用左键点击直接调用`Lawn.Board.MouseDown`（用全局对象获取游戏`Board`对象，`gvar.gboard`），本框架不再提供此类接口
+6. 不同于pyvz和AvZ，本框架可以调用任意游戏内部函数。内部函数可以通过反编译得到（比如用ILSpy），也可以参考`typings`目录下的`.pyi`存根文件，它们列出了所有游戏内部C#对象/方法的Python对应。所以要使用左键点击直接调用`Lawn.Board.MouseDown`（用全局对象获取游戏`Board`对象，`Sexy.GlobalStaticVars.gLawnApp.mBoard`），本框架不再提供此类接口
 
 7. 不同于pyvz和AvZ，本框架（有限）支持中途退出游戏。重进以后会从原来退出的时间点继续脚本操作，过去时间点的操作会无视，不会像pyvz和AvZ一样过去时间点的堆积到现在时间点操作。
 

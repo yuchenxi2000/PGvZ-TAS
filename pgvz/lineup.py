@@ -6,7 +6,6 @@ import Lawn
 import Sexy
 import base64
 import zlib
-from .global_var import gvar
 from .util import SeedTypeNone
 
 class LineUpGrid:
@@ -175,7 +174,7 @@ class LineUp:
         # 场景
         self.scene = int(board.mBackground)
         # 格子
-        NRow = 6 if gvar.gboard.StageHas6Rows() else 5
+        NRow = 6 if Sexy.GlobalStaticVars.gLawnApp.mBoard.StageHas6Rows() else 5
         NCol = 9
         for row in range(NRow):
             for col in range(NCol):
@@ -209,10 +208,10 @@ class LineUp:
             newGridItem.mGridItemType = Lawn.GridItemType.Rake
             newGridItem.mGridX = self.rake_col
             newGridItem.mGridY = self.rake_row
-            newGridItem.mPosX = gvar.gboard.GridToPixelX(newGridItem.mGridX, newGridItem.mGridY)
-            newGridItem.mPosY = gvar.gboard.GridToPixelY(newGridItem.mGridX, newGridItem.mGridY)
+            newGridItem.mPosX = Sexy.GlobalStaticVars.gLawnApp.mBoard.GridToPixelX(newGridItem.mGridX, newGridItem.mGridY)
+            newGridItem.mPosY = Sexy.GlobalStaticVars.gLawnApp.mBoard.GridToPixelY(newGridItem.mGridX, newGridItem.mGridY)
             newGridItem.mRenderOrder = Lawn.Board.MakeRenderOrder(Lawn.RenderLayer.GraveStone, newGridItem.mGridY, 9)
-            gvar.gboard.mGridItems.Add(newGridItem)
-            theReanimation = gvar.gboard.CreateRakeReanim(newGridItem.mPosX, newGridItem.mPosY, 0)
-            newGridItem.mGridItemReanimID = gvar.gboard.mApp.ReanimationGetID(theReanimation)
+            Sexy.GlobalStaticVars.gLawnApp.mBoard.mGridItems.Add(newGridItem)
+            theReanimation = Sexy.GlobalStaticVars.gLawnApp.mBoard.CreateRakeReanim(newGridItem.mPosX, newGridItem.mPosY, 0)
+            newGridItem.mGridItemReanimID = Sexy.GlobalStaticVars.gLawnApp.mBoard.mApp.ReanimationGetID(theReanimation)
             newGridItem.mGridItemState = Lawn.GridItemState.RakeAttracting

@@ -38,17 +38,17 @@
                             <template #header>阳光金币</template>
                             <el-row>
                                 <el-button type="primary" style="margin-top:8px"
-                                    @click="send(`gvar.gboard.mSunMoney = ${sunValue}`)">设置阳光</el-button>
+                                    @click="send(`Sexy.GlobalStaticVars.gLawnApp.mBoard.mSunMoney = ${sunValue}`)">设置阳光</el-button>
                                 <el-input-number v-model="sunValue" :min="0" :max="9990" size="small" />
                             </el-row>
                             <el-row>
                                 <el-button type="warning" style="margin-top:8px"
-                                    @click="send(`gvar.glawnapp.mPlayerInfo.mCoins = ${moneyValue}`)">设置金币</el-button>
+                                    @click="send(`Sexy.GlobalStaticVars.gLawnApp.mPlayerInfo.mCoins = ${moneyValue}`)">设置金币</el-button>
                                 <el-input-number v-model="moneyValue" :min="0" :max="999999" size="small" />
                             </el-row>
                             <el-row>
                                 <el-button type="warning" style="margin-top:8px"
-                                    @click="send(`gvar.glawnapp.mPlayerInfo.mChallengeRecords[48] = ${treeHeight}`)">智慧树高度</el-button>
+                                    @click="send(`Sexy.GlobalStaticVars.gLawnApp.mPlayerInfo.mChallengeRecords[48] = ${treeHeight}`)">智慧树高度</el-button>
                                 <el-input-number v-model="treeHeight" :min="0" :max="2147483647" size="small" />
                             </el-row>
                             <el-row>
@@ -57,7 +57,7 @@
                                 <el-input-number v-model="level" :min="1" :max="50" size="small" />
                             </el-row>
                             <el-row>
-                                <el-button type="primary" style="margin-top:8px" @click="send('gvar.glawnapp.KillDialog(19)\ngvar.gboard.FadeOutLevel()')">直接过关</el-button>
+                                <el-button type="primary" style="margin-top:8px" @click="send('Sexy.GlobalStaticVars.gLawnApp.KillDialog(19)\nSexy.GlobalStaticVars.gLawnApp.mBoard.FadeOutLevel()')">直接过关</el-button>
                                 <el-button type="primary" style="margin-top:8px" @click="send('cheat_option.FailImmediately(Lawn.ZombieType.Normal)')">直接失败</el-button>
                                 <el-button type="primary" style="margin-top:8px" @click="send('cheat_option.GetFinishedAccount()')">通关存档</el-button>
                             </el-row>
@@ -237,7 +237,7 @@
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.StartLawnMower()`)">启动割草机</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`gvar.gboard.mBonusLawnMowersRemaining = 2147483647`)">无限割草机</el-button>
+                                @click="send(`Sexy.GlobalStaticVars.gLawnApp.mBoard.mBonusLawnMowersRemaining = 2147483647`)">无限割草机</el-button>
                         </el-card>
                     </el-col>
                     <el-col :span="6">
@@ -312,11 +312,11 @@
                                 <el-button type="primary" style="margin-top:8px"
                                     @click="send(`cheat_option.EnterNewGame(Lawn.GameMode.${selectedLevel})`)">进入关卡</el-button>
                                 <el-button type="primary" style="margin-top:8px"
-                                    @click="send(`gvar.glawnapp.mGameMode = Lawn.GameMode.${selectedLevel}`)">混乱关卡</el-button>
+                                    @click="send(`Sexy.GlobalStaticVars.gLawnApp.mGameMode = Lawn.GameMode.${selectedLevel}`)">混乱关卡</el-button>
                             </el-row>
                             <el-row>
                                 <el-button type="primary" style="margin-top:8px"
-                                    @click="send(`gvar.gboard.mChallenge.mSurvivalStage = ${numSurvivalStage}`)">生存模式轮数</el-button>
+                                    @click="send(`Sexy.GlobalStaticVars.gLawnApp.mBoard.mChallenge.mSurvivalStage = ${numSurvivalStage}`)">生存模式轮数</el-button>
                                 <el-input-number v-model="numSurvivalStage" size="small" />
                             </el-row>
                             <el-row>
@@ -1294,7 +1294,7 @@
                             break;
 
                         case 'noCooldown':
-                            send(`gvar.glawnapp.mEasyPlantingCheat = ${value ? 'True' : 'False'}`);
+                            send(`Sexy.GlobalStaticVars.gLawnApp.mEasyPlantingCheat = ${value ? 'True' : 'False'}`);
                             break;
                         
                         case 'infSun':
@@ -1378,7 +1378,7 @@
                     send(`cheat_option.LineUpOnBoard('${lineupCode.value.trim()}')`);
                 }
                 function getLineupCode() {
-                    send(`pgvz.lineup.LineUp.from_board(gvar.gboard).to_str()`);
+                    send(`pgvz.lineup.LineUp.from_board(Sexy.GlobalStaticVars.gLawnApp.mBoard).to_str()`);
                 }
 
                 function AddGridItem() {

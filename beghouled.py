@@ -6,6 +6,7 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 import Lawn
+import Sexy
 from pgvz import *
 
 # 宝石迷阵自动操作类
@@ -106,13 +107,13 @@ def BeghouledUpgradePlant():
     Card(Lawn.SeedType.Tallnut, 1, 9)
 
 def ScriptBeghouledTwist():
-    board = gvar.gboard
+    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
     BeghouledUpgradePlant()
     beghouled.Fill(board)
     beghouled.doValidTwist(board)
 
 def ScriptBeghouled():
-    board = gvar.gboard
+    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
     BeghouledUpgradePlant()
     beghouled.Fill(board)
     beghouled.doValidMove(board)

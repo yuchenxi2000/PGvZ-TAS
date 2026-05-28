@@ -21,8 +21,6 @@ auto_collector = script_manager.Register(AutoCollect, runmode=ScriptRunMode.FORE
 @LawnMod.MonoModUtils.HookTo(Lawn.LawnApp.UpdateFrames)
 def LawnApp__UpdateFrames(orig, lawnapp: Lawn.LawnApp):
     if lawnapp.mBoard is None:
-        # 设置全局变量
-        gvar.Set(lawnapp)
         # 管理脚本
         script_manager.Manage()
     orig(lawnapp)
@@ -31,9 +29,6 @@ def LawnApp__UpdateFrames(orig, lawnapp: Lawn.LawnApp):
 # 上面的钩子在倍速时无法保证每个游戏逻辑处理帧运行一次
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.UpdateGame)
 def Board__UpdateGame(orig, board: Lawn.Board):
-    # 设置全局变量
-    gvar.gboard = board
-    gvar.glawnapp = board.mApp
     # 管理脚本
     script_manager.Manage()
     orig(board)

@@ -7,10 +7,11 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 import Lawn
+import Sexy
 from pgvz import *
 
 def SetPE12():
-    board = gvar.gboard
+    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
     # 放植物
     plantList = []
     for i in range(3, 5):
@@ -75,7 +76,7 @@ def BlowBalloonZombieBehind():
             Card(Lawn.SeedType.Blover, 2, 1)
 
 def RunPE12():
-    board = gvar.gboard
+    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
 
     # 根据需要设置僵尸列表。第二个参数为True是自然出怪（调用内部出怪函数），由于自然出怪限制可能实际出怪不会包括所有设置的僵尸
     # SetZombies([
@@ -159,7 +160,7 @@ def RunPE12():
                         Card(card, pos, 9)
 
 def ScriptPE12():
-    board = gvar.gboard
+    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
     if board.mPlants.Count == 0:
         # 如果场上没有植物，先设置阵型，然后直接跳下一关
         yield from SetPE12()

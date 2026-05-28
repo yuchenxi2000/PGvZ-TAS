@@ -6,7 +6,7 @@ from .global_var import gvar
 def RawFire(cobCannon: Lawn.Plant, row: int, col: float):
     if gvar.opCanceled:
         return
-    board = gvar.gboard
+    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
     board.RefreshSeedPacketFromCursor()
     x, y = RowColToPixel(board, row, col)
     cobCannon.CobCannonFire(x, y)

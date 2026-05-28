@@ -6,11 +6,12 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 import Lawn
+import Sexy
 from pgvz import *
 
 # 自动锤僵尸
 def WhackZombie():
-    board = gvar.gboard
+    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
     for zombie in IterAliveZombies():
         if zombie.mPhaseCounter <= 19:
             posX = zombie.mPosX + 0.5 * zombie.mZombieRect.mWidth

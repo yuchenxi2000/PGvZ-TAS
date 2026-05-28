@@ -19,7 +19,7 @@ def hook_seedpacket_picknextslotmachineseed(action, seed_packet: Lawn.SeedPacket
 
 # 自动转老虎机
 def SlotMachinePullHandle():
-    board = gvar.gboard
+    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
     gameConst = Sexy.Constants
     if board.mChallenge.mChallengeState == Lawn.ChallengeState.Normal:
         handleX = int(gameConst.Challenge_SlotMachineHandle_Pos.mX + 0.5 * gameConst.Challenge_SlotMachineHandle_Pos.mWidth)
