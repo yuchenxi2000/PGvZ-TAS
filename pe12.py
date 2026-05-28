@@ -104,7 +104,7 @@ def RunPE12():
         Lawn.SeedType.Cobcannon,
         Lawn.SeedType.Pumpkinshell,
         Lawn.SeedType.Sunflower,
-    ])
+    ], selectRose=False)
 
     # 备份存档
     SurvivalBackupGame()

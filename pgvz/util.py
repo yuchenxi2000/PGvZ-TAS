@@ -7,9 +7,16 @@ from .global_var import gvar
 def PixelToGrid(board: Lawn.Board, pixel):
     return board.PixelToGridX(*pixel), board.PixelToGridY(*pixel)
 
-# 行列转坐标
+# 行列转坐标，得到格子左上角坐标
 def GridToPixel(board: Lawn.Board, grid):
     return board.GridToPixelX(*grid), board.GridToPixelY(*grid)
+
+# 得到格子中间坐标（col为浮点数时按比例得到坐标）
+def RowColToPixel(board, row, col):  # type: (Lawn.Board, int, int | float) -> tuple[int, int]
+    tCol = int(col + 0.5)
+    x = int(col * 80.0 + 1e-3)
+    y = board.GridToPixelY(tCol - 1, row - 1) + 40
+    return x, y
 
 def MouseDragGrid(board: Lawn.Board, grid_from, grid_to):
     pixel_from = GridToPixel(board, grid_from)

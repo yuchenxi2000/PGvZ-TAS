@@ -10,6 +10,7 @@ import Lawn
 import LawnMod
 import Sexy
 import Sexy.TodLib
+import System
 from pgvz import *
 from pgvz.lineup import LineUp
 from functools import wraps
@@ -56,6 +57,9 @@ class CheatOption:
         self.chomperNoCooling = False
         self.noCover = False
         self.stopSpawning = False
+        self.drawPlantHp = False
+        self.drawZombieHp = False
+        self.selectZombieHp = False
 
     def ConvertRange(self, row: int, col: int):
         NRow = 6 if gvar.gboard.StageHas6Rows() else 5
@@ -361,8 +365,7 @@ class CheatOption:
         Sexy.GlobalStaticVars.gSlowMo = not fast
         Sexy.GlobalStaticVars.gFastSlowMoNum = factor
     
-    @main_thread  # 必须在主线程运行，不然会有概率崩溃
-    def EnterNewGame(self, gamemode: Lawn.GameMode):
+    def _EnterNewGame(self, gamemode: Lawn.GameMode):
         # 删除所有对话框
         gvar.glawnapp.KillDialog(3)  # 图鉴
         gvar.glawnapp.KillDialog(4)  # 商店
@@ -380,6 +383,22 @@ class CheatOption:
             gvar.glawnapp.KillAwardScreen()
         # 加载新游戏
         gvar.glawnapp.PreNewGame(gamemode, True)
+    
+    @main_thread  # 必须在主线程运行，不然会有概率崩溃
+    def EnterNewGame(self, gamemode: Lawn.GameMode):
+        self._EnterNewGame(gamemode)
+    
+    @main_thread
+    def EnterMoonEndless(self):
+        self._EnterNewGame(Lawn.GameMode.SurvivalEndlessStage5)
+        board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+        # 设置场景
+        board.mBackground = Lawn.BackgroundType.Num6Boss
+        board.LoadBackgroundImages()
+        # 设置关卡数
+        board.mChallenge.mSurvivalStage = -1
+        # 直接下一关
+        board.FadeOutLevel()
     
     @main_thread
     def CheatSetZombies(self, zb_list, internal_spawn: bool = True):  # type: (list[Lawn.ZombieType], bool) -> None
@@ -823,3 +842,116 @@ def Plant__UpdateShooting(orig, plant: Lawn.Plant):
             plant.mShootingCounter -= 1
             return
     orig(plant)
+
+# 显示植物/僵尸血量
+
+def DrawPlantHp(plant: Lawn.Plant, g: Sexy.Graphics, marginX: int, offsetY: int, color1, color2):
+    if plant.mPlantHealth < plant.mPlantMaxHealth:
+        # 一格80x80，画60x5
+        numGrid = 2 if plant.mSeedType == Lawn.SeedType.Cobcannon else 1
+        totalWidth = 80 * numGrid - 2 * marginX
+        x = plant.mX + marginX + gvar.gboard.mX
+        y = plant.mY + offsetY + gvar.gboard.mY
+        hpWidth = int(totalWidth * plant.mPlantHealth / plant.mPlantMaxHealth)
+        g.SetColor(color1)
+        g.FillRect(x, y, hpWidth, 5)
+        g.SetColor(color2)
+        g.FillRect(x + hpWidth, y, totalWidth - hpWidth, 5)
+
+def DrawZombieHp(zombie: Lawn.Zombie, g: Sexy.Graphics, marginX: int, offsetY: int, color1, color2, color3, color4):
+    rect = zombie.GetZombieRect()
+    totalWidth = rect.mWidth
+    x = rect.mX + marginX + gvar.gboard.mX
+    y = rect.mY + offsetY + gvar.gboard.mY + 20
+    # 两类血量
+    hpWidth = 0
+    hpWidth2 = 0
+    plotHp1 = False
+    plotHp2 = False
+    # 画头盔/本体
+    if zombie.mZombieType == Lawn.ZombieType.Monk:
+        # 特殊处理武僧僵尸
+        if zombie.mHasHelm and zombie.mHelmHealth < zombie.mHelmMaxHealth:
+            hpWidth2 = int(totalWidth * zombie.mHelmHealth / zombie.mHelmMaxHealth)
+            plotHp2 = True
+        if zombie.mBodyHealth < zombie.mBodyMaxHealth:
+            hpWidth = int(totalWidth * zombie.mBodyHealth / zombie.mBodyMaxHealth)
+            plotHp1 = True
+    else:
+        if zombie.mHasHelm and zombie.mHelmHealth < zombie.mHelmMaxHealth:
+            hpWidth = int(totalWidth * zombie.mHelmHealth / zombie.mHelmMaxHealth)
+            plotHp1 = True
+        elif zombie.mBodyHealth < zombie.mBodyMaxHealth:
+            hpWidth = int(totalWidth * zombie.mBodyHealth / zombie.mBodyMaxHealth)
+            plotHp1 = True
+    # 如果有铁门、梯子等画下面
+    if zombie.mHasShield and zombie.mShieldHealth < zombie.mShieldMaxHealth:
+        hpWidth2 = int(totalWidth * zombie.mShieldHealth / zombie.mShieldMaxHealth)
+        plotHp2 = True
+    # 开始绘制
+    if plotHp1:
+        g.SetColor(color1)
+        g.FillRect(x, y, hpWidth, 5)
+        g.SetColor(color2)
+        g.FillRect(x + hpWidth, y, totalWidth - hpWidth, 5)
+    if plotHp2:
+        g.SetColor(color3)
+        g.FillRect(x, y + 10, hpWidth2, 5)
+        g.SetColor(color4)
+        g.FillRect(x + hpWidth2, y + 10, totalWidth - hpWidth2, 5)
+    
+selectZbList = [
+    Lawn.ZombieType.Football,
+    Lawn.ZombieType.Zamboni,
+    Lawn.ZombieType.Gargantuar,
+    Lawn.ZombieType.RedeyeGargantuar,
+    Lawn.ZombieType.TallnutHead,
+    Lawn.ZombieType.RobotTitan,
+    Lawn.ZombieType.RedeyeRobotTitan,
+    Lawn.ZombieType.Monk,
+    Lawn.ZombieType.FootballPremium,
+]
+
+def HookDrawGame(lawnapp: Lawn.LawnApp, g: Sexy.Graphics):
+    if gvar.gboard is not None:
+        g.ClearClipRect()  # 否则无法全部画出
+        g.SetColorizeImages(True)
+        color1 = Sexy.SexyColor(255, 153, 51, 255).Color  # 橙色
+        color2 = Sexy.SexyColor(204, 0, 0, 255).Color  # 深红
+        color3 = Sexy.SexyColor(102, 204, 0, 255).Color  # 绿色
+        color4 = Sexy.SexyColor(0, 153, 153, 255).Color  # 青色
+        color5 = Sexy.SexyColor(255, 51, 255, 255).Color
+        color6 = Sexy.SexyColor(127, 0, 255, 255).Color
+        color7 = Sexy.SexyColor(255, 0, 127, 255).Color
+        color8 = Sexy.SexyColor(153, 0, 76, 255).Color
+        # 画植物
+        if cheat_option.drawPlantHp:
+            NRow = 6 if gvar.gboard.StageHas6Rows() else 5
+            NCol = 9
+            for gridX in range(NCol):
+                for gridY in range(NRow):
+                    plant = gvar.gboard.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.EatingOrder)
+                    if plant is not None:
+                        DrawPlantHp(plant, g, 10, 60, color1, color2)
+                        plant2 = gvar.gboard.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.CatapultOrder)
+                        if plant2 is not None and plant is not plant2:
+                            DrawPlantHp(plant2, g, 10, 50, color3, color4)
+        # 画僵尸
+        if cheat_option.drawZombieHp:
+            for zombie in IterAliveZombies():
+                # 只画精英怪
+                if cheat_option.selectZombieHp and zombie.mZombieType not in selectZbList:
+                    continue
+                DrawZombieHp(zombie, g, 0, 0, color5, color6, color7, color8)
+        g.SetColorizeImages(False)
+
+@LawnMod.MonoModUtils.HookTo(Lawn.LawnApp.DrawGame)
+def LawnApp__DrawGame(orig, self: Lawn.LawnApp, gameTime):
+    Sexy.GlobalStaticVars.g.BeginFrame()
+    self.mWidgetManager.DrawScreen()
+    mDebugScreenEnabled = LawnMod.DynamicHelper.GetPrivateField[System.Boolean](self, 'mDebugScreenEnabled')
+    if mDebugScreenEnabled:
+        self.DrawDebugInfo(gameTime)
+    HookDrawGame(self, Sexy.GlobalStaticVars.g)
+    Sexy.GlobalStaticVars.g.EndFrame()
+    Sexy.TodLib.FilterEffect.FilterEffectProcessDeleteQueue()

@@ -1,6 +1,6 @@
 import Lawn
 import Sexy
-from .util import GridToPixel, SeedTypeNone
+from .util import RowColToPixel, SeedTypeNone
 from .global_var import gvar
 
 # 种卡
@@ -11,11 +11,10 @@ def RawCard(seedpacket: Lawn.SeedPacket, row: int, col) -> bool:
     if gvar.opCanceled:
         return False
     board = gvar.gboard
-    col = int(col + 0.5)
     isImitater = seedpacket.mPacketType == Lawn.SeedType.Imitater
     seedtype = seedpacket.mImitaterType if isImitater else seedpacket.mPacketType
     if board.CanPlantAt(col - 1, row - 1, seedtype, False) == Lawn.PlantingReason.Ok:
-        pixel = GridToPixel(board, (col - 1, row - 1))
+        pixel = RowColToPixel(board, row, col)
         seedpacket.MouseDown(*pixel, 1)
         board.MouseUpWithPlant(*pixel, 1)
         board.RefreshSeedPacketFromCursor()
@@ -68,7 +67,7 @@ def LetsRock():
         yield
     seedChooserScreen.CloseSeedChooser()
 
-def SelectCards(seedList: list, *args, waitTime: int = 200):
+def SelectCards(seedList: list, *args, waitTime: int = 200, selectRose: bool = True):
     # imitater type
     if len(args) == 0:
         imitaterType = SeedTypeNone
@@ -84,6 +83,9 @@ def SelectCards(seedList: list, *args, waitTime: int = 200):
     # wait until chooser screen appears
     while not seedChooserScreen.mMouseVisible:
         yield
+    # rose (rake)
+    if not seedChooserScreen.mRoseButton.mDisabled and selectRose != seedChooserScreen.mRoseButton.mChecked:
+        seedChooserScreen.ButtonDepress(111)
     # find seed position
     seedsToChoose = []  # type: list[Lawn.SeedType]
     seedsToKeep = []  # type: list[Lawn.SeedType]

@@ -277,6 +277,9 @@
                             <el-checkbox v-model="cheatOption.visibleGhoul">隐形僵尸显形</el-checkbox>
                             <el-checkbox v-model="cheatOption.noThunder">暴风雨不瞎眼</el-checkbox>
                             <el-checkbox v-model="cheatOption.noCover">去除右侧遮挡</el-checkbox>
+                            <el-checkbox v-model="cheatOption.drawPlantHp">显示植物血量</el-checkbox>
+                            <el-checkbox v-model="cheatOption.drawZombieHp">显示僵尸血量</el-checkbox>
+                            <el-checkbox v-model="cheatOption.selectZombieHp">血量只显示精英怪</el-checkbox>
                         </el-card>
                     </el-col>
                     <el-col :span="8">
@@ -315,6 +318,10 @@
                                 <el-button type="primary" style="margin-top:8px"
                                     @click="send(`gvar.gboard.mChallenge.mSurvivalStage = ${numSurvivalStage}`)">生存模式轮数</el-button>
                                 <el-input-number v-model="numSurvivalStage" size="small" />
+                            </el-row>
+                            <el-row>
+                                <el-button type="primary" style="margin-top:8px"
+                                    @click="send(`cheat_option.EnterMoonEndless()`)">进入月夜无尽</el-button>
                             </el-row>
                         </el-card>
                     </el-col>
@@ -1254,6 +1261,9 @@
                     'visibleGhoul',
                     'noThunder',
                     'noCover',
+                    'drawPlantHp',
+                    'drawZombieHp',
+                    'selectZombieHp',
                 ];
                 const cheatOption = reactive({});
                 optionConfig.forEach(item => {

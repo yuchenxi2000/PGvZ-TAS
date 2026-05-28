@@ -1,6 +1,6 @@
 import Lawn
 import Sexy
-from .util import IterAlivePlants
+from .util import IterAlivePlants, RowColToPixel
 from .global_var import gvar
 
 def RawFire(cobCannon: Lawn.Plant, row: int, col: float):
@@ -8,9 +8,7 @@ def RawFire(cobCannon: Lawn.Plant, row: int, col: float):
         return
     board = gvar.gboard
     board.RefreshSeedPacketFromCursor()
-    tCol = int(col + 0.5)
-    x = int(col * 80.0 + 1e-3)
-    y = board.GridToPixelY(tCol - 1, row - 1) + 40
+    x, y = RowColToPixel(board, row, col)
     cobCannon.CobCannonFire(x, y)
     board.RefreshSeedPacketFromCursor()
     Sexy.Debug.Log(f'cob fire {row} {col}')
