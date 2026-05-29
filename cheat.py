@@ -37,7 +37,7 @@ class CheatOption:
         self.wontLose = False
         self.freePlant = False
         self.plantAnyWhere = False
-        self.plantNoDie = False
+        self._plantNoDie = False
         self.zombieNoDie = False
         self.cobNoCooling = False
         self.disableTalisman = False
@@ -60,6 +60,22 @@ class CheatOption:
         self.drawPlantHp = False
         self.drawZombieHp = False
         self.selectZombieHp = False
+    
+    @property
+    def plantNoDie(self):
+        return self._plantNoDie
+    
+    @plantNoDie.setter
+    def plantNoDie(self, value):
+        if self._plantNoDie != value:
+            # 取消篮球、僵尸豌豆的伤害
+            if value:
+                Lawn.GameConstants.gProjectileDefinition[int(Lawn.ProjectileType.ZombiePea)].mDamage = 0
+                Lawn.GameConstants.gProjectileDefinition[int(Lawn.ProjectileType.Basketball)].mDamage = 0
+            else:
+                Lawn.GameConstants.gProjectileDefinition[int(Lawn.ProjectileType.ZombiePea)].mDamage = 20
+                Lawn.GameConstants.gProjectileDefinition[int(Lawn.ProjectileType.Basketball)].mDamage = 75
+            self._plantNoDie = value
 
     def ConvertRange(self, row: int, col: int):
         NRow = 6 if Sexy.GlobalStaticVars.gLawnApp.mBoard.StageHas6Rows() else 5
@@ -98,20 +114,29 @@ class CheatOption:
     @main_thread
     def ZombieOnBoard(self, row: int, col: int, zombietype: Lawn.ZombieType, mind_ctrl: bool = False):
         row_range, col_range = self.ConvertRange(row, col)
-        curwave = Sexy.GlobalStaticVars.gLawnApp.mBoard.mCurrentWave
+        board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+        curwave = board.mCurrentWave
         for row1 in row_range:
             for col1 in col_range:
-                xi = Sexy.GlobalStaticVars.gLawnApp.mBoard.GridToPixelX(col1, row1)
-                zombie = Sexy.GlobalStaticVars.gLawnApp.mBoard.AddZombieInRow(zombietype, row1, curwave)
+                xi = board.GridToPixelX(col1, row1)
+                zombie = board.AddZombieInRow(zombietype, row1, curwave)
+                offsetX = xi - zombie.mPosX
                 zombie.mPosX = xi
-                zombie.mX = xi
                 zombie.mMindControlled = mind_ctrl
                 if zombietype == Lawn.ZombieType.Bungee:
                     zombie.mTargetCol = col1
                     zombie.SetRow(row1)
-                    zombie.mPosX = Sexy.GlobalStaticVars.gLawnApp.mBoard.GridToPixelX(col1, row1)
+                    zombie.mPosX = board.GridToPixelX(col1, row1)
                     zombie.mPosY = zombie.GetPosYBasedOnRow(row1)
                     zombie.mRenderOrder = Lawn.Board.MakeRenderOrder(Lawn.RenderLayer.GraveStone, row1, 7)
+                elif zombietype == Lawn.ZombieType.Bobsled:
+                    # 找到其他三个人
+                    for iz in range(zombie.mFollowerZombieID.Count):
+                        zombieFollower = zombie.mFollowerZombieID[iz]
+                        if zombieFollower is None:
+                            continue
+                        zombieFollower.mPosX += offsetX
+                        zombieFollower.mMindControlled = mind_ctrl
     
     @main_thread
     def RemoveZombieOnBoard(self):
@@ -870,21 +895,27 @@ def DrawZombieHp(zombie: Lawn.Zombie, g: Sexy.Graphics, marginX: int, offsetY: i
     plotHp1 = False
     plotHp2 = False
     # 画头盔/本体
-    if zombie.mZombieType == Lawn.ZombieType.Monk:
-        # 特殊处理武僧僵尸
-        if zombie.mHasHelm and zombie.mHelmHealth < zombie.mHelmMaxHealth:
+    if zombie.mBodyHealth < zombie.mBodyMaxHealth:
+        # 考虑血量临界值
+        if zombie.CanLoseBodyParts():
+            threshold = int(zombie.mBodyMaxHealth / 3)
+        else:
+            threshold = 0
+        hpWidth = int(totalWidth * (zombie.mBodyHealth - threshold) / (zombie.mBodyMaxHealth - threshold))
+        hpWidth = 0 if hpWidth < 0 else hpWidth
+        if zombie.mHasHead:
+            plotHp1 = True
+    if zombie.mHasHelm and zombie.mHelmHealth < zombie.mHelmMaxHealth:
+        if zombie.mZombieType == Lawn.ZombieType.Monk:  # 特殊处理武僧僵尸
             hpWidth2 = int(totalWidth * zombie.mHelmHealth / zombie.mHelmMaxHealth)
             plotHp2 = True
-        if zombie.mBodyHealth < zombie.mBodyMaxHealth:
-            hpWidth = int(totalWidth * zombie.mBodyHealth / zombie.mBodyMaxHealth)
-            plotHp1 = True
-    else:
-        if zombie.mHasHelm and zombie.mHelmHealth < zombie.mHelmMaxHealth:
+        else:
             hpWidth = int(totalWidth * zombie.mHelmHealth / zombie.mHelmMaxHealth)
             plotHp1 = True
-        elif zombie.mBodyHealth < zombie.mBodyMaxHealth:
-            hpWidth = int(totalWidth * zombie.mBodyHealth / zombie.mBodyMaxHealth)
-            plotHp1 = True
+    # 画飞行物
+    if zombie.IsFlying() and zombie.mFlyingHealth < zombie.mFlyingMaxHealth:
+        hpWidth = int(totalWidth * zombie.mFlyingHealth / zombie.mFlyingMaxHealth)
+        plotHp1 = True
     # 如果有铁门、梯子等画下面
     if zombie.mHasShield and zombie.mShieldHealth < zombie.mShieldMaxHealth:
         hpWidth2 = int(totalWidth * zombie.mShieldHealth / zombie.mShieldMaxHealth)
