@@ -40,6 +40,7 @@ class CheatOption:
         self._plantNoDie = False
         self.zombieNoDie = False
         self.cobNoCooling = False
+        self.potatoNoCooling = False
         self.disableTalisman = False
         self.disableNinja = False
         self.visibleGhoul = False
@@ -60,6 +61,7 @@ class CheatOption:
         self.drawPlantHp = False
         self.drawZombieHp = False
         self.selectZombieHp = False
+        self.shovelNoReset = False
     
     @property
     def plantNoDie(self):
@@ -416,15 +418,23 @@ class CheatOption:
     
     @main_thread
     def EnterMoonEndless(self):
-        self._EnterNewGame(Lawn.GameMode.SurvivalEndlessStage5)
-        board = Sexy.GlobalStaticVars.gLawnApp.mBoard
-        # 设置场景
-        board.mBackground = Lawn.BackgroundType.Num6Boss
-        board.LoadBackgroundImages()
-        # 设置关卡数
-        board.mChallenge.mSurvivalStage = -1
-        # 直接下一关
-        board.FadeOutLevel()
+        # 会覆盖屋顶无尽存档，先检查是否有存档
+        lawnapp = Sexy.GlobalStaticVars.gLawnApp
+        targetGameMode = Lawn.GameMode.SurvivalEndlessStage5
+        prevSave = f'docs/userdata/game{lawnapp.mPlayerInfo.mId}_{int(targetGameMode)}.dat'
+        if lawnapp.FileExists(prevSave):
+            # ID为7的对话框点击ok按钮会直接关闭
+            lawnapp.DoDialog(7, True, "错误！", '该功能会覆盖屋顶无尽存档，请先删除或备份！（二次进入直接进屋顶无尽）', '好的', 3)
+        else:
+            self._EnterNewGame(targetGameMode)
+            board = lawnapp.mBoard
+            # 设置场景
+            board.mBackground = Lawn.BackgroundType.Num6Boss
+            board.LoadBackgroundImages()
+            # 设置关卡数
+            board.mChallenge.mSurvivalStage = -1
+            # 直接下一关
+            board.FadeOutLevel()
     
     @main_thread
     def CheatSetZombies(self, zb_list, internal_spawn: bool = True):  # type: (list[Lawn.ZombieType], bool) -> None
@@ -656,7 +666,7 @@ def Plant__FindTargetZombie(orig, plant: Lawn.Plant, theRow: int, thePlantWeapon
         return None
     return orig(plant, theRow, thePlantWeapon)
 
-# 玉米炮无冷却, 僵尸无敌修改大嘴花
+# 玉米炮无冷却, 僵尸无敌修改大嘴花，大嘴花无冷却，土豆雷无冷却
 @LawnMod.MonoModUtils.HookTo(Lawn.Plant.Update)
 def Plant__Update(orig, plant: Lawn.Plant):
     if plant.mState == Lawn.PlantState.CobcannonArming and cheat_option.cobNoCooling:
@@ -664,6 +674,8 @@ def Plant__Update(orig, plant: Lawn.Plant):
     elif plant.mState == Lawn.PlantState.ChomperBitingGotOne and cheat_option.zombieNoDie:
         plant.mState = Lawn.PlantState.ChomperBitingMissed
     elif plant.mState == Lawn.PlantState.ChomperDigesting and cheat_option.chomperNoCooling:
+        plant.mStateCountdown = 0
+    elif plant.mSeedType == Lawn.SeedType.Potatomine and cheat_option.potatoNoCooling:
         plant.mStateCountdown = 0
     orig(plant)
 
@@ -987,3 +999,10 @@ def LawnApp__DrawGame(orig, self: Lawn.LawnApp, gameTime):
     HookDrawGame(self, Sexy.GlobalStaticVars.g)
     Sexy.GlobalStaticVars.g.EndFrame()
     Sexy.TodLib.FilterEffect.FilterEffectProcessDeleteQueue()
+
+# 连续铲子
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.MouseDownWithTool)
+def Board__MouseDownWithTool(orig, board: Lawn.Board, x: int, y: int, clickCnt: int, cursorType: Lawn.CursorType, posScaled: bool, isTouch: bool):
+    orig(board, x, y, clickCnt, cursorType, posScaled, isTouch)
+    if cheat_option.shovelNoReset and clickCnt >= 0 and cursorType == Lawn.CursorType.Shovel:
+        board.mCursorObject.mCursorType = Lawn.CursorType.Shovel
