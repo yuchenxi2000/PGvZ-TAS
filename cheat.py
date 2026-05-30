@@ -3,14 +3,16 @@
 请配合cheat-gui.html使用
 """
 import sys
-import os
-sys.path.append(os.path.dirname(__file__))
+import System
+pyLibPath = System.Environment.ProcessPath.rsplit('\\', maxsplit=1)[0] + '\\lib'
+modsDirPath = System.Environment.CurrentDirectory + '\\mods'
+sys.path.append(pyLibPath)
+sys.path.append(modsDirPath)
 
 import Lawn
 import LawnMod
 import Sexy
 import Sexy.TodLib
-import System
 from pgvz import *
 from pgvz.lineup import LineUp
 from functools import wraps
@@ -325,7 +327,7 @@ class CheatOption:
         if playerinfo.mFinishedAdventure < 2:
             playerinfo.mFinishedAdventure = 2
         # 完成所有关卡
-        for gamemode in range(1, 148):
+        for gamemode in range(1, int(Lawn.GameMode.GameModeCount)):
             if 70 <= gamemode < 122:
                 continue
             # 当前版本无法完成
@@ -380,6 +382,8 @@ class CheatOption:
         playerinfo.mPurchases[36] = 4
         # 夜晚绿房
         playerinfo.mPurchases[37] = 1
+        # 猫尾草皮肤
+        playerinfo.mPurchases[38] = 1
         # 刷新显示
         if lawnapp.mGameScene == Lawn.GameScenes.Menu:
             lawnapp.KillGameSelector()
@@ -424,7 +428,7 @@ class CheatOption:
         prevSave = f'docs/userdata/game{lawnapp.mPlayerInfo.mId}_{int(targetGameMode)}.dat'
         if lawnapp.FileExists(prevSave):
             # ID为7的对话框点击ok按钮会直接关闭
-            lawnapp.DoDialog(7, True, "错误！", '该功能会覆盖屋顶无尽存档，请先删除或备份！（二次进入直接进屋顶无尽）', '好的', 3)
+            lawnapp.DoDialog(7, True, "错误！", '该功能会覆盖屋顶无尽存档，请先删除或重命名！（二次进入直接进屋顶无尽）', '好的', 3)
         else:
             self._EnterNewGame(targetGameMode)
             board = lawnapp.mBoard

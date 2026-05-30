@@ -38,13 +38,16 @@ TAS框架的模块是pgvz，编写脚本先要import这个模块。
 
 1. PvZ基类、主类的访问通过游戏C#静态对象`Sexy.GlobalStaticVars`，`Sexy.GlobalStaticVars.gLawnApp`就是其他框架的`PvzBase`，`Sexy.GlobalStaticVars.gLawnApp.mBoard`就是其他框架的`MainObject`
 
-2. 脚本在引入pgvz模块前，必须设置加载路径为脚本所在目录，如下所示。这个是游戏本身的锅，我也没办法
+2. 脚本在引入pgvz模块前，必须添加加载路径（IronPython官方库目录和模组文件夹），如下所示。这个是游戏本身的锅，我也没办法
 
     ```python
     # 先设置加载路径
     import sys
-    import os
-    sys.path.append(os.path.dirname(__file__))
+    import System
+    pyLibPath = System.Environment.ProcessPath.rsplit('\\', maxsplit=1)[0] + '\\lib'
+    modsDirPath = System.Environment.CurrentDirectory + '\\mods'
+    sys.path.append(pyLibPath)
+    sys.path.append(modsDirPath)
     # 然后再引入模块
     from pgvz import *
     ```

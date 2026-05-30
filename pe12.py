@@ -3,8 +3,11 @@
 如果没有摆阵型，本脚本会自动摆阵型，然后跳到4002flags
 """
 import sys
-import os
-sys.path.append(os.path.dirname(__file__))
+import System
+pyLibPath = System.Environment.ProcessPath.rsplit('\\', maxsplit=1)[0] + '\\lib'
+modsDirPath = System.Environment.CurrentDirectory + '\\mods'
+sys.path.append(pyLibPath)
+sys.path.append(modsDirPath)
 
 import Lawn
 import Sexy
