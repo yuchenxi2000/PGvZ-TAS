@@ -154,6 +154,9 @@ class DrawStringJustification(typing.SupportsInt):
     LeftVerticalMiddle : DrawStringJustification # 3
     RightVerticalMiddle : DrawStringJustification # 4
     CenterVerticalMiddle : DrawStringJustification # 5
+    LeftVerticalBottom : DrawStringJustification # 6
+    RightVerticalBottom : DrawStringJustification # 7
+    CenterVerticalBottom : DrawStringJustification # 8
 
 
 class EffectSystem:
@@ -752,7 +755,7 @@ class Reanimation:
     def AssignRenderGroupToTrack(self, theTrackName: str, theRenderGroup: int) -> None: ...
     def AttacherSynchWalkSpeed(self, theTrackIndex: int, theAttachReanim: clr.Reference[Reanimation], theAttacherInfo: AttacherInfo) -> None: ...
     def AttachParticleToTrack(self, theTrackName: str, theParticleSystem: clr.Reference[TodParticleSystem], thePosX: float, thePosY: float) -> AttachEffect: ...
-    def AttachToAnotherReanimation(self, theAttachReanim: clr.Reference[Reanimation], theTrackName: str) -> None: ...
+    def AttachToAnotherReanimation(self, theAttachReanim: clr.Reference[Reanimation], theTrackName: str) -> AttachEffect: ...
     def Draw(self, g: Graphics, isHardwareClipRequired: bool = ...) -> None: ...
     def DrawRenderGroup(self, g: Graphics, theRenderGroup: int, isHardwareClipRequired: bool = ...) -> None: ...
     def FindSubReanim(self, theReanimType: ReanimationType) -> Reanimation: ...
@@ -1010,7 +1013,8 @@ class ReanimationType(typing.SupportsInt):
     Talisman : ReanimationType # 146
     Zorrose : ReanimationType # 147
     ZombiePropeller : ReanimationType # 148
-    NumReanims : ReanimationType # 149
+    HypnoCattail : ReanimationType # 149
+    NumReanims : ReanimationType # 150
     None_ : ReanimationType # -1
 
 
@@ -1783,6 +1787,7 @@ class TrailType(typing.SupportsInt):
     Ice : TrailType # 0
     Cattail : TrailType # 1
     Endoflame : TrailType # 2
-    NumTrails : TrailType # 3
+    HypnoCattail : TrailType # 3
+    NumTrails : TrailType # 4
     None_ : TrailType # -1
 
