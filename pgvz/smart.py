@@ -7,6 +7,10 @@ def AutoCollect():
     board = Sexy.GlobalStaticVars.gLawnApp.mBoard
     if board is None:
         return
+    # 花园里互动时候关闭自动收集
+    zenGarden = Sexy.GlobalStaticVars.gLawnApp.mZenGarden
+    if zenGarden.mIsInteracting:
+        return
     num3 = 30 if Sexy.GlobalStaticVars.gLawnApp.IsWhackAZombieLevel() else 0
     cursor_obj = board.mCursorObject.mCursorType
     if cursor_obj == Lawn.CursorType.Normal or cursor_obj == Lawn.CursorType.Hammer:

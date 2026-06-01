@@ -235,6 +235,8 @@
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.GivePottedPlant(Lawn.SeedType.${selectedSeedType}, reverse=${potLeft ? 'True' : 'False'})`)">获得花园盆栽</el-button>
                             <el-button type="primary" style="margin-top:8px"
+                                @click="send(`cheat_option.GiveAllPottedPlants()`)">获得所有类型盆栽</el-button>
+                            <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.AddLawnMower()`)">放置割草机</el-button>
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.StartLawnMower()`)">启动割草机</el-button>

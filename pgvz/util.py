@@ -27,6 +27,7 @@ def MouseDragGrid(board: Lawn.Board, grid_from, grid_to):
 
 # 和Python关键字冲突。用反射绕开
 SeedTypeNone: Lawn.SeedType = getattr(Lawn.SeedType, 'None')
+PottedPlantNeedNone: Lawn.PottedPlantNeed = getattr(Lawn.PottedPlantNeed, 'None')
 
 def SetPlantOnBoard(plantList: list):
     board = Sexy.GlobalStaticVars.gLawnApp.mBoard
