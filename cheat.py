@@ -64,6 +64,8 @@ class CheatOption:
         self.drawZombieHp = False
         self.selectZombieHp = False
         self.shovelNoReset = False
+        self.runBackground = False
+        self.gloveNoCooling = False
     
     def ShowErrorInGame(self, title: str, msg: str):
         lawnapp = Sexy.GlobalStaticVars.gLawnApp
@@ -551,6 +553,12 @@ class CheatOption:
 
 cheat_option = CheatOption()
 
+# 后台运行。如果直接设置Sexy.Main.RunWhenLocked，切换用户时会失效，因此得挂钩子
+@LawnMod.MonoModUtils.HookTo(Lawn.LawnApp.LostFocus)
+def LawnApp__LostFocus(orig, lawnapp: Lawn.LawnApp):
+    Sexy.Main.RunWhenLocked = cheat_option.runBackground
+    orig(lawnapp)
+
 # 免费用卡
 # 第二个hook为了让无尽里紫卡阳光仍为0
 @LawnMod.MonoModUtils.HookTo(Lawn.Plant.GetCost)
@@ -611,6 +619,13 @@ def Board__HasGlove(orig, board: Lawn.Board):
         return board.mApp.mGameMode not in [Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom]
     else:
         return orig(board)
+
+# 手套无冷却
+@LawnMod.MonoModUtils.HookTo(Lawn.Challenge.MovePlant)
+def Challenge__MovePlant(orig, challenge: Lawn.Challenge, plant: Lawn.Plant, gridX: int, gridY: int):
+    orig(challenge, plant, gridX, gridY)
+    if cheat_option.gloveNoCooling:
+        challenge.mGloveCounter = 0
 
 # 僵尸停滞不前
 @LawnMod.MonoModUtils.HookTo(Lawn.Zombie.UpdateZombieWalking)

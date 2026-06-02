@@ -33,7 +33,7 @@ class CobManager:
     def GetCobOnBoard(self):
         self.cobList = []
         for plant in IterAlivePlants():
-            if plant.mSeedType == Lawn.SeedType.Cobcannon or (plant.mSeedType == Lawn.SeedType.Imitater and plant.mSeedType == Lawn.SeedType.Cobcannon):
+            if plant.mSeedType == Lawn.SeedType.Cobcannon:
                 self.cobList.append(plant)
 
     def _TryFire(self, row: int, col) -> bool:

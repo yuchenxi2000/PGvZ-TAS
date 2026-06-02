@@ -74,6 +74,7 @@
                             <el-checkbox v-model="cheatOption.infSun">无限阳光</el-checkbox>
                             <el-checkbox v-model="cheatOption.conveyorNoCooling">连续传送带</el-checkbox>
                             <el-checkbox v-model="cheatOption.enableGlove">启用手套</el-checkbox>
+                            <el-checkbox v-model="cheatOption.gloveNoCooling">手套无冷却</el-checkbox>
                             <el-checkbox v-model="cheatOption.shovelNoReset">连续铲子</el-checkbox>
                             <el-checkbox v-model="cheatOption.plantNoDie">植物无敌</el-checkbox>
                             <el-checkbox v-model="cheatOption.zombieNoDie">僵尸无敌</el-checkbox>
@@ -1276,6 +1277,7 @@
                     'drawPlantHp',
                     'drawZombieHp',
                     'selectZombieHp',
+                    'gloveNoCooling',
                 ];
                 const cheatOption = reactive({});
                 optionConfig.forEach(item => {
@@ -1285,10 +1287,6 @@
                 cheatOption['runBackground'] = true;
                 function setCheatOption(key, value) {
                     switch (key) {
-                        case 'runBackground':
-                            send(`Sexy.Main.RunWhenLocked = ${value ? 'True' : 'False'}`);
-                            break;
-                        
                         case 'autoCollect':
                             if (value) {
                                 send(`auto_collector.On()`);
