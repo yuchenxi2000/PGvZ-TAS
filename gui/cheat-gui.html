@@ -19,6 +19,11 @@
         .command-card {
             margin-bottom: 16px;
         }
+
+        pre {
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
     </style>
 </head>
 
@@ -259,7 +264,7 @@
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.RemoveGridItemOnBoard(${selectedRow}, ${selectedCol}, Lawn.GridItemType.${selectedGridItem})`)">移除场地物品（选中）</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.RemoveGridItemOnBoard(-1, -1, Lawn.GridItemType.Talisman)\ncheat_option.RemoveGridItemOnBoard(-1, -1, Lawn.GridItemType.TalismanMove)`)">移除天尸诅咒</el-button>
+                                @click="send(`cheat_option.RemoveTalisman()`)">移除天尸诅咒</el-button>
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.RemoveLawnMower()`)">移除割草机</el-button>
                             <el-button type="primary" style="margin-top:8px"
@@ -442,7 +447,8 @@
             // 让所有组件使用中文
             setup() {
                 // ========== 配置区 ==========
-                const SERVER_URL = 'ws://localhost:8080/Py'; // 游戏 WebSocket 地址
+                const wsParams = new URLSearchParams(location.search);
+                const SERVER_URL = wsParams.get('ws') || 'ws://localhost:8080/Py';
 
                 // ========== 状态 ==========
                 const seedTypes = [
@@ -1242,6 +1248,8 @@
                     lastResult.text = '⏳ 已发送，等待结果...';
                 }
 
+                const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
                 // ========== 修改器状态 ============
                 const optionConfig = [
                     'autoCollect',
@@ -1343,8 +1351,14 @@
                     ws.onopen = () => {
                         connected.value = true;
                         statusText.value = '✅ 已连接到游戏服务器';
-                        send('from pgvz import *\nfrom cheat import cheat_option, script_skill_nocooling, script_inf_sun\nimport Lawn\nimport Sexy\nimport Sexy.TodLib\nimport LawnMod\nimport pgvz.lineup');
-                        syncCheatOptions();
+                        if (isMobile) {
+                            // 手机端：先拉取游戏当前状态，原因是手机后台应用（比如浏览器网页）可能被系统杀死，所以应该从游戏同步作弊选项到网页而不是相反
+                            send('from pgvz import *\nfrom pgvztool import *\nimport Lawn\nimport Sexy\nimport Sexy.TodLib\nimport LawnMod\nimport pgvz.lineup\nget_cheat_state()');
+                        } else {
+                            // PC端：网页状态推送到游戏，这个行为和原版修改器PvZToolkit一致
+                            send('from pgvz import *\nfrom pgvztool import *\nimport Lawn\nimport Sexy\nimport Sexy.TodLib\nimport LawnMod\nimport pgvz.lineup');
+                            syncCheatOptions();
+                        }
                     };
                     ws.onmessage = (event) => {
                         try {
@@ -1352,6 +1366,23 @@
                             if (data.statuscode === 0) {
                                 lastResult.ok = true;
                                 lastResult.text = data.result || '执行成功';
+                                if (data.result) {
+                                    try {
+                                        let r = data.result;
+                                        if ((r.startsWith("'") && r.endsWith("'")) || (r.startsWith('"') && r.endsWith('"'))) {
+                                            r = r.slice(1, -1);
+                                        }
+                                        const msg = JSON.parse(r);
+                                        // 同步协议：{action:"sync", options:{...}}
+                                        if (msg.action === 'sync' && msg.options) {
+                                            lastResult.text = '✅ 状态已同步';
+                                            Object.keys(msg.options).forEach(k => {
+                                                if (k in cheatOption) cheatOption[k] = msg.options[k];
+                                            });
+                                            return;
+                                        }
+                                    } catch {}
+                                }
                             } else {
                                 lastResult.ok = false;
                                 lastResult.text = data.errortype || '未知错误';

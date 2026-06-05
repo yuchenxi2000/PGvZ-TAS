@@ -3,8 +3,14 @@
 """
 import sys
 import System
-pyLibPath = System.Environment.ProcessPath.rsplit('\\', maxsplit=1)[0] + '\\lib'
-modsDirPath = System.Environment.CurrentDirectory + '\\mods'
+import System.IO
+# 貌似手机版不需要设置路径也能正常运行，但这里还是加上以防万一
+# Android: IronPython库在 CurrentDirectory/IronPython/Libs
+pyLibPath = System.IO.Path.Combine(System.Environment.CurrentDirectory, 'IronPython', 'Libs')
+if not System.IO.Directory.Exists(pyLibPath):
+    # Windows: IronPython库在游戏主程序同目录下的lib
+    pyLibPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.Environment.ProcessPath), 'lib')
+modsDirPath = System.IO.Path.Combine(System.Environment.CurrentDirectory, 'mods')
 sys.path.append(pyLibPath)
 sys.path.append(modsDirPath)
 
@@ -110,13 +116,13 @@ def BeghouledUpgradePlant():
     Card(Lawn.SeedType.Tallnut, 1, 9)
 
 def ScriptBeghouledTwist():
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     BeghouledUpgradePlant()
     beghouled.Fill(board)
     beghouled.doValidTwist(board)
 
 def ScriptBeghouled():
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     BeghouledUpgradePlant()
     beghouled.Fill(board)
     beghouled.doValidMove(board)

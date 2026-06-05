@@ -14,17 +14,29 @@ by yuchenxi2000
 
 把本仓库下载下来，然后把里面的所有文件放到游戏的`mods`目录下。注意游戏只会加载`mods`目录下以`.py`作为后缀的文件，因此脚本必须直接放`mods`目录下。`pgvz`文件夹直接放`mods`目录下，里面文件不要动。
 
-对于PC版游戏，默认的`mods`目录是`C:\Users\你的用户名\AppData\Roaming\ZBC\PlantGirlsVsZombies\mods`
+对于PC版游戏，默认的`mods`目录是`C:\Users\你的用户名\AppData\Roaming\ZBC\PlantGirlsVsZombies\mods`。对于安卓版，`mods`目录是`/storage/emulated/0/Android/data/net.pvz.pgvz.zbcteam/files/mods`
 
 如果不生效，可能的原因是没有开启模组功能，你需要编辑一下配置文件`C:\Users\你的用户名\AppData\Roaming\ZBC\PlantGirlsVsZombies\user_config.json`，把`ironpython_enabled`这个选项改成`true`
 
-本仓库包含键控框架模块`pgvz`，以及几个可直接作为模组加载的示例脚本。
+本仓库包含键控框架模块`pgvz`，修改器模块`pgvztool`，修改器GUI界面`gui`，修改器GUI服务器`cheat-gui.py`，以及几个可直接作为模组加载的示例脚本。
+
+> 警告：手机版用户不要加很多模组（放.py脚本在模组目录），因为这游戏加载模组在主线程，且先于游戏渲染，因此模组过多会超时，被系统杀死（表现为游戏闪退）
+>
+> 一个规避的方法是放文件夹里面，写成Python包的形式，就比如我这个仓库的pgvz和pgvztool。游戏启动后打开修改器，在修改器里面最右边一栏运行自定义代码里面写import语句导入模组。此时加载模组代码在非主线程运行，不会卡死游戏。游戏只会查找模组目录下面以.py为后缀的文件，而不会自动加载文件夹形式存在的Python包
 
 ## 修改器使用方法
 
-1. 按上节方法，将`pgvz`文件夹和`cheat.py`放到`mods`目录下；或者直接运行`cp-cheat-mods.bat`
+PC用户：
 
-2. 双击`cheat-gui.html`开始使用
+1. 按上节方法，将`pgvz/`, `pgvztool/`, `gui/`, `cheat-gui.py`放到`mods`目录下；或者直接运行`cp-cheat-mods.bat`
+
+2. 浏览器里打开localhost:58080开始使用（此链接只有在游戏开启时有效），或者双击`gui/cheat-gui.html`
+
+安卓用户：
+
+1. 安装修改器mod。需要自行将所有文件（`pgvz/`, `pgvztool/`, `gui/`, `cheat-gui.py`）拷贝到模组目录`/storage/emulated/0/Android/data/net.pvz.pgvz.zbcteam/files/mods`下面
+
+2. 浏览器里打开localhost:58080（此链接只有在游戏开启时有效）
 
 ## 脚本编写教程
 
@@ -36,16 +48,22 @@ TAS框架的模块是pgvz，编写脚本先要import这个模块。
 
 下面介绍和pyvz、AvZ的异同：
 
-1. PvZ基类、主类的访问通过游戏C#静态对象`Sexy.GlobalStaticVars`，`Sexy.GlobalStaticVars.gLawnApp`就是其他框架的`PvzBase`，`Sexy.GlobalStaticVars.gLawnApp.mBoard`就是其他框架的`MainObject`
+1. PvZ基类、主类的访问通过游戏C#静态对象`Sexy.GlobalStaticVars`，`Sexy.GlobalStaticVars.gLawnApp`就是其他框架的`PvzBase`，`Sexy.GlobalStaticVars.gLawnApp.mBoard`就是其他框架的`MainObject`。或者使用包装好的`GetLawnApp()`和`GetBoard()`
 
-2. 脚本在引入pgvz模块前，必须添加加载路径（IronPython官方库目录和模组文件夹），如下所示。这个是游戏本身的锅，我也没办法
+2. 脚本在引入pgvz模块前，必须添加加载路径（IronPython官方库目录和模组文件夹），如下所示。这个是游戏本身的锅，我也没办法。手机版不需要设置路径，但我为了以防万一还是设置了路径，大家可以自行决定
 
     ```python
     # 先设置加载路径
     import sys
     import System
-    pyLibPath = System.Environment.ProcessPath.rsplit('\\', maxsplit=1)[0] + '\\lib'
-    modsDirPath = System.Environment.CurrentDirectory + '\\mods'
+    import System.IO
+    # 貌似手机版不需要设置路径也能正常运行，但这里还是加上以防万一
+    # Android: IronPython库在 CurrentDirectory/IronPython/Libs
+    pyLibPath = System.IO.Path.Combine(System.Environment.CurrentDirectory, 'IronPython', 'Libs')
+    if not System.IO.Directory.Exists(pyLibPath):
+        # Windows: IronPython库在游戏主程序同目录下的lib
+        pyLibPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.Environment.ProcessPath), 'lib')
+    modsDirPath = System.IO.Path.Combine(System.Environment.CurrentDirectory, 'mods')
     sys.path.append(pyLibPath)
     sys.path.append(modsDirPath)
     # 然后再引入模块
@@ -116,7 +134,7 @@ TAS框架的模块是pgvz，编写脚本先要import这个模块。
 
 注意被包装函数的第一个参数是原方法。如果是成员方法，第二个参数是对象，后续是类方法的参数；如果是静态方法，则没有对象参数。
 
-具体写法详见`cheat.py`以及`pgvz/__init__.py`。
+具体写法详见`pgvztool/cheat.py`以及`pgvz/__init__.py`。
 
 ## 参考资料
 

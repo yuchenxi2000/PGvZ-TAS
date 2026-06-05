@@ -3,8 +3,14 @@
 """
 import sys
 import System
-pyLibPath = System.Environment.ProcessPath.rsplit('\\', maxsplit=1)[0] + '\\lib'
-modsDirPath = System.Environment.CurrentDirectory + '\\mods'
+import System.IO
+# 貌似手机版不需要设置路径也能正常运行，但这里还是加上以防万一
+# Android: IronPython库在 CurrentDirectory/IronPython/Libs
+pyLibPath = System.IO.Path.Combine(System.Environment.CurrentDirectory, 'IronPython', 'Libs')
+if not System.IO.Directory.Exists(pyLibPath):
+    # Windows: IronPython库在游戏主程序同目录下的lib
+    pyLibPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.Environment.ProcessPath), 'lib')
+modsDirPath = System.IO.Path.Combine(System.Environment.CurrentDirectory, 'mods')
 sys.path.append(pyLibPath)
 sys.path.append(modsDirPath)
 
@@ -14,7 +20,7 @@ from pgvz import *
 
 # 自动锤僵尸
 def WhackZombie():
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     for zombie in IterAliveZombies():
         if zombie.mPhaseCounter <= 19:
             posX = zombie.mPosX + 0.5 * zombie.mZombieRect.mWidth

@@ -174,7 +174,7 @@ class LineUp:
         # 场景
         self.scene = int(board.mBackground)
         # 格子
-        NRow = 6 if Sexy.GlobalStaticVars.gLawnApp.mBoard.StageHas6Rows() else 5
+        NRow = 6 if board.StageHas6Rows() else 5
         NCol = 9
         for row in range(NRow):
             for col in range(NCol):
@@ -208,10 +208,10 @@ class LineUp:
             newGridItem.mGridItemType = Lawn.GridItemType.Rake
             newGridItem.mGridX = self.rake_col
             newGridItem.mGridY = self.rake_row
-            newGridItem.mPosX = Sexy.GlobalStaticVars.gLawnApp.mBoard.GridToPixelX(newGridItem.mGridX, newGridItem.mGridY)
-            newGridItem.mPosY = Sexy.GlobalStaticVars.gLawnApp.mBoard.GridToPixelY(newGridItem.mGridX, newGridItem.mGridY)
+            newGridItem.mPosX = board.GridToPixelX(newGridItem.mGridX, newGridItem.mGridY)
+            newGridItem.mPosY = board.GridToPixelY(newGridItem.mGridX, newGridItem.mGridY)
             newGridItem.mRenderOrder = Lawn.Board.MakeRenderOrder(Lawn.RenderLayer.GraveStone, newGridItem.mGridY, 9)
-            Sexy.GlobalStaticVars.gLawnApp.mBoard.mGridItems.Add(newGridItem)
-            theReanimation = Sexy.GlobalStaticVars.gLawnApp.mBoard.CreateRakeReanim(newGridItem.mPosX, newGridItem.mPosY, 0)
-            newGridItem.mGridItemReanimID = Sexy.GlobalStaticVars.gLawnApp.mBoard.mApp.ReanimationGetID(theReanimation)
+            board.mGridItems.Add(newGridItem)
+            theReanimation = board.CreateRakeReanim(newGridItem.mPosX, newGridItem.mPosY, 0)
+            newGridItem.mGridItemReanimID = board.mApp.ReanimationGetID(theReanimation)
             newGridItem.mGridItemState = Lawn.GridItemState.RakeAttracting

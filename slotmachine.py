@@ -4,8 +4,14 @@
 """
 import sys
 import System
-pyLibPath = System.Environment.ProcessPath.rsplit('\\', maxsplit=1)[0] + '\\lib'
-modsDirPath = System.Environment.CurrentDirectory + '\\mods'
+import System.IO
+# 貌似手机版不需要设置路径也能正常运行，但这里还是加上以防万一
+# Android: IronPython库在 CurrentDirectory/IronPython/Libs
+pyLibPath = System.IO.Path.Combine(System.Environment.CurrentDirectory, 'IronPython', 'Libs')
+if not System.IO.Directory.Exists(pyLibPath):
+    # Windows: IronPython库在游戏主程序同目录下的lib
+    pyLibPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.Environment.ProcessPath), 'lib')
+modsDirPath = System.IO.Path.Combine(System.Environment.CurrentDirectory, 'mods')
 sys.path.append(pyLibPath)
 sys.path.append(modsDirPath)
 
@@ -22,7 +28,7 @@ def hook_seedpacket_picknextslotmachineseed(action, seed_packet: Lawn.SeedPacket
 
 # 自动转老虎机
 def SlotMachinePullHandle():
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     gameConst = Sexy.Constants
     if board.mChallenge.mChallengeState == Lawn.ChallengeState.Normal:
         handleX = int(gameConst.Challenge_SlotMachineHandle_Pos.mX + 0.5 * gameConst.Challenge_SlotMachineHandle_Pos.mWidth)

@@ -2,13 +2,7 @@
 更好的作弊
 请配合cheat-gui.html使用
 """
-import sys
 import System
-pyLibPath = System.Environment.ProcessPath.rsplit('\\', maxsplit=1)[0] + '\\lib'
-modsDirPath = System.Environment.CurrentDirectory + '\\mods'
-sys.path.append(pyLibPath)
-sys.path.append(modsDirPath)
-
 import Lawn
 import LawnMod
 import Sexy
@@ -68,7 +62,7 @@ class CheatOption:
         self.gloveNoCooling = False
     
     def ShowErrorInGame(self, title: str, msg: str):
-        lawnapp = Sexy.GlobalStaticVars.gLawnApp
+        lawnapp = GetLawnApp()
         # ID为7的对话框点击ok按钮会直接关闭
         lawnapp.KillDialog(7)
         lawnapp.DoDialog(7, True, title, msg, '好的', 3)
@@ -90,7 +84,7 @@ class CheatOption:
             self._plantNoDie = value
 
     def ConvertRange(self, row: int, col: int):
-        NRow = 6 if Sexy.GlobalStaticVars.gLawnApp.mBoard.StageHas6Rows() else 5
+        NRow = 6 if GetBoard().StageHas6Rows() else 5
         if row < 0:
             row_range = range(NRow)
         elif row >= NRow:
@@ -108,15 +102,18 @@ class CheatOption:
 
     @main_thread
     def PlantOnBoard(self, row: int, col: int, seedtype: Lawn.SeedType, isImitater: bool):
+        board = GetBoard()
+        if board is None:
+            return
         if seedtype == Lawn.SeedType.Imitater and not isImitater:
             return
         row_range, col_range = self.ConvertRange(row, col)
         for row1 in row_range:
             for col1 in col_range:
                 if isImitater:
-                    Sexy.GlobalStaticVars.gLawnApp.mBoard.AddPlant(col1, row1, Lawn.SeedType.Imitater, seedtype)
+                    board.AddPlant(col1, row1, Lawn.SeedType.Imitater, seedtype)
                 else:
-                    Sexy.GlobalStaticVars.gLawnApp.mBoard.AddPlant(col1, row1, seedtype, SeedTypeNone)
+                    board.AddPlant(col1, row1, seedtype, SeedTypeNone)
     
     @main_thread
     def RemovePlantOnBoard(self):
@@ -125,8 +122,10 @@ class CheatOption:
     
     @main_thread
     def ZombieOnBoard(self, row: int, col: int, zombietype: Lawn.ZombieType, mind_ctrl: bool = False):
+        board = GetBoard()
+        if board is None:
+            return
         row_range, col_range = self.ConvertRange(row, col)
-        board = Sexy.GlobalStaticVars.gLawnApp.mBoard
         curwave = board.mCurrentWave
         for row1 in row_range:
             for col1 in col_range:
@@ -152,11 +151,16 @@ class CheatOption:
     
     @main_thread
     def RemoveZombieOnBoard(self):
+        if GetBoard() is None:
+            return
         for zombie in IterAliveZombies():
             zombie.DieNoLoot(False)
     
     def SetSeedPacket(self, idx: int, seedtype: Lawn.SeedType, isImitater: bool):
-        seedpacket = Sexy.GlobalStaticVars.gLawnApp.mBoard.mSeedBank.mSeedPackets[idx]
+        board = GetBoard()
+        if board is None:
+            return
+        seedpacket = board.mSeedBank.mSeedPackets[idx]
         if isImitater:
             seedpacket.SetPacketType(Lawn.SeedType.Imitater, seedtype)
         else:
@@ -164,6 +168,10 @@ class CheatOption:
     
     @main_thread
     def AddGridItemOnBoard(self, row: int, col: int, gridItemType: Lawn.GridItemType):
+        lawnApp = GetLawnApp()
+        board = lawnApp.mBoard
+        if board is None:
+            return
         row_range, col_range = self.ConvertRange(row, col)
         for row1 in row_range:
             for col1 in col_range:
@@ -173,21 +181,21 @@ class CheatOption:
                     newGridItem.mGridItemType = Lawn.GridItemType.Rake
                     newGridItem.mGridX = col1
                     newGridItem.mGridY = row1
-                    newGridItem.mPosX = Sexy.GlobalStaticVars.gLawnApp.mBoard.GridToPixelX(newGridItem.mGridX, newGridItem.mGridY)
-                    newGridItem.mPosY = Sexy.GlobalStaticVars.gLawnApp.mBoard.GridToPixelY(newGridItem.mGridX, newGridItem.mGridY)
+                    newGridItem.mPosX = board.GridToPixelX(newGridItem.mGridX, newGridItem.mGridY)
+                    newGridItem.mPosY = board.GridToPixelY(newGridItem.mGridX, newGridItem.mGridY)
                     newGridItem.mRenderOrder = Lawn.Board.MakeRenderOrder(Lawn.RenderLayer.GraveStone, newGridItem.mGridY, 9)
-                    Sexy.GlobalStaticVars.gLawnApp.mBoard.mGridItems.Add(newGridItem)
-                    theReanimation = Sexy.GlobalStaticVars.gLawnApp.mBoard.CreateRakeReanim(newGridItem.mPosX, newGridItem.mPosY, 0)
-                    newGridItem.mGridItemReanimID = Sexy.GlobalStaticVars.gLawnApp.mBoard.mApp.ReanimationGetID(theReanimation)
+                    board.mGridItems.Add(newGridItem)
+                    theReanimation = board.CreateRakeReanim(newGridItem.mPosX, newGridItem.mPosY, 0)
+                    newGridItem.mGridItemReanimID = lawnApp.ReanimationGetID(theReanimation)
                     newGridItem.mGridItemState = Lawn.GridItemState.RakeAttracting
                 elif gridItemType == Lawn.GridItemType.Crater:
-                    crater = Sexy.GlobalStaticVars.gLawnApp.mBoard.AddACrater(col1, row1)
+                    crater = board.AddACrater(col1, row1)
                     crater.mGridItemCounter = 18000
                 elif gridItemType == Lawn.GridItemType.Gravestone:
-                    grave_stone = Sexy.GlobalStaticVars.gLawnApp.mBoard.AddAGraveStone(col1, row1)
+                    grave_stone = board.AddAGraveStone(col1, row1)
                     grave_stone.mGridItemCounter = 100  # 否则非存在墓碑场地不更新，墓碑无法钻出
                 elif gridItemType == Lawn.GridItemType.Ladder:
-                    Sexy.GlobalStaticVars.gLawnApp.mBoard.AddALadder(col1, row1)
+                    board.AddALadder(col1, row1)
                 elif gridItemType == Lawn.GridItemType.Talisman:
                     Lawn.Zombie.GetNewZombie().CreateTalismanAt(col1, row1)
                 elif gridItemType == Lawn.GridItemType.TalismanMove:
@@ -199,10 +207,13 @@ class CheatOption:
                     newGridItem.mGridY = row1
                     newGridItem.mRenderOrder = Lawn.Board.MakeRenderOrder(Lawn.RenderLayer.Particle, newGridItem.mGridY, 0)
                     newGridItem.OpenPortal()
-                    Sexy.GlobalStaticVars.gLawnApp.mBoard.mGridItems.Add(newGridItem)
+                    board.mGridItems.Add(newGridItem)
 
     @main_thread
     def AddScaryPotOnBoard(self, row: int, col: int, theScaryPotType: Lawn.ScaryPotType, appearance: Lawn.GridItemState, theZombieType: Lawn.ZombieType, theSeedType: Lawn.SeedType, numSun: int):
+        board = GetBoard()
+        if board is None:
+            return
         row_range, col_range = self.ConvertRange(row, col)
         for row1 in row_range:
             for col1 in col_range:
@@ -215,26 +226,33 @@ class CheatOption:
                 newGridItem.mSeedType = theSeedType
                 newGridItem.mZombieType = theZombieType
                 newGridItem.mScaryPotType = theScaryPotType
-                Sexy.GlobalStaticVars.gLawnApp.mBoard.mGridItems.Add(newGridItem)
+                board.mGridItems.Add(newGridItem)
                 if theScaryPotType == Lawn.ScaryPotType.Sun:
                     newGridItem.mSunCount = numSun
     
     @main_thread
     def AddLadderSmart(self):
-        NRow = 6 if Sexy.GlobalStaticVars.gLawnApp.mBoard.StageHas6Rows() else 5
+        board = GetBoard()
+        if board is None:
+            return
+        NRow = 6 if board.StageHas6Rows() else 5
         NCol = 9
         for row1 in range(NRow):
-            if Sexy.GlobalStaticVars.gLawnApp.mBoard.mPlantRow[row1] != Lawn.PlantRowType.Pool:  # 泳池不要搭梯
+            if board.mPlantRow[row1] != Lawn.PlantRowType.Pool:  # 泳池不要搭梯
                 for col1 in range(1, NCol):  # 最后一排不要搭梯
-                    plantPumpkin = Sexy.GlobalStaticVars.gLawnApp.mBoard.GetTopPlantAt(col1, row1, Lawn.TopPlant.OnlyPumpkin)
-                    if plantPumpkin is not None and Sexy.GlobalStaticVars.gLawnApp.mBoard.GetLadderAt(col1, row1) is None:  # 没南瓜，或已经有梯子不要搭梯
-                        Sexy.GlobalStaticVars.gLawnApp.mBoard.AddALadder(col1, row1)
+                    plantPumpkin = board.GetTopPlantAt(col1, row1, Lawn.TopPlant.OnlyPumpkin)
+                    if plantPumpkin is not None and board.GetLadderAt(col1, row1) is None:  # 没南瓜，或已经有梯子不要搭梯
+                        board.AddALadder(col1, row1)
 
     @main_thread
     def RemoveGridItemOnBoard(self, row: int, col: int, gridItemType: Lawn.GridItemType):
+        lawnApp = GetLawnApp()
+        board = lawnApp.mBoard
+        if board is None:
+            return
         # 虽然宝石迷阵里的弹坑并不是场地物品，还是把它移除了吧
-        if gridItemType == Lawn.GridItemType.Crater and Sexy.GlobalStaticVars.gLawnApp.mGameMode in [Lawn.GameMode.ChallengeBeghouled, Lawn.GameMode.ChallengeBeghouledTwist]:
-            challenge = Sexy.GlobalStaticVars.gLawnApp.mBoard.mChallenge
+        if gridItemType == Lawn.GridItemType.Crater and lawnApp.mGameMode in [Lawn.GameMode.ChallengeBeghouled, Lawn.GameMode.ChallengeBeghouledTwist]:
+            challenge = board.mChallenge
             challenge.BeghouledClearCrater(40)
             challenge.BeghouledStartFalling(Lawn.ChallengeState.BeghouledFalling)
             return
@@ -245,13 +263,19 @@ class CheatOption:
     
     @main_thread
     def RemoveCoinOnBoard(self, cointype: Lawn.CoinType):
+        board = GetBoard()
+        if board is None:
+            return
         for coin in IterAliveCoins():
             if coin.mType == cointype:
                 coin.Die()
     
     @main_thread
     def AddCoinOnBoard(self, x: int, y: int, cointype: Lawn.CoinType, seedtype: Lawn.SeedType, reverse: bool):
-        coin = Sexy.GlobalStaticVars.gLawnApp.mBoard.AddCoin(x, y, cointype, Lawn.CoinMotion.Coin)
+        board = GetBoard()
+        if board is None:
+            return
+        coin = board.AddCoin(x, y, cointype, Lawn.CoinMotion.Coin)
         if cointype == Lawn.CoinType.UsableSeedPacket:
             coin.mUsableSeedType = seedtype
         elif cointype == Lawn.CoinType.PresentPlant:
@@ -260,36 +284,50 @@ class CheatOption:
     
     @main_thread
     def OpenScaryPotterOnBoard(self):
+        board = GetBoard()
+        if board is None:
+            return
         for griditem in IterAliveGridItems():
             if griditem.mGridItemType == Lawn.GridItemType.ScaryPot:
-                Sexy.GlobalStaticVars.gLawnApp.mBoard.mChallenge.ScaryPotterOpenPot(griditem)
+                board.mChallenge.ScaryPotterOpenPot(griditem)
 
     @main_thread
     def AddLawnMower(self):
-        NRow = 6 if Sexy.GlobalStaticVars.gLawnApp.mBoard.StageHas6Rows() else 5
+        board = GetBoard()
+        if board is None:
+            return
+        NRow = 6 if board.StageHas6Rows() else 5
         for row in range(NRow):
             mower = Lawn.LawnMower.GetNewLawnMower()
             mower.LawnMowerInitialize(row)
             mower.mMowerState = Lawn.LawnMowerState.Ready
             mower.mPosX = Sexy.Constants.BOARD_EXTRA_ROOM - 21.0
-            Sexy.GlobalStaticVars.gLawnApp.mBoard.mLawnMowers.Add(mower)
+            board.mLawnMowers.Add(mower)
     
     def StartLawnMower(self):
-        for i in range(Sexy.GlobalStaticVars.gLawnApp.mBoard.mLawnMowers.Count):
-            mower = Sexy.GlobalStaticVars.gLawnApp.mBoard.mLawnMowers[i]
+        board = GetBoard()
+        if board is None:
+            return
+        for i in range(board.mLawnMowers.Count):
+            mower = board.mLawnMowers[i]
             if not mower.mDead:
                 mower.StartMower()
     
     def RemoveLawnMower(self):
-        Sexy.GlobalStaticVars.gLawnApp.mBoard.mBonusLawnMowersRemaining = 0
-        for i in range(Sexy.GlobalStaticVars.gLawnApp.mBoard.mLawnMowers.Count):
-            mower = Sexy.GlobalStaticVars.gLawnApp.mBoard.mLawnMowers[i]
+        board = GetBoard()
+        if board is None:
+            return
+        board.mBonusLawnMowersRemaining = 0
+        for i in range(board.mLawnMowers.Count):
+            mower = board.mLawnMowers[i]
             if not mower.mDead:
                 mower.Die()
 
     @main_thread
     def FailImmediately(self, zombietype: Lawn.ZombieType):
-        if Sexy.GlobalStaticVars.gLawnApp.mBoard is None:
+        lawnApp = GetLawnApp()
+        board = lawnApp.mBoard
+        if board is None:
             return
         board_EDGE = Sexy.Constants.BOARD_EDGE
         if zombietype in [Lawn.ZombieType.Gargantuar, Lawn.ZombieType.RedeyeGargantuar]:
@@ -302,15 +340,15 @@ class CheatOption:
             board_EDGE = Sexy.Constants.BOARD_EDGE - 75
         elif zombietype in [Lawn.ZombieType.BackupDancer, Lawn.ZombieType.Dancer, Lawn.ZombieType.Snorkel]:
             board_EDGE = Sexy.Constants.BOARD_EDGE - 30
-        zombie = Sexy.GlobalStaticVars.gLawnApp.mBoard.AddZombie(zombietype, 0)
+        zombie = board.AddZombie(zombietype, 0)
         zombie.mPosX = board_EDGE
         # 没有这个会崩溃，因为游戏失败对话和暂停貌似会冲突
-        Sexy.GlobalStaticVars.gLawnApp.KillDialog(19)
-        Sexy.GlobalStaticVars.gLawnApp.mBoard.ZombiesWon(zombie)
+        lawnApp.KillDialog(19)
+        board.ZombiesWon(zombie)
     
     @main_thread
     def GivePottedPlant(self, seedtype: Lawn.SeedType, reverse: bool = False):
-        zenGarden = Sexy.GlobalStaticVars.gLawnApp.mZenGarden
+        zenGarden = GetLawnApp().mZenGarden
         if zenGarden.IsZenGardenFull(False):
             self.ShowErrorInGame('错误！', '你的花园已经满了，请清理一些盆栽，或者移一些到蘑菇园和水族馆后再试！')
             return
@@ -323,7 +361,7 @@ class CheatOption:
         zenGarden.AddPottedPlant(pottedPlant)
     
     def AddPottedPlantToGivenPos(self, seedtype: Lawn.SeedType, facing: Lawn.PottedPlant.FacingDirection, x: int, y: int, pos: Lawn.GardenType):
-        lawnapp = Sexy.GlobalStaticVars.gLawnApp
+        lawnapp = GetLawnApp()
         player = lawnapp.mPlayerInfo
         pottedPlant = player.mPottedPlant[player.mNumPottedPlants]
         pottedPlant.InitializePottedPlant(seedtype)
@@ -338,7 +376,7 @@ class CheatOption:
     
     @main_thread
     def GiveAllPottedPlants(self):
-        lawnapp = Sexy.GlobalStaticVars.gLawnApp
+        lawnapp = GetLawnApp()
         player = lawnapp.mPlayerInfo
         # 检查是否所有花园已购买
         # 18: 蘑菇园; 25: 水族馆; 37: 夜晚绿房
@@ -401,7 +439,7 @@ class CheatOption:
 
     @main_thread
     def GetFinishedAccount(self):
-        lawnapp = Sexy.GlobalStaticVars.gLawnApp
+        lawnapp = GetLawnApp()
         playerinfo = lawnapp.mPlayerInfo
         # 解锁所有关卡
         playerinfo.mHasUnlockedMinigames = True
@@ -488,7 +526,7 @@ class CheatOption:
         Sexy.GlobalStaticVars.gFastSlowMoNum = factor
     
     def _EnterNewGame(self, gamemode: Lawn.GameMode):
-        lawnapp = Sexy.GlobalStaticVars.gLawnApp
+        lawnapp = GetLawnApp()
         # 删除所有对话框
         lawnapp.KillDialog(3)  # 图鉴
         lawnapp.KillDialog(4)  # 商店
@@ -514,42 +552,64 @@ class CheatOption:
     @main_thread
     def EnterMoonEndless(self):
         # 会覆盖屋顶无尽存档，先检查是否有存档
-        lawnapp = Sexy.GlobalStaticVars.gLawnApp
+        lawnapp = GetLawnApp()
         targetGameMode = Lawn.GameMode.SurvivalEndlessStage5
         prevSave = f'docs/userdata/game{lawnapp.mPlayerInfo.mId}_{int(targetGameMode)}.dat'
         if lawnapp.FileExists(prevSave):
-            self.ShowErrorInGame('错误！', '该功能会覆盖屋顶无尽存档，请先删除或重命名！（二次进入直接进屋顶无尽）')
-        else:
-            self._EnterNewGame(targetGameMode)
-            board = lawnapp.mBoard
-            # 设置场景
-            board.mBackground = Lawn.BackgroundType.Num6Boss
-            board.LoadBackgroundImages()
-            # 设置关卡数
-            board.mChallenge.mSurvivalStage = -1
-            # 直接下一关
-            board.FadeOutLevel()
+            self.ShowErrorInGame('错误！', '该功能会覆盖屋顶无尽存档，请先删除或重命名！二次进入请直接进屋顶无尽')
+            return
+        self._EnterNewGame(targetGameMode)
+        board = lawnapp.mBoard
+        # 设置场景
+        board.mBackground = Lawn.BackgroundType.Num6Boss
+        board.LoadBackgroundImages()
+        # 设置关卡数
+        board.mChallenge.mSurvivalStage = -1
+        # 直接下一关
+        board.FadeOutLevel()
     
     @main_thread
     def CheatSetZombies(self, zb_list, internal_spawn: bool = True):  # type: (list[Lawn.ZombieType], bool) -> None
+        board = GetBoard()
+        if board is None:
+            return
         SetZombies(zb_list, internal_spawn)
     
     @main_thread  # 必须在主线程运行，不然会有概率崩溃
     def LineUpOnBoard(self, linup_code_b64: str):
-        LineUp.from_str(linup_code_b64).to_board(Sexy.GlobalStaticVars.gLawnApp.mBoard)
+        board = GetBoard()
+        if board is None:
+            return
+        LineUp.from_str(linup_code_b64).to_board(board)
     
     def UnlockCrazyDaveSeed(self):
+        if GetBoard() is None:
+            return
+        lawnApp = GetLawnApp()
         for i in range(60):
-            chosenSeed = Sexy.GlobalStaticVars.gLawnApp.mSeedChooserScreen.mChosenSeeds[i]
+            chosenSeed = lawnApp.mSeedChooserScreen.mChosenSeeds[i]
             if chosenSeed is not None:
                 chosenSeed.mCrazyDavePicked = False
     
     @main_thread
     def SetAdventureLevel(self, level: int):
-        Sexy.GlobalStaticVars.gLawnApp.mPlayerInfo.mLevel = level
-        if Sexy.GlobalStaticVars.gLawnApp.mGameScene == Lawn.GameScenes.Menu:
-            Sexy.GlobalStaticVars.gLawnApp.KillGameSelector()
-            Sexy.GlobalStaticVars.gLawnApp.ShowGameSelector()
+        lawnApp = GetLawnApp()
+        lawnApp.mPlayerInfo.mLevel = level
+        if lawnApp.mGameScene == Lawn.GameScenes.Menu:
+            lawnApp.KillGameSelector()
+            lawnApp.ShowGameSelector()
+    
+    @main_thread
+    def RemoveTalisman(self):
+        board = GetBoard()
+        if board is None:
+            return
+        cheat_option.RemoveGridItemOnBoard(-1, -1, Lawn.GridItemType.Talisman)
+        cheat_option.RemoveGridItemOnBoard(-1, -1, Lawn.GridItemType.TalismanMove)
+        board.mSealedCountdown = 0
+        for plant in IterAlivePlants():
+            plant.SetSealing(False)
+            plant.mInTalismanCounter = 0
 
 cheat_option = CheatOption()
 
@@ -576,7 +636,7 @@ def Board__GetCurrentPlantCost(orig, board: Lawn.Board, plantType: Lawn.SeedType
 
 # 无限阳光
 def ScriptInfSun():
-    Sexy.GlobalStaticVars.gLawnApp.mBoard.mSunMoney = 9990
+    GetBoard().mSunMoney = 9990
 script_inf_sun = script_manager.Register(ScriptInfSun, runmode=ScriptRunMode.FOREVER)
 script_inf_sun.Off()
 
@@ -788,8 +848,8 @@ def Plant__Update(orig, plant: Lawn.Plant):
 
 # 技能无冷却
 def ScriptKillNoCooling():
-    Sexy.GlobalStaticVars.gLawnApp.mBoard.mAgavePowerfulCountdown = 0
-    Sexy.GlobalStaticVars.gLawnApp.mBoard.mEndoflamePowerfulCountdown = 0
+    GetBoard().mAgavePowerfulCountdown = 0
+    GetBoard().mEndoflamePowerfulCountdown = 0
 script_skill_nocooling = script_manager.Register(ScriptKillNoCooling, runmode=ScriptRunMode.FOREVER)
 script_skill_nocooling.Off()
 
@@ -995,8 +1055,8 @@ def DrawPlantHp(plant: Lawn.Plant, g: Sexy.Graphics, marginX: int, offsetY: int,
         # 一格80x80，画60x5
         numGrid = 2 if plant.mSeedType == Lawn.SeedType.Cobcannon else 1
         totalWidth = 80 * numGrid - 2 * marginX
-        x = plant.mX + marginX + Sexy.GlobalStaticVars.gLawnApp.mBoard.mX
-        y = plant.mY + offsetY + Sexy.GlobalStaticVars.gLawnApp.mBoard.mY
+        x = plant.mX + marginX + GetBoard().mX
+        y = plant.mY + offsetY + GetBoard().mY
         hpWidth = int(totalWidth * plant.mPlantHealth / plant.mPlantMaxHealth)
         g.SetColor(color1)
         g.FillRect(x, y, hpWidth, 5)
@@ -1006,8 +1066,8 @@ def DrawPlantHp(plant: Lawn.Plant, g: Sexy.Graphics, marginX: int, offsetY: int,
 def DrawZombieHp(zombie: Lawn.Zombie, g: Sexy.Graphics, marginX: int, offsetY: int, color1, color2, color3, color4):
     rect = zombie.GetZombieRect()
     totalWidth = rect.mWidth
-    x = rect.mX + marginX + Sexy.GlobalStaticVars.gLawnApp.mBoard.mX
-    y = rect.mY + offsetY + Sexy.GlobalStaticVars.gLawnApp.mBoard.mY + 20
+    x = rect.mX + marginX + GetBoard().mX
+    y = rect.mY + offsetY + GetBoard().mY + 20
     # 两类血量
     hpWidth = 0
     hpWidth2 = 0
@@ -1064,7 +1124,8 @@ selectZbList = [
 ]
 
 def HookDrawGame(lawnapp: Lawn.LawnApp, g: Sexy.Graphics):
-    if Sexy.GlobalStaticVars.gLawnApp.mBoard is not None:
+    board = GetBoard()
+    if board is not None:
         g.ClearClipRect()  # 否则无法全部画出
         g.SetColorizeImages(True)
         color1 = Sexy.SexyColor(255, 153, 51, 255).Color  # 橙色
@@ -1077,14 +1138,14 @@ def HookDrawGame(lawnapp: Lawn.LawnApp, g: Sexy.Graphics):
         color8 = Sexy.SexyColor(153, 0, 76, 255).Color
         # 画植物
         if cheat_option.drawPlantHp:
-            NRow = 6 if Sexy.GlobalStaticVars.gLawnApp.mBoard.StageHas6Rows() else 5
+            NRow = 6 if board.StageHas6Rows() else 5
             NCol = 9
             for gridX in range(NCol):
                 for gridY in range(NRow):
-                    plant = Sexy.GlobalStaticVars.gLawnApp.mBoard.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.EatingOrder)
+                    plant = board.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.EatingOrder)
                     if plant is not None:
                         DrawPlantHp(plant, g, 10, 60, color1, color2)
-                        plant2 = Sexy.GlobalStaticVars.gLawnApp.mBoard.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.CatapultOrder)
+                        plant2 = board.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.CatapultOrder)
                         if plant2 is not None and plant is not plant2:
                             DrawPlantHp(plant2, g, 10, 50, color3, color4)
         # 画僵尸
@@ -1113,3 +1174,28 @@ def Board__MouseDownWithTool(orig, board: Lawn.Board, x: int, y: int, clickCnt: 
     orig(board, x, y, clickCnt, cursorType, posScaled, isTouch)
     if cheat_option.shovelNoReset and clickCnt >= 0 and cursorType == Lawn.CursorType.Shovel:
         board.mCursorObject.mCursorType = Lawn.CursorType.Shovel
+
+
+# ========== 状态查询（供手机端网页从游戏同步状态） ==========
+def get_cheat_state():
+    import json
+    state = {}
+    # 常规选项直接从 cheat_option 属性读取
+    regular_attrs = [
+        'wontLose', 'freePlant', 'plantAnyWhere', 'zombieNoDie',
+        'cobNoCooling', 'potatoNoCooling', 'disableTalisman', 'disableNinja',
+        'visibleGhoul', 'noThunder', 'diamondZenTools', 'noFog',
+        'transScaryPot', 'conveyorNoCooling', 'featureThreePeater',
+        'butterPult', 'doubleGatlingpea', 'fullAreaGloomshroom',
+        'enableGlove', 'zombieStop', 'chomperNoCooling', 'noCover',
+        'stopSpawning', 'drawPlantHp', 'drawZombieHp', 'selectZombieHp',
+        'shovelNoReset', 'runBackground', 'gloveNoCooling', 'plantNoDie',
+    ]
+    for attr in regular_attrs:
+        state[attr] = getattr(cheat_option, attr, False)
+    # 特殊选项（状态不在 cheat_option 上）
+    state['autoCollect'] = auto_collector.enabled
+    state['infSun'] = script_inf_sun.enabled
+    state['skillNoCooling'] = script_skill_nocooling.enabled
+    state['noCooldown'] = GetLawnApp().mEasyPlantingCheat
+    return json.dumps({"action": "sync", "options": state})

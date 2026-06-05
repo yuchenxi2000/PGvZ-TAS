@@ -4,8 +4,14 @@
 """
 import sys
 import System
-pyLibPath = System.Environment.ProcessPath.rsplit('\\', maxsplit=1)[0] + '\\lib'
-modsDirPath = System.Environment.CurrentDirectory + '\\mods'
+import System.IO
+# 貌似手机版不需要设置路径也能正常运行，但这里还是加上以防万一
+# Android: IronPython库在 CurrentDirectory/IronPython/Libs
+pyLibPath = System.IO.Path.Combine(System.Environment.CurrentDirectory, 'IronPython', 'Libs')
+if not System.IO.Directory.Exists(pyLibPath):
+    # Windows: IronPython库在游戏主程序同目录下的lib
+    pyLibPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.Environment.ProcessPath), 'lib')
+modsDirPath = System.IO.Path.Combine(System.Environment.CurrentDirectory, 'mods')
 sys.path.append(pyLibPath)
 sys.path.append(modsDirPath)
 
@@ -14,7 +20,7 @@ import Sexy
 from pgvz import *
 
 def SetPE12():
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     # 放植物
     plantList = []
     for i in range(3, 5):
@@ -79,7 +85,7 @@ def BlowBalloonZombieBehind():
             Card(Lawn.SeedType.Blover, 2, 1)
 
 def RunPE12():
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
 
     # 根据需要设置僵尸列表。第二个参数为True是自然出怪（调用内部出怪函数），由于自然出怪限制可能实际出怪不会包括所有设置的僵尸
     # SetZombies([
@@ -163,7 +169,7 @@ def RunPE12():
                         Card(card, pos, 9)
 
 def ScriptPE12():
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     if board.mPlants.Count == 0:
         # 如果场上没有植物，先设置阵型，然后直接跳下一关
         yield from SetPE12()

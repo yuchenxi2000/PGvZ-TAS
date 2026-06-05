@@ -1,12 +1,12 @@
 import Lawn
 import Sexy
-from .util import IterAlivePlants, RowColToPixel
+from .util import IterAlivePlants, RowColToPixel, GetBoard
 from .global_var import gvar
 
 def RawFire(cobCannon: Lawn.Plant, row: int, col: float):
     if gvar.opCanceled:
         return
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     board.RefreshSeedPacketFromCursor()
     x, y = RowColToPixel(board, row, col)
     cobCannon.CobCannonFire(x, y)

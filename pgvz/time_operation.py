@@ -1,8 +1,9 @@
 import Sexy
 from .global_var import gvar
+from .util import GetBoard
 
 def UntilCountDown(t: int, huge_wave: bool):
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     if not huge_wave:
         while board.mZombieCountDown > t:
             yield
@@ -30,7 +31,7 @@ refresh_point = 0
 prev_until_time = 0
 
 def Delay(t: int):
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     prev_time = board.mMainCounter
     while board.mMainCounter - prev_time < t:
         yield
@@ -45,7 +46,7 @@ def Prejudge(rel_time: int, wave: int):
     global refresh_point
     global prev_until_time
     prev_until_time = rel_time
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     if board.mCurrentWave < wave:
         while board.mCurrentWave < wave - 1:
             yield
@@ -74,7 +75,7 @@ def Until(t: int):
     global refresh_point
     global prev_until_time
     prev_until_time = t
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     yield from Delay(t - (board.mMainCounter - refresh_point))
     Sexy.Debug.Log(f"Until: time = {t}")
     Sexy.Debug.Log(f"TimeInfo: maincounter = {board.mMainCounter} wave = {board.mCurrentWave} cntdown = {board.mZombieCountDown} hugewavecnt = {board.mHugeWaveCountDown}")

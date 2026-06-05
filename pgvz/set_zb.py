@@ -1,8 +1,10 @@
 import Lawn
 import Sexy
 from .rng import rng_manip
+from .util import GetBoard
 
 def SetZombies(zb_list, internal_spawn: bool = True):  # type: (list[Lawn.ZombieType], bool) -> None
+    board = GetBoard()
     if internal_spawn:
         # enable RNG manipulation
         rng_manip.enabled = True
@@ -17,16 +19,16 @@ def SetZombies(zb_list, internal_spawn: bool = True):  # type: (list[Lawn.Zombie
         rng_manip.next_rand = rng_list
         Sexy.Debug.Log(f'rng list: {rng_list}')
         # init zombies
-        Sexy.GlobalStaticVars.gLawnApp.mBoard.InitZombieWaves()
+        board.InitZombieWaves()
         # disable RNG manipulation
         rng_manip.enabled = False
     else:
         for i in range(40):
-            Sexy.GlobalStaticVars.gLawnApp.mBoard.mZombieAllowed[i] = False
+            board.mZombieAllowed[i] = False
         for zb in zb_list:
-            Sexy.GlobalStaticVars.gLawnApp.mBoard.mZombieAllowed[int(zb)] = True
-        Sexy.GlobalStaticVars.gLawnApp.mBoard.mZombieAllowed[0] = True
-        Sexy.GlobalStaticVars.gLawnApp.mBoard.PickZombieWaves()
+            board.mZombieAllowed[int(zb)] = True
+        board.mZombieAllowed[0] = True
+        board.PickZombieWaves()
     # reset zombie preview
-    Sexy.GlobalStaticVars.gLawnApp.mBoard.RemoveCutsceneZombies()
-    Sexy.GlobalStaticVars.gLawnApp.mBoard.mCutScene.mPlacedZombies = False
+    board.RemoveCutsceneZombies()
+    board.mCutScene.mPlacedZombies = False

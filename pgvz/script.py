@@ -2,6 +2,7 @@ import enum
 import inspect
 import Lawn
 import Sexy
+from .util import GetBoard, GetLawnApp
 
 class ScriptType(enum.Enum):
     COROUTINE = 0
@@ -77,7 +78,7 @@ class ScriptManager:
             if gamemode is None or gamemode == Lawn.GameMode.GameModeCount:
                 runconf = ScriptConf(runmode, lambda: True)
             else:
-                runconf = ScriptConf(runmode, lambda: Sexy.GlobalStaticVars.gLawnApp.mGameMode == gamemode)
+                runconf = ScriptConf(runmode, lambda: GetLawnApp().mGameMode == gamemode)
         scriptObj = ScriptObj(scriptGenFunc, runconf)
         if runconf.runmode == ScriptRunMode.GLOBAL:
             scriptObj.Start()
@@ -87,19 +88,23 @@ class ScriptManager:
         Sexy.Debug.Log(f'registered script func: {scriptGenFunc}')
         return scriptObj
     
-    def Unregister(self, scriptObj: ScriptObj):
-        self.scriptList.remove(scriptObj)
+    def Unregister(self, scriptObj: ScriptObj) -> bool:
+        try:
+            self.scriptList.remove(scriptObj)
+            return True
+        except ValueError:
+            return False
 
     def RunInThread(self, scriptGenFunc):
-        board = Sexy.GlobalStaticVars.gLawnApp.mBoard
-        gamemode = board.mApp.mGameMode
-        conf = ScriptConf(ScriptRunMode.ONCE, lambda: Sexy.GlobalStaticVars.gLawnApp.mGameMode == gamemode)
+        board = GetBoard()
+        gamemode = GetLawnApp().mGameMode
+        conf = ScriptConf(ScriptRunMode.ONCE, lambda: GetLawnApp().mGameMode == gamemode)
         scriptObj = ScriptObj(scriptGenFunc, conf)
         scriptObj.Start()
         self.scriptList.append(scriptObj)
     
     def Manage(self):
-        lawnapp = Sexy.GlobalStaticVars.gLawnApp
+        lawnapp = GetLawnApp()
         # run global scripts
         finishedGlobalScripts = []
         for scriptObj in self.globalScriptList:

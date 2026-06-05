@@ -1,6 +1,6 @@
 import Lawn
 import Sexy
-from .util import RowColToPixel, SeedTypeNone
+from .util import RowColToPixel, SeedTypeNone, GetBoard, GetLawnApp
 from .global_var import gvar
 
 # 种卡
@@ -10,7 +10,7 @@ from .global_var import gvar
 def RawCard(seedpacket: Lawn.SeedPacket, row: int, col) -> bool:
     if gvar.opCanceled:
         return False
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     isImitater = seedpacket.mPacketType == Lawn.SeedType.Imitater
     seedtype = seedpacket.mImitaterType if isImitater else seedpacket.mPacketType
     if board.CanPlantAt(col - 1, row - 1, seedtype, False) == Lawn.PlantingReason.Ok:
@@ -23,7 +23,7 @@ def RawCard(seedpacket: Lawn.SeedPacket, row: int, col) -> bool:
     return False
 
 def FindSeedPacket(seedtype: Lawn.SeedType, isImitater: bool = False):
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     seedbank = board.mSeedBank
     for i in range(seedbank.mNumPackets):
         seedpacket = seedbank.mSeedPackets[i]
@@ -45,7 +45,7 @@ def Card(seedtype: Lawn.SeedType, row: int, col, isImitater: bool = False) -> bo
 def Shovel(row: int, col: int, seedtype: Lawn.SeedType = None):  # type: ignore
     if gvar.opCanceled:
         return
-    board = Sexy.GlobalStaticVars.gLawnApp.mBoard
+    board = GetBoard()
     x = col * 80
     y = board.GridToPixelY(col - 1, row - 1) + 40
     if seedtype == Lawn.SeedType.InstantCoffee:
@@ -58,12 +58,12 @@ def Shovel(row: int, col: int, seedtype: Lawn.SeedType = None):  # type: ignore
     Sexy.Debug.Log(f'shovel plant at {row} {col}, type {seedtype}')
 
 def LetsRock():
-    seedChooserScreen = Sexy.GlobalStaticVars.gLawnApp.mSeedChooserScreen
+    seedChooserScreen = GetLawnApp().mSeedChooserScreen
     if seedChooserScreen is None:
         raise StopIteration
     while seedChooserScreen.mSeedsInFlight > 0 \
         or seedChooserScreen.mChooseState == Lawn.SeedChooserState.ViewLawn \
-            or seedChooserScreen.mSeedsInBank < Sexy.GlobalStaticVars.gLawnApp.mBoard.mSeedBank.mNumPackets:
+            or seedChooserScreen.mSeedsInBank < GetBoard().mSeedBank.mNumPackets:
         yield
     seedChooserScreen.CloseSeedChooser()
 
@@ -77,9 +77,9 @@ def SelectCards(seedList: list, *args, waitTime: int = 200, selectRose: bool = T
         Sexy.Debug.Log(f'SelectCards: argument error')
         raise StopIteration
     # cannot choose seed in fight
-    if Sexy.GlobalStaticVars.gLawnApp.mGameScene != Lawn.GameScenes.LevelIntro:
+    if GetLawnApp().mGameScene != Lawn.GameScenes.LevelIntro:
         raise StopIteration
-    seedChooserScreen = Sexy.GlobalStaticVars.gLawnApp.mSeedChooserScreen
+    seedChooserScreen = GetLawnApp().mSeedChooserScreen
     # wait until chooser screen appears
     while not seedChooserScreen.mMouseVisible:
         yield
@@ -128,12 +128,12 @@ def SelectCards(seedList: list, *args, waitTime: int = 200, selectRose: bool = T
         else:
             seedChooserScreen.ClickedSeedInChooser(chosenSeed)
             # 什么乱七八糟的不推荐变灰植物来挡我视线，西内
-            if Sexy.GlobalStaticVars.gLawnApp.GetDialog(16) is not None:
-                Sexy.GlobalStaticVars.gLawnApp.KillDialog(16)
+            if GetLawnApp().GetDialog(16) is not None:
+                GetLawnApp().KillDialog(16)
                 seedChooserScreen.ClickedSeedInChooser(chosenSeed)
     # 等待一段时间，然后开始游戏
     for _ in range(waitTime):
-        if Sexy.GlobalStaticVars.gLawnApp.mGameScene != Lawn.GameScenes.Playing:
+        if GetLawnApp().mGameScene != Lawn.GameScenes.Playing:
             yield
     # 开始游戏
     yield from LetsRock()
