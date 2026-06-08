@@ -71,8 +71,7 @@ class LineUpGrid:
                 self.under = 0
             else:
                 self.underImitater = underPlant.mImitaterType == Lawn.SeedType.Imitater
-                underType = int(underPlant.mSeedType)
-                self.under = 1 if underType == Lawn.SeedType.Lilypad else 2
+                self.under = 1 if underPlant.mSeedType == Lawn.SeedType.Lilypad else 2
         # 植物本体
         plant = board.GetTopPlantAt(col, row, Lawn.TopPlant.OnlyNormalPosition)
         if plant is not None and plant.mPlantCol == col:  # 行数判断是为了防止玉米炮前一格被认为有植物
@@ -110,7 +109,7 @@ class LineUpGrid:
         if self.plantType >= 0:
             plant = board.AddPlant(col, row, Lawn.SeedType(self.plantType), Lawn.SeedType.Imitater if self.plantImitater else SeedTypeNone)
             plant.SetSleeping(self.plantSleeping)
-            if plant.mSeedType in [Lawn.SeedType.Sunshroom, Lawn.SeedType.Potatomine]:
+            if plant.mSeedType in (Lawn.SeedType.Sunshroom, Lawn.SeedType.Potatomine):
                 plant.mStateCountdown = 0
         # 南瓜
         if self.hasPumpkin:
@@ -190,7 +189,7 @@ class LineUp:
         # 移除已有钉耙和墓碑
         for i in range(board.mGridItems.Count):
             gridItem = board.mGridItems[i]
-            if not gridItem.mDead and gridItem.mGridItemType in [Lawn.GridItemType.Rake, Lawn.GridItemType.Gravestone]:
+            if not gridItem.mDead and gridItem.mGridItemType in (Lawn.GridItemType.Rake, Lawn.GridItemType.Gravestone):
                 gridItem.GridItemDie()
         # 根据布阵码放置植物
         # check current background

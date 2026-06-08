@@ -65,6 +65,7 @@
                                 <el-button type="primary" style="margin-top:8px" @click="send('Sexy.GlobalStaticVars.gLawnApp.KillDialog(19)\nSexy.GlobalStaticVars.gLawnApp.mBoard.FadeOutLevel()')">直接过关</el-button>
                                 <el-button type="primary" style="margin-top:8px" @click="send('cheat_option.FailImmediately(Lawn.ZombieType.Normal)')">直接失败</el-button>
                                 <el-button type="primary" style="margin-top:8px" @click="send('cheat_option.GetFinishedAccount()')">通关存档</el-button>
+                                <el-button type="primary" style="margin-top:8px" @click="send('GetBoard().mShowShovel = True')">显示铲子</el-button>
                             </el-row>
                         </el-card>
                     </el-col>
@@ -114,7 +115,7 @@
                         <el-card shadow="hover" class="command-card">
                             <template #header>类型选择</template>
                             <el-text class="mx-1">植物类型</el-text>
-                            <el-select v-model="selectedSeedType" filterable placeholder="选择植物">
+                            <el-select v-model="selectedSeedType" filterable placeholder="选择植物" @change="(val) => send(`placer.seedType = Lawn.SeedType.${val}`)">
                                 <el-option 
                                     v-for="item in seedTypes"
                                     :key="item.value"
@@ -123,7 +124,7 @@
                                 />
                             </el-select>
                             <el-text class="mx-1">僵尸类型</el-text>
-                            <el-select v-model="selectedZombieType" filterable placeholder="选择僵尸">
+                            <el-select v-model="selectedZombieType" filterable placeholder="选择僵尸" @change="(val) => send(`placer.zombieType = Lawn.ZombieType.${val}`)">
                                 <el-option 
                                     v-for="item in zombieTypes"
                                     :key="item.value"
@@ -158,9 +159,9 @@
                                     :value="item.value"
                                 />
                             </el-select>
-                            <el-checkbox v-model="isImitater">模仿者</el-checkbox>
-                            <el-checkbox v-model="mindCtrl">僵尸被魅惑</el-checkbox>
-                            <el-checkbox v-model="potLeft">花园盆栽反向</el-checkbox>
+                            <el-checkbox v-model="isImitater" @change="(val) => send(`placer.imitater = ${val ? 'True' : 'False'}`)">模仿者</el-checkbox>
+                            <el-checkbox v-model="mindCtrl" @change="(val) => send(`placer.mindCtrl = ${val ? 'True' : 'False'}`)">僵尸被魅惑</el-checkbox>
+                            <el-checkbox v-model="potLeft" @change="(val) => send(`placer.potReverse = ${val ? 'True' : 'False'}`)">花园盆栽反向</el-checkbox>
                         </el-card>
                     </el-col>
                     <el-col :span="6">
@@ -168,7 +169,7 @@
                             <template #header>类型选择2</template>
                             <el-row>
                                 <el-text class="mx-1">场地物品类型</el-text>
-                                <el-select v-model="selectedGridItem" filterable placeholder="选择场地物品">
+                                <el-select v-model="selectedGridItem" filterable placeholder="选择场地物品" @change="(val) => send(`placer.gridItemType = Lawn.GridItemType.${val}`)">
                                     <el-option 
                                         v-for="item in gridItemTypes"
                                         :key="item.value"
@@ -179,7 +180,7 @@
                             </el-row>
                             <el-row>
                                 <el-text class="mx-1">掉落物类型</el-text>
-                                <el-select v-model="selectedCoin" filterable placeholder="选择掉落物类型">
+                                <el-select v-model="selectedCoin" filterable placeholder="选择掉落物类型" @change="(val) => send(`placer.coinType = Lawn.CoinType.${val}`)">
                                     <el-option 
                                         v-for="item in coinTypes"
                                         :key="item.value"
@@ -221,31 +222,43 @@
                                     />
                                 </el-select>
                             </el-row>
+                            <el-row>
+                                <el-text class="mx-1">轻松放置模式</el-text>
+                                <el-select v-model="easyPlaceMode" filterable placeholder="放置类型" style="width:140px" @change="(value) => send(`placer.SetEasyPlaceMode('${value}')`)">
+                                    <el-option 
+                                        v-for="item in easyPlaceModeList"
+                                        :key="item.value"
+                                        :label="item.label"
+                                        :value="item.value"
+                                    />
+                                </el-select>
+                                <el-checkbox v-model="easyPlaceEnabled" @change="(value) => send(`placer.easyPlaceEnabled = ${value ? 'True' : 'False'}`)">启用轻松放置</el-checkbox>
+                            </el-row>
                         </el-card>
                     </el-col>
                     <el-col :span="6">
                         <el-card shadow="hover" class="command-card">
                             <template #header>场地放置</template>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.PlantOnBoard(${selectedRow}, ${selectedCol}, Lawn.SeedType.${selectedSeedType}, ${isImitater ? 'True' : 'False'})`)">种植植物</el-button>
+                                @click="send(`placer.PlantOnBoard(${selectedRow}, ${selectedCol}, Lawn.SeedType.${selectedSeedType}, ${isImitater ? 'True' : 'False'})`)">种植植物</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.ZombieOnBoard(${selectedRow}, ${selectedCol}, Lawn.ZombieType.${selectedZombieType}, mind_ctrl=${mindCtrl ? 'True' : 'False'})`)">召唤僵尸</el-button>
+                                @click="send(`placer.ZombieOnBoard(${selectedRow}, ${selectedCol}, Lawn.ZombieType.${selectedZombieType}, mind_ctrl=${mindCtrl ? 'True' : 'False'})`)">召唤僵尸</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.SetSeedPacket(${selectedPacketIdx}, Lawn.SeedType.${selectedSeedType}, ${isImitater ? 'True' : 'False'})`)">换卡片</el-button>
+                                @click="send(`placer.SetSeedPacket(${selectedPacketIdx}, Lawn.SeedType.${selectedSeedType}, ${isImitater ? 'True' : 'False'})`)">换卡片</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.AddCoinOnBoard(${coinX}, ${coinY}, Lawn.CoinType.${selectedCoin}, Lawn.SeedType.${selectedSeedType}, ${potLeft ? 'True' : 'False'})`)">放置掉落物</el-button>
+                                @click="send(`placer.AddCoinOnBoard(${coinX}, ${coinY}, Lawn.CoinType.${selectedCoin}, Lawn.SeedType.${selectedSeedType}, ${potLeft ? 'True' : 'False'})`)">放置掉落物</el-button>
                             <el-button type="primary" style="margin-top:8px"
                                 @click="AddGridItem()">放置场地物品</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.AddLadderSmart()`)">智能搭梯</el-button>
+                                @click="send(`placer.AddLadderSmart()`)">智能搭梯</el-button>
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.GivePottedPlant(Lawn.SeedType.${selectedSeedType}, reverse=${potLeft ? 'True' : 'False'})`)">获得花园盆栽</el-button>
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.GiveAllPottedPlants()`)">获得所有类型盆栽</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.AddLawnMower()`)">放置割草机</el-button>
+                                @click="send(`placer.AddLawnMower()`)">放置割草机</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.StartLawnMower()`)">启动割草机</el-button>
+                                @click="send(`placer.StartLawnMower()`)">启动割草机</el-button>
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`Sexy.GlobalStaticVars.gLawnApp.mBoard.mBonusLawnMowersRemaining = 2147483647`)">无限割草机</el-button>
                         </el-card>
@@ -254,21 +267,21 @@
                         <el-card shadow="hover" class="command-card">
                             <template #header>场地移除</template>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.RemovePlantOnBoard()`)">移除植物</el-button>
+                                @click="send(`placer.RemovePlantOnBoard()`)">移除植物</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.RemoveZombieOnBoard()`)">杀死僵尸</el-button>
+                                @click="send(`placer.RemoveZombieOnBoard()`)">杀死僵尸</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.RemoveCoinOnBoard(Lawn.CoinType.${selectedCoin})`)">移除掉落物</el-button>
+                                @click="send(`placer.RemoveCoinOnBoard(Lawn.CoinType.${selectedCoin})`)">移除掉落物</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.RemoveGridItemOnBoard(-1, -1, Lawn.GridItemType.${selectedGridItem})`)">移除场地物品</el-button>
+                                @click="send(`placer.RemoveGridItemOnBoard(-1, -1, Lawn.GridItemType.${selectedGridItem})`)">移除场地物品</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.RemoveGridItemOnBoard(${selectedRow}, ${selectedCol}, Lawn.GridItemType.${selectedGridItem})`)">移除场地物品（选中）</el-button>
+                                @click="send(`placer.RemoveGridItemOnBoard(${selectedRow}, ${selectedCol}, Lawn.GridItemType.${selectedGridItem})`)">移除场地物品（选中）</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.RemoveTalisman()`)">移除天尸诅咒</el-button>
+                                @click="send(`placer.RemoveTalisman()`)">移除天尸诅咒</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.RemoveLawnMower()`)">移除割草机</el-button>
+                                @click="send(`placer.RemoveLawnMower()`)">移除割草机</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.OpenScaryPotterOnBoard()`)">砸开罐子</el-button>
+                                @click="send(`placer.OpenScaryPotterOnBoard()`)">砸开罐子</el-button>
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`cheat_option.UnlockCrazyDaveSeed()`)">解锁戴夫卡片</el-button>
                         </el-card>
@@ -650,6 +663,14 @@
                     { label: '钉耙', value: 'Rake' },
                     { label: '封印符咒', value: 'Talisman' },
                     { label: '移动符咒', value: 'TalismanMove' },
+                ];
+
+                const easyPlaceModeList = [
+                    { label: '植物', value: 'plant' },
+                    { label: '僵尸', value: 'zombie' },
+                    { label: '场地物品', value: 'griditem' },
+                    { label: '掉落物', value: 'coin' },
+                    { label: '割草机', value: 'mower' },
                 ];
 
                 const scaryPotType = [
@@ -1235,6 +1256,8 @@
                 const selectedSetZbType = ref([]);
                 const selectedScene = ref('pool');
                 const selectedLineUp = ref('');
+                const easyPlaceMode = ref('plant');
+                const easyPlaceEnabled = ref(true);
 
                 let ws = null;
 
@@ -1332,6 +1355,15 @@
                     optionConfig.forEach(item => {
                         setCheatOption(item, cheatOption[item]);
                     });
+                    send(`placer.seedType = Lawn.SeedType.${selectedSeedType.value}`);
+                    send(`placer.zombieType = Lawn.ZombieType.${selectedZombieType.value}`);
+                    send(`placer.gridItemType = Lawn.GridItemType.${selectedGridItem.value}`);
+                    send(`placer.coinType = Lawn.CoinType.${selectedCoin.value}`);
+                    send(`placer.mindCtrl = ${mindCtrl.value ? 'True' : 'False'}`);
+                    send(`placer.potReverse = ${potLeft.value ? 'True' : 'False'}`);
+                    send(`placer.imitater = ${isImitater.value ? 'True' : 'False'}`);
+                    send(`placer.easyPlaceMode = '${easyPlaceMode.value}'`);
+                    send(`placer.easyPlaceEnabled = '${easyPlaceEnabled.value ? 'True' : 'False'}'`);
                 }
                 watch(
                     () => ({ ...cheatOption }),
@@ -1379,7 +1411,19 @@
                                             Object.keys(msg.options).forEach(k => {
                                                 if (k in cheatOption) cheatOption[k] = msg.options[k];
                                             });
+                                            selectedSeedType.value = msg.options.seedType;
+                                            selectedZombieType.value = msg.options.zombieType;
+                                            selectedGridItem.value = msg.options.gridItemType;
+                                            selectedCoin.value = msg.options.coinType;
+                                            mindCtrl.value = msg.options.mindCtrl;
+                                            potLeft.value = msg.options.potReverse;
+                                            isImitater.value = msg.options.imitater;
+                                            easyPlaceMode.value = msg.options.easyPlaceMode;
+                                            easyPlaceEnabled.value = msg.options.easyPlaceEnabled;
                                             return;
+                                        } else if (msg.action === 'lineup' && msg.code) {
+                                            lastResult.text = '已获得布阵码';
+                                            lineupCode.value = msg.code;
                                         }
                                     } catch {}
                                 }
@@ -1419,7 +1463,7 @@
                     send(`cheat_option.LineUpOnBoard('${lineupCode.value.trim()}')`);
                 }
                 function getLineupCode() {
-                    send(`pgvz.lineup.LineUp.from_board(Sexy.GlobalStaticVars.gLawnApp.mBoard).to_str()`);
+                    send(`'{"action":"lineup","code":"' + pgvz.lineup.LineUp.from_board(Sexy.GlobalStaticVars.gLawnApp.mBoard).to_str() + '"}'`);
                 }
 
                 function AddGridItem() {
@@ -1444,9 +1488,9 @@
                                 potType = selectedScaryPotType.value;
                                 break;
                         }
-                        send(`cheat_option.AddScaryPotOnBoard(${selectedRow.value}, ${selectedCol.value}, Lawn.ScaryPotType.${potType}, Lawn.GridItemState.${selectedScaryPotAppearance.value}, Lawn.ZombieType.${selectedZombieType.value}, Lawn.SeedType.${selectedSeedType.value}, ${numSun})`);
+                        send(`placer.AddScaryPotOnBoard(${selectedRow.value}, ${selectedCol.value}, Lawn.ScaryPotType.${potType}, Lawn.GridItemState.${selectedScaryPotAppearance.value}, Lawn.ZombieType.${selectedZombieType.value}, Lawn.SeedType.${selectedSeedType.value}, ${numSun})`);
                     } else {
-                        send(`cheat_option.AddGridItemOnBoard(${selectedRow.value}, ${selectedCol.value}, Lawn.GridItemType.${selectedGridItem.value})`);
+                        send(`placer.AddGridItemOnBoard(${selectedRow.value}, ${selectedCol.value}, Lawn.GridItemType.${selectedGridItem.value})`);
                     }
                 }
 
@@ -1525,6 +1569,9 @@
                     optionConfig,
                     cheatOption,
                     syncCheatOptions,
+                    easyPlaceMode,
+                    easyPlaceModeList,
+                    easyPlaceEnabled,
                 };
             }
         });

@@ -16,7 +16,6 @@ sys.path.append(pyLibPath)
 sys.path.append(modsDirPath)
 
 import Lawn
-import Sexy
 from pgvz import *
 
 def SetPE12():

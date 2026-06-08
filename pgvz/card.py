@@ -91,9 +91,9 @@ def SelectCards(seedList: list, *args, waitTime: int = 200, selectRose: bool = T
     seedsToKeep = []  # type: list[Lawn.SeedType]
     for seedtype in seedList:
         chosenSeed = seedChooserScreen.mChosenSeeds[int(seedtype)]
-        if chosenSeed.mSeedState in [Lawn.ChosenSeedState.SEED_IN_CHOOSER, Lawn.ChosenSeedState.SEED_FLYING_TO_CHOOSER]:
+        if chosenSeed.mSeedState in (Lawn.ChosenSeedState.SEED_IN_CHOOSER, Lawn.ChosenSeedState.SEED_FLYING_TO_CHOOSER):
             seedsToChoose.append(seedtype)
-        elif chosenSeed.mSeedState in [Lawn.ChosenSeedState.SEED_IN_BANK, Lawn.ChosenSeedState.SEED_FLYING_TO_BANK]:
+        elif chosenSeed.mSeedState in (Lawn.ChosenSeedState.SEED_IN_BANK, Lawn.ChosenSeedState.SEED_FLYING_TO_BANK):
             if seedtype == Lawn.SeedType.Imitater and chosenSeed.mImitaterType != imitaterType:
                 seedsToChoose.append(seedtype)
             else:
@@ -106,7 +106,7 @@ def SelectCards(seedList: list, *args, waitTime: int = 200, selectRose: bool = T
     for i in range(54):
         chosenSeed = seedChooserScreen.mChosenSeeds[i]
         seedtype = Lawn.SeedType(i)
-        if chosenSeed.mSeedState in [Lawn.ChosenSeedState.SEED_IN_BANK, Lawn.ChosenSeedState.SEED_FLYING_TO_BANK]:
+        if chosenSeed.mSeedState in (Lawn.ChosenSeedState.SEED_IN_BANK, Lawn.ChosenSeedState.SEED_FLYING_TO_BANK):
             if seedtype in seedsToKeep:
                 continue
             while seedChooserScreen.mSeedsInFlight > 0:

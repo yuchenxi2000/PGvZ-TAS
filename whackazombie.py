@@ -15,7 +15,6 @@ sys.path.append(pyLibPath)
 sys.path.append(modsDirPath)
 
 import Lawn
-import Sexy
 from pgvz import *
 
 # 自动锤僵尸

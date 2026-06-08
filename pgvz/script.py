@@ -114,7 +114,7 @@ class ScriptManager:
             self.globalScriptList.remove(scriptObj)
         # 退出战斗界面时卸载被设置为只运行一次的脚本
         leaveFight = self.prev_scene == Lawn.GameScenes.Playing and lawnapp.mGameScene != Lawn.GameScenes.Playing
-        backToMain = self.prev_scene == Lawn.GameScenes.LevelIntro and lawnapp.mGameScene not in [Lawn.GameScenes.Playing, Lawn.GameScenes.LevelIntro]
+        backToMain = self.prev_scene == Lawn.GameScenes.LevelIntro and lawnapp.mGameScene not in (Lawn.GameScenes.Playing, Lawn.GameScenes.LevelIntro)
         if leaveFight or backToMain:
             if self.loaded:
                 tmpList = []
@@ -126,7 +126,7 @@ class ScriptManager:
                 self.scriptList = tmpList
                 self.loaded = False
         # 只有在存在Board（关卡内）、在Playing状态下、并且没有继续游戏的对话框时，才能运行脚本
-        gamescene_ok = lawnapp.mGameScene in [Lawn.GameScenes.Playing, Lawn.GameScenes.LevelIntro]
+        gamescene_ok = lawnapp.mGameScene in (Lawn.GameScenes.Playing, Lawn.GameScenes.LevelIntro)
         if lawnapp.mBoard is not None and gamescene_ok and lawnapp.GetDialog(37) is None:
             if self.loaded:
                 # run all scripts
