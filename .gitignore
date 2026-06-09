@@ -2,6 +2,11 @@
 test*.py
 test/
 
+## Coding Agent
+.claude/
+# .mcp.json
+# CLAUDE.md
+
 ## Python
 # Byte-compiled / optimized / DLL files
 __pycache__/

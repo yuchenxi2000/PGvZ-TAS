@@ -51,6 +51,7 @@ class CheatOption:
         self.runBackground = False
         self.gloveNoCooling = False
         self.enableShovel = False
+        self.enableTrashcan = False
     
     def ShowErrorInGame(self, title: str, msg: str):
         lawnapp = GetLawnApp()
@@ -922,3 +923,12 @@ def Board__MouseDownWithTool(orig, board: Lawn.Board, x: int, y: int, clickCnt: 
     orig(board, x, y, clickCnt, cursorType, posScaled, isTouch)
     if cheat_option.shovelNoReset and clickCnt >= 0 and cursorType == Lawn.CursorType.Shovel:
         board.mCursorObject.mCursorType = Lawn.CursorType.Shovel
+
+# 垃圾桶
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.HasTrashcan)
+def Board__HasTrashcan(orig, board: Lawn.Board):
+    if cheat_option.enableTrashcan:
+        gamemode = board.mApp.mGameMode
+        return gamemode not in (Lawn.GameMode.Upsell, Lawn.GameMode.Intro, Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom)
+    else:
+        return orig(board)

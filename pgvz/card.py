@@ -76,6 +76,9 @@ def SelectCards(seedList: list, *args, waitTime: int = 200, selectRose: bool = T
     elif len(args) >= 2:
         Sexy.Debug.Log(f'SelectCards: argument error')
         raise StopIteration
+    # return if can't choose seeds
+    if not GetBoard().ChooseSeedsOnCurrentLevel():
+        raise StopIteration
     # cannot choose seed in fight
     if GetLawnApp().mGameScene != Lawn.GameScenes.LevelIntro:
         raise StopIteration

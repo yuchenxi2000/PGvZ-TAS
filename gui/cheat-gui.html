@@ -82,6 +82,7 @@
                             <el-checkbox v-model="cheatOption.enableGlove">启用手套</el-checkbox>
                             <el-checkbox v-model="cheatOption.gloveNoCooling">手套无冷却</el-checkbox>
                             <el-checkbox v-model="cheatOption.shovelNoReset">连续铲子</el-checkbox>
+                            <el-checkbox v-model="cheatOption.enableTrashcan">启用垃圾桶</el-checkbox>
                             <el-checkbox v-model="cheatOption.plantNoDie">植物无敌</el-checkbox>
                             <el-checkbox v-model="cheatOption.zombieNoDie">僵尸无敌</el-checkbox>
                             <el-checkbox v-model="cheatOption.wontLose">房主无敌</el-checkbox>
@@ -849,8 +850,8 @@
                     { label: '奇人异尸1', value: 'MarvelousPeople' },
                     { label: '奇人异尸2', value: 'MarvelousPeople2' },
                     { label: '奇人异尸3', value: 'MarvelousPeople3' },
-                    { label: '随机传送带', value: 'RogueConveyorbelt' },
-                    { label: '随机传送带（无尽）', value: 'RogueConveyorbeltHard' },
+                    { label: '随机传送带（无尽）', value: 'RogueConveyorbelt' },
+                    { label: '随机传送带', value: 'RogueConveyorbeltHard' },
                     { label: '僵王博士的复仇2', value: 'ChallengeFinalBoss2' },
                     { label: '随机模仿者', value: 'ImitaterRandom' },
                     { label: '排山倒海2', value: 'ChallengeColumn2' },
@@ -1309,6 +1310,7 @@
                     'drawZombieHp',
                     'selectZombieHp',
                     'gloveNoCooling',
+                    'enableTrashcan',
                 ];
                 const cheatOption = reactive({});
                 optionConfig.forEach(item => {

@@ -96,7 +96,6 @@ class ScriptManager:
             return False
 
     def RunInThread(self, scriptGenFunc):
-        board = GetBoard()
         gamemode = GetLawnApp().mGameMode
         conf = ScriptConf(ScriptRunMode.ONCE, lambda: GetLawnApp().mGameMode == gamemode)
         scriptObj = ScriptObj(scriptGenFunc, conf)
