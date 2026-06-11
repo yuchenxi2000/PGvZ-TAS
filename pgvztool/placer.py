@@ -239,7 +239,6 @@ class Placer:
             challenge = board.mChallenge
             challenge.BeghouledClearCrater(40)
             challenge.BeghouledStartFalling(Lawn.ChallengeState.BeghouledFalling)
-            return
         row_range, col_range = self.ConvertRange(row, col)
         for griditem in IterAliveGridItems():
             if griditem.mGridItemType == gridItemType and griditem.mGridX in col_range and griditem.mGridY in row_range:
@@ -331,7 +330,7 @@ placer = Placer()
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.DrawShovel)
 def Board__DrawShovel(orig, board: Lawn.Board, g: Sexy.Graphics):
     orig(board, g)
-    if placer.easyPlaceEnabled and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
+    if placer.easyPlaceEnabled and board.mApp.mGameScene == Lawn.GameScenes.Playing and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
         shovel_rect = board.GetShovelButtonRect()
         btn_w = shovel_rect.mWidth
         btn_h = shovel_rect.mHeight

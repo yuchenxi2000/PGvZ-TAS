@@ -16,7 +16,7 @@ def get_cheat_state():
         'enableGlove', 'zombieStop', 'chomperNoCooling', 'noCover',
         'stopSpawning', 'drawPlantHp', 'drawZombieHp', 'selectZombieHp',
         'shovelNoReset', 'runBackground', 'gloveNoCooling', 'plantNoDie',
-        'enableTrashcan',
+        'enableTrashcan', 'showWaveInfo',
     ]
     for attr in regular_attrs:
         state[attr] = getattr(cheat_option, attr, False)

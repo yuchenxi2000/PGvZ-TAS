@@ -52,6 +52,7 @@ class CheatOption:
         self.gloveNoCooling = False
         self.enableShovel = False
         self.enableTrashcan = False
+        self.showWaveInfo = False
     
     def ShowErrorInGame(self, title: str, msg: str):
         lawnapp = GetLawnApp()
@@ -904,6 +905,24 @@ def HookDrawGame(lawnapp: Lawn.LawnApp, g: Sexy.Graphics):
                 if cheat_option.selectZombieHp and zombie.mZombieType not in selectZbList:
                     continue
                 DrawZombieHp(camera, zombie, g, 0, 0, color5, color6, color7, color8)
+        # 画波数信息
+        if cheat_option.showWaveInfo and board.HasProgressMeter():
+            # meterX = Sexy.Constants.UIProgressMeterPosition.X - Sexy.Constants.Board_Offset_AspectRatio_Correction
+            meterX = Sexy.Constants.UIProgressMeterPosition.X
+            meterY = Sexy.Constants.UIProgressMeterPosition.Y
+            flagImage = Sexy.AtlasResources.IMAGE_FLAGMETER
+            meterWidth = flagImage.GetCelWidth()
+            meterHeight = flagImage.GetCelHeight()
+            textX = meterX + meterWidth // 2
+            textY = meterY + meterHeight
+            waveColor = Sexy.SexyColor(255, 255, 255)
+            waveFont = Sexy.Resources.FONT_DWARVENTODCRAFT12
+            waveText = f'Wave: {board.mCurrentWave}/{board.mNumWaves}'
+            Sexy.TodLib.TodCommon.TodDrawString(g, waveText, textX, textY, waveFont, waveColor, Sexy.TodLib.DrawStringJustification.Center)
+            cdStr = f'{board.mZombieCountDown}' if board.mZombieCountDown > 0 else '--'
+            hugeStr = f'{board.mHugeWaveCountDown}' if board.mHugeWaveCountDown > 0 else '--'
+            cdText = f'CD: {cdStr} | Huge: {hugeStr}'
+            Sexy.TodLib.TodCommon.TodDrawString(g, cdText, textX, textY + 16, waveFont, waveColor, Sexy.TodLib.DrawStringJustification.Center)
         g.SetColorizeImages(False)
 
 @LawnMod.MonoModUtils.HookTo(Lawn.LawnApp.DrawGame)
