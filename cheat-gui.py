@@ -38,6 +38,10 @@ class _GUIHandler(http.server.SimpleHTTPRequestHandler):
                 return gui
         return result
 
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-cache')
+        super().end_headers()
+
     def log_message(self, format, *args):
         pass
 

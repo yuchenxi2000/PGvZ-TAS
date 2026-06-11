@@ -1,5 +1,5 @@
 import json
-from .cheat import cheat_option, script_inf_sun, script_skill_nocooling
+from .cheat import cheat_option, script_inf_sun, script_skill_nocooling, script_mushroom_awake
 from .placer import placer
 from pgvz import GetLawnApp, auto_collector
 
@@ -25,6 +25,7 @@ def get_cheat_state():
     state['infSun'] = script_inf_sun.enabled
     state['skillNoCooling'] = script_skill_nocooling.enabled
     state['noCooldown'] = GetLawnApp().mEasyPlantingCheat
+    state['mushroomAwake'] = script_mushroom_awake.enabled
     # placer状态
     state['seedType'] = str(placer.seedType)
     state['zombieType'] = str(placer.zombieType)

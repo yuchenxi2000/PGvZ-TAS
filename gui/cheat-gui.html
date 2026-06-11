@@ -96,6 +96,7 @@
                             <el-checkbox v-model="cheatOption.disableTalisman">天尸不得施法</el-checkbox>
                             <el-checkbox v-model="cheatOption.disableNinja">女忍者显形</el-checkbox>
                             <el-checkbox v-model="cheatOption.diamondZenTools">全屏花园工具</el-checkbox>
+                            <el-checkbox v-model="cheatOption.mushroomAwake">蘑菇清醒</el-checkbox>
                             <el-checkbox v-model="cheatOption.cobNoCooling">玉米炮无冷却</el-checkbox>
                             <el-checkbox v-model="cheatOption.chomperNoCooling">大嘴花无冷却</el-checkbox>
                             <el-checkbox v-model="cheatOption.potatoNoCooling">土豆雷无冷却</el-checkbox>
@@ -300,7 +301,7 @@
                             <el-checkbox v-model="cheatOption.transScaryPot">罐子透视</el-checkbox>
                             <el-checkbox v-model="cheatOption.visibleGhoul">隐形僵尸显形</el-checkbox>
                             <el-checkbox v-model="cheatOption.noThunder">暴风雨不瞎眼</el-checkbox>
-                            <el-checkbox v-model="cheatOption.noCover">去除右侧遮挡</el-checkbox>
+                            <el-checkbox v-model="cheatOption.noCover">去除遮挡草丛</el-checkbox>
                             <el-checkbox v-model="cheatOption.showWaveInfo">显示波数信息</el-checkbox>
                             <el-checkbox v-model="cheatOption.drawPlantHp">显示植物血量</el-checkbox>
                             <el-checkbox v-model="cheatOption.drawZombieHp">显示僵尸血量</el-checkbox>
@@ -1313,6 +1314,7 @@
                     'gloveNoCooling',
                     'enableTrashcan',
                     'showWaveInfo',
+                    'mushroomAwake',
                 ];
                 const cheatOption = reactive({});
                 optionConfig.forEach(item => {
@@ -1347,6 +1349,14 @@
                                 send(`script_inf_sun.On()`);
                             } else {
                                 send(`script_inf_sun.Off()`);
+                            }
+                            break;
+                        
+                        case 'mushroomAwake':
+                            if (value) {
+                                send(`script_mushroom_awake.On()`);
+                            } else {
+                                send(`script_mushroom_awake.Off()`);
                             }
                             break;
                         

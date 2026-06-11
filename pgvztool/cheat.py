@@ -362,3 +362,10 @@ def ScriptKillNoCooling():
     GetBoard().mEndoflamePowerfulCountdown = 0
 script_skill_nocooling = script_manager.Register(ScriptKillNoCooling, runmode=ScriptRunMode.FOREVER)
 script_skill_nocooling.Off()
+
+# 蘑菇清醒
+def ScriptMushroomAwake():
+    for plant in IterAlivePlants():
+        plant.SetSleeping(False)
+script_mushroom_awake = script_manager.Register(ScriptMushroomAwake, runmode=ScriptRunMode.FOREVER)
+script_mushroom_awake.Off()

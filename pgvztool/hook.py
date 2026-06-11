@@ -441,13 +441,6 @@ def Plant__UpdateShooting(orig, plant: Lawn.Plant):
 
 # 显示植物/僵尸血量
 
-# 为适配手机
-def ZoomFillRect(camera: Lawn.Board.Camera, g: Sexy.Graphics, x, y, w, h):
-    tpoint = camera.BoardToScreen(int(x), int(y))
-    zoom = camera.Zoom
-    board = GetBoard()
-    g.FillRect(tpoint.x + board.mX, tpoint.y + board.mY, int(w * zoom), int(h * zoom))
-
 def DrawPlantHp(camera: Lawn.Board.Camera, plant: Lawn.Plant, g: Sexy.Graphics, marginX: int, offsetY: int, color1, color2):
     if plant.mPlantHealth < plant.mPlantMaxHealth:
         # 一格80x80，画60x5
@@ -457,9 +450,28 @@ def DrawPlantHp(camera: Lawn.Board.Camera, plant: Lawn.Plant, g: Sexy.Graphics, 
         y = plant.mY + offsetY
         hpWidth = totalWidth * plant.mPlantHealth / plant.mPlantMaxHealth
         g.SetColor(color2)
-        ZoomFillRect(camera, g, x, y, totalWidth, 5)
+        g.FillRect(x, y, totalWidth, 5)
         g.SetColor(color1)
-        ZoomFillRect(camera, g, x, y, hpWidth, 5)
+        g.FillRect(x, y, int(hpWidth), 5)
+
+def DrawPlantHpAll(board: Lawn.Board, g: Sexy.Graphics):
+    g.SetColorizeImages(True)
+    color1 = Sexy.SexyColor(255, 153, 51, 255).Color  # 橙色
+    color2 = Sexy.SexyColor(204, 0, 0, 255).Color  # 深红
+    color3 = Sexy.SexyColor(102, 204, 0, 255).Color  # 绿色
+    color4 = Sexy.SexyColor(0, 153, 153, 255).Color  # 青色
+    camera = board.mCamera
+    NRow = 6 if board.StageHas6Rows() else 5
+    NCol = 9
+    for gridX in range(NCol):
+        for gridY in range(NRow):
+            plant = board.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.EatingOrder)
+            if plant is not None:
+                DrawPlantHp(camera, plant, g, 10, 60, color1, color2)
+                plant2 = board.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.CatapultOrder)
+                if plant2 is not None and plant is not plant2:
+                    DrawPlantHp(camera, plant2, g, 10, 50, color3, color4)
+    g.SetColorizeImages(False)
 
 def DrawZombieHp(camera: Lawn.Board.Camera, zombie: Lawn.Zombie, g: Sexy.Graphics, marginX: int, offsetY: int, color1, color2, color3, color4):
     rect = zombie.GetZombieRect()
@@ -500,14 +512,14 @@ def DrawZombieHp(camera: Lawn.Board.Camera, zombie: Lawn.Zombie, g: Sexy.Graphic
     # 开始绘制
     if plotHp1:
         g.SetColor(color2)
-        ZoomFillRect(camera, g, x, y, totalWidth, 5)
+        g.FillRect(x, y, totalWidth, 5)
         g.SetColor(color1)
-        ZoomFillRect(camera, g, x, y, hpWidth, 5)
+        g.FillRect(x, y, int(hpWidth), 5)
     if plotHp2:
         g.SetColor(color4)
-        ZoomFillRect(camera, g, x, y + 10, totalWidth, 5)
+        g.FillRect(x, y + 10, totalWidth, 5)
         g.SetColor(color3)
-        ZoomFillRect(camera, g, x, y + 10, hpWidth2, 5)
+        g.FillRect(x, y + 10, int(hpWidth2), 5)
 
 selectZbList = [
     Lawn.ZombieType.Football,
@@ -521,69 +533,18 @@ selectZbList = [
     Lawn.ZombieType.FootballPremium,
 ]
 
-def HookDrawGame(lawnapp: Lawn.LawnApp, g: Sexy.Graphics):
-    board = GetBoard()
-    if board is not None:
-        camera = board.mCamera
-        g.ClearClipRect()  # 否则无法全部画出
-        g.SetColorizeImages(True)
-        color1 = Sexy.SexyColor(255, 153, 51, 255).Color  # 橙色
-        color2 = Sexy.SexyColor(204, 0, 0, 255).Color  # 深红
-        color3 = Sexy.SexyColor(102, 204, 0, 255).Color  # 绿色
-        color4 = Sexy.SexyColor(0, 153, 153, 255).Color  # 青色
-        color5 = Sexy.SexyColor(255, 51, 255, 255).Color
-        color6 = Sexy.SexyColor(127, 0, 255, 255).Color
-        color7 = Sexy.SexyColor(255, 0, 127, 255).Color
-        color8 = Sexy.SexyColor(153, 0, 76, 255).Color
-        # 画植物
-        if cheat_option.drawPlantHp:
-            NRow = 6 if board.StageHas6Rows() else 5
-            NCol = 9
-            for gridX in range(NCol):
-                for gridY in range(NRow):
-                    plant = board.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.EatingOrder)
-                    if plant is not None:
-                        DrawPlantHp(camera, plant, g, 10, 60, color1, color2)
-                        plant2 = board.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.CatapultOrder)
-                        if plant2 is not None and plant is not plant2:
-                            DrawPlantHp(camera, plant2, g, 10, 50, color3, color4)
-        # 画僵尸
-        if cheat_option.drawZombieHp:
-            for zombie in IterAliveZombies():
-                # 只画精英怪
-                if cheat_option.selectZombieHp and zombie.mZombieType not in selectZbList:
-                    continue
-                DrawZombieHp(camera, zombie, g, 0, 0, color5, color6, color7, color8)
-        # 画波数信息
-        if cheat_option.showWaveInfo and board.HasProgressMeter():
-            # meterX = Sexy.Constants.UIProgressMeterPosition.X - Sexy.Constants.Board_Offset_AspectRatio_Correction
-            meterX = Sexy.Constants.UIProgressMeterPosition.X
-            meterY = Sexy.Constants.UIProgressMeterPosition.Y
-            flagImage = Sexy.AtlasResources.IMAGE_FLAGMETER
-            meterWidth = flagImage.GetCelWidth()
-            meterHeight = flagImage.GetCelHeight()
-            textX = meterX + meterWidth // 2
-            textY = meterY + meterHeight
-            waveColor = Sexy.SexyColor(255, 255, 255)
-            waveFont = Sexy.Resources.FONT_DWARVENTODCRAFT12
-            waveText = f'Wave: {board.mCurrentWave}/{board.mNumWaves}'
-            Sexy.TodLib.TodCommon.TodDrawString(g, waveText, textX, textY, waveFont, waveColor, Sexy.TodLib.DrawStringJustification.Center)
-            cdStr = f'{board.mZombieCountDown}' if board.mZombieCountDown > 0 else '--'
-            hugeStr = f'{board.mHugeWaveCountDown}' if board.mHugeWaveCountDown > 0 else '--'
-            cdText = f'CD: {cdStr} | Huge: {hugeStr}'
-            Sexy.TodLib.TodCommon.TodDrawString(g, cdText, textX, textY + 16, waveFont, waveColor, Sexy.TodLib.DrawStringJustification.Center)
-        g.SetColorizeImages(False)
-
-@LawnMod.MonoModUtils.HookTo(Lawn.LawnApp.DrawGame)
-def LawnApp__DrawGame(orig, self: Lawn.LawnApp, gameTime):
-    Sexy.GlobalStaticVars.g.BeginFrame()
-    self.mWidgetManager.DrawScreen()
-    mDebugScreenEnabled = LawnMod.DynamicHelper.GetPrivateField[System.Boolean](self, 'mDebugScreenEnabled')
-    if mDebugScreenEnabled:
-        self.DrawDebugInfo(gameTime)
-    HookDrawGame(self, Sexy.GlobalStaticVars.g)
-    Sexy.GlobalStaticVars.g.EndFrame()
-    Sexy.TodLib.FilterEffect.FilterEffectProcessDeleteQueue()
+def DrawZombieHpAll(board: Lawn.Board, g: Sexy.Graphics):
+    g.SetColorizeImages(True)
+    color5 = Sexy.SexyColor(255, 51, 255, 255).Color
+    color6 = Sexy.SexyColor(127, 0, 255, 255).Color
+    color7 = Sexy.SexyColor(255, 0, 127, 255).Color
+    color8 = Sexy.SexyColor(153, 0, 76, 255).Color
+    for zombie in IterAliveZombies():
+        # 只画精英怪
+        if cheat_option.selectZombieHp and zombie.mZombieType not in selectZbList:
+            continue
+        DrawZombieHp(board.mCamera, zombie, g, 0, 0, color5, color6, color7, color8)
+    g.SetColorizeImages(False)
 
 # 连续铲子
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.MouseDownWithTool)
@@ -601,12 +562,26 @@ def Board__HasTrashcan(orig, board: Lawn.Board):
     else:
         return orig(board)
 
-# ========== 轻松放置：绘制按钮 ==========
+# 轻松放置：点击处理
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.MouseDownInternal)
+def Board__MouseDownInternal(orig, board: Lawn.Board, x: int, y: int, theClickCount: int, isTouch: bool):
+    if placer.active and theClickCount < 0:
+        placer.active = False
+        return
+    if placer.easyPlaceEnabled and placer._ep_rect.Contains(x, y) and board.CanInteractWithBoardButtons() and board.mCursorObject.mCursorType in (Lawn.CursorType.Normal, Lawn.CursorType.Hammer):
+        placer.toggle()
+        return
+    if placer.active and theClickCount >= 0:
+        # 没有这一行手机会出问题
+        x, y = board.mCamera.ScreenToBoardReplace(x, y)  # type: ignore
+        if placer.try_place(board, x, y):
+            return
+    orig(board, x, y, theClickCount, isTouch)
+    if placer.active and board.mCursorObject.mCursorType not in (Lawn.CursorType.Normal, Lawn.CursorType.Hammer):
+        placer.active = False
 
-@LawnMod.MonoModUtils.HookTo(Lawn.Board.DrawShovel)
-def Board__DrawShovel(orig, board: Lawn.Board, g: Sexy.Graphics):
-    orig(board, g)
-    if placer.easyPlaceEnabled and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
+def DrawEasyPlaceUI(board: Lawn.Board, g: Sexy.Graphics):
+    if board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
         shovel_rect = board.GetShovelButtonRect()
         btn_w = shovel_rect.mWidth
         btn_h = shovel_rect.mHeight
@@ -622,24 +597,41 @@ def Board__DrawShovel(orig, board: Lawn.Board, g: Sexy.Graphics):
         g.SetColorizeImages(False)
 
         placer._ep_rect = Sexy.TRect(btn_x, btn_y, btn_w, btn_h)
-    else:
-        placer._ep_rect = None  # type: ignore
 
-# ========== 轻松放置：点击处理 ==========
+def DrawWaveInfo(board: Lawn.Board, g: Sexy.Graphics):
+    # 在进度条下面画波数信息
+    if board.HasProgressMeter():
+        meterX = Sexy.Constants.UIProgressMeterPosition.X - Sexy.Constants.Board_Offset_AspectRatio_Correction
+        meterY = Sexy.Constants.UIProgressMeterPosition.Y
+        flagImage = Sexy.AtlasResources.IMAGE_FLAGMETER
+        meterWidth = flagImage.GetCelWidth()
+        meterHeight = flagImage.GetCelHeight()
+        textX = meterX + meterWidth // 2
+        textY = meterY + meterHeight
+        g.SetColorizeImages(True)
+        waveColor = Sexy.SexyColor(255, 255, 255)
+        waveFont = Sexy.Resources.FONT_DWARVENTODCRAFT12
+        waveText = f'Wave: {board.mCurrentWave}/{board.mNumWaves}'
+        Sexy.TodLib.TodCommon.TodDrawString(g, waveText, textX, textY, waveFont, waveColor, Sexy.TodLib.DrawStringJustification.Center)
+        cdStr = f'{board.mZombieCountDown}' if board.mZombieCountDown > 0 else '--'
+        hugeStr = f'{board.mHugeWaveCountDown}' if board.mHugeWaveCountDown > 0 else '--'
+        cdText = f'CD: {cdStr} | Huge: {hugeStr}'
+        Sexy.TodLib.TodCommon.TodDrawString(g, cdText, textX, textY + 16, waveFont, waveColor, Sexy.TodLib.DrawStringJustification.Center)
+        g.SetColorizeImages(False)
 
-@LawnMod.MonoModUtils.HookTo(Lawn.Board.MouseDownInternal)
-def Board__MouseDownInternal(orig, board: Lawn.Board, x: int, y: int, theClickCount: int, isTouch: bool):
-    if placer.active and theClickCount < 0:
-        placer.active = False
-        return
-    if placer._ep_rect is not None and placer._ep_rect.Contains(x, y) and board.CanInteractWithBoardButtons() and board.mCursorObject.mCursorType in (Lawn.CursorType.Normal, Lawn.CursorType.Hammer):
-        placer.toggle()
-        return
-    if placer.active and theClickCount >= 0:
-        # 没有这一行手机会出问题
-        x, y = board.mCamera.ScreenToBoardReplace(x, y)  # type: ignore
-        if placer.try_place(board, x, y):
-            return
-    orig(board, x, y, theClickCount, isTouch)
-    if placer.active and board.mCursorObject.mCursorType not in (Lawn.CursorType.Normal, Lawn.CursorType.Hammer):
-        placer.active = False
+# 场地绘制统一钩子
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.Draw)
+def Board__Draw(orig, board: Lawn.Board, g: Sexy.Graphics):
+    orig(board, g)
+    # 进入Board坐标空间
+    board.mCamera.ApplyTransform(g)
+    if cheat_option.drawPlantHp:
+        DrawPlantHpAll(board, g)
+    if cheat_option.drawZombieHp:
+        DrawZombieHpAll(board, g)
+    board.mCamera.ResetTransform(g)
+    # 屏幕坐标空间
+    if placer.easyPlaceEnabled:
+        DrawEasyPlaceUI(board, g)
+    if cheat_option.showWaveInfo:
+        DrawWaveInfo(board, g)
