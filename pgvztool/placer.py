@@ -3,7 +3,6 @@
 同时提供轻松放置功能（游戏内点击场地直接放置）
 """
 import Lawn
-import LawnMod
 import Sexy
 from pgvz import *
 from .util import main_thread
@@ -324,49 +323,6 @@ class Placer:
                 mower.Die()
 
 placer = Placer()
-
-# ========== 轻松放置：绘制按钮 ==========
-
-@LawnMod.MonoModUtils.HookTo(Lawn.Board.DrawShovel)
-def Board__DrawShovel(orig, board: Lawn.Board, g: Sexy.Graphics):
-    orig(board, g)
-    if placer.easyPlaceEnabled and board.mApp.mGameScene == Lawn.GameScenes.Playing and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
-        shovel_rect = board.GetShovelButtonRect()
-        btn_w = shovel_rect.mWidth
-        btn_h = shovel_rect.mHeight
-        btn_y = shovel_rect.mY
-        num_ui = int(board.mShowShovel) + int(board.HasGlove())
-        btn_x = shovel_rect.mX + 90 * num_ui
-
-        g.DrawImage(Sexy.AtlasResources.IMAGE_SHOVELBANK_ZEN, btn_x, btn_y)
-        if placer.active:
-            g.SetColorizeImages(True)
-            g.SetColor(Sexy.SexyColor(200, 200, 200).Color)
-        g.DrawImage(Sexy.AtlasResources.IMAGE_TACO, btn_x - 7, btn_y - 3)
-        g.SetColorizeImages(False)
-
-        placer._ep_rect = Sexy.TRect(btn_x, btn_y, btn_w, btn_h)
-    else:
-        placer._ep_rect = None  # type: ignore
-
-# ========== 轻松放置：点击处理 ==========
-
-@LawnMod.MonoModUtils.HookTo(Lawn.Board.MouseDownInternal)
-def Board__MouseDownInternal(orig, board: Lawn.Board, x: int, y: int, theClickCount: int, isTouch: bool):
-    if placer.active and theClickCount < 0:
-        placer.active = False
-        return
-    if placer._ep_rect is not None and placer._ep_rect.Contains(x, y) and board.CanInteractWithBoardButtons() and board.mCursorObject.mCursorType in (Lawn.CursorType.Normal, Lawn.CursorType.Hammer):
-        placer.toggle()
-        return
-    if placer.active and theClickCount >= 0:
-        # 没有这一行手机会出问题
-        x, y = board.mCamera.ScreenToBoardReplace(x, y)  # type: ignore
-        if placer.try_place(board, x, y):
-            return
-    orig(board, x, y, theClickCount, isTouch)
-    if placer.active and board.mCursorObject.mCursorType not in (Lawn.CursorType.Normal, Lawn.CursorType.Hammer):
-        placer.active = False
 
 # 离开战斗界面重置状态
 def ScriptResetEasyPlacerState():
