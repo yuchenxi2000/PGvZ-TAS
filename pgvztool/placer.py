@@ -4,14 +4,60 @@
 """
 import Lawn
 import Sexy
+from enum import Enum
 from pgvz import *
 from .util import main_thread
+
+def IterPortals(board: Lawn.Board):
+    for i in range(board.mGridItems.Count):
+        gridItem = board.mGridItems[i]
+        if not gridItem.mDead and gridItem.mGridItemState != Lawn.GridItemState.PortalClosed and gridItem.mGridItemType in (Lawn.GridItemType.PortalCircle, Lawn.GridItemType.PortalSquare):
+            yield gridItem
+
+class PortalPlacer:
+    class PortalPlacerState(Enum):
+        Normal = 0
+        Selected = 1
+
+    def __init__(self):
+        self.place_grid_pos = (0, 0)
+        self.select_portal_rect = Sexy.TRect(0, 0, 1, 1)
+        self.state = self.PortalPlacerState.Normal
+    
+    def try_place(self, board: Lawn.Board, x: int, y: int):
+        if self.state == self.PortalPlacerState.Selected:
+            col, row = PixelToGridRaw(board, (x, y))
+            if self.place_grid_pos == (col, row):
+                self.state = self.PortalPlacerState.Normal
+                return
+            for portal in IterPortals(board):
+                if portal.mGridX == self.place_grid_pos[0] and portal.mGridY == self.place_grid_pos[1]:
+                    portal.mGridX = col
+                    portal.mGridY = row
+                    portal.OpenPortal()
+                    self.state = self.PortalPlacerState.Normal
+                    return
+        else:
+            for portal in IterPortals(board):
+                mX, mY = GridToPixel(board, (portal.mGridX, portal.mGridY))
+                rect = Sexy.TRect(mX, mY, 80, 100)
+                if rect.Contains(x, y):
+                    self.select_portal_rect = rect
+                    self.place_grid_pos = (portal.mGridX, portal.mGridY)
+                    self.state = self.PortalPlacerState.Selected
+                    return
+    
+    def isSelected(self):
+        return self.state == self.PortalPlacerState.Selected
+
+    def reset(self):
+        self.state = self.PortalPlacerState.Normal
 
 class Placer:
     def __init__(self):
         # 轻松放置状态
         self.easyPlaceEnabled = True
-        self.active = True
+        self._active = True
         self.easyPlaceMode = 'plant'
         self.seedType = Lawn.SeedType.Peashooter
         self.zombieType = Lawn.ZombieType.Normal
@@ -20,8 +66,19 @@ class Placer:
         self.mindCtrl = False
         self.potReverse = False
         self.imitater = False
-        self._ep_rect: Sexy.TRect = None  # type: ignore
+        self._ep_rect = Sexy.TRect(0, 0, 0, 0)
+        self.portal_placer = PortalPlacer()
     
+    @property
+    def active(self):
+        return self._active
+    
+    @active.setter
+    def active(self, value):
+        self._active = value
+        if not value:
+            placer.portal_placer.reset()
+
     def SetEasyPlaceMode(self, mode):
         self.easyPlaceMode = mode
 
@@ -35,6 +92,8 @@ class Placer:
         NCol = 9
         if col < 0 or col >= NCol or row < 0 or row >= NRow:
             return False
+        if self.easyPlaceMode != 'portal':
+            self.portal_placer.reset()
         if self.easyPlaceMode == 'plant':
             self.PlantOnBoard(row, col, self.seedType, self.imitater)
             return True
@@ -49,6 +108,10 @@ class Placer:
             return True
         elif self.easyPlaceMode == 'mower':
             self._AddLawnMower(board.PixelToGridY(x, y), x)
+            return True
+        elif self.easyPlaceMode == 'portal':
+            self.portal_placer.try_place(board, x, y)
+            return True
         return False
 
     # ===== 以下为网页直接调用的放置/移除方法 =====

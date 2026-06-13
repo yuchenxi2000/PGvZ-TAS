@@ -12,9 +12,44 @@ def GetBoard() -> Lawn.Board:
 def PixelToGrid(board: Lawn.Board, pixel):
     return board.PixelToGridX(*pixel), board.PixelToGridY(*pixel)
 
+# no boundary check
+def PixelToGridRaw(board: Lawn.Board, pixel):
+    if board.mApp.mGameMode == Lawn.GameMode.ChallengeZenGarden and board.mBackground in (Lawn.BackgroundType.MushroomGarden, Lawn.BackgroundType.Zombiquarium, Lawn.BackgroundType.Greenhouse, Lawn.BackgroundType.GreenhouseNight):
+        return board.mApp.mZenGarden.PixelToGridX(*pixel), board.mApp.mZenGarden.PixelToGridY(*pixel)
+    theX, theY = pixel
+    gridX = (theX - Sexy.Constants.LAWN_XMIN) // 80
+    if board.StageHasRoof():
+        num2 = 0
+        if gridX < 5:
+            num2 = (5 - gridX) * 20 - 20
+        gridY = (theY - Sexy.Constants.LAWN_YMIN - num2) // 85
+    elif board.StageHas6Rows():
+        gridY = (theY - Sexy.Constants.LAWN_YMIN) // 85
+    else:
+        gridY = (theY - Sexy.Constants.LAWN_YMIN) // 100
+    return gridX, gridY
+
+# 更安全的版本，原版如果坐标越界会直接崩溃
+def SafeGridToPixelY(board, theGridX, theGridY):
+    if board.mApp.mGameMode == Lawn.GameMode.ChallengeZenGarden and board.mBackground in (Lawn.BackgroundType.MushroomGarden, Lawn.BackgroundType.Zombiquarium, Lawn.BackgroundType.Greenhouse, Lawn.BackgroundType.GreenhouseNight):
+        return board.mApp.mZenGarden.GridToPixelY(theGridX, theGridY)
+    if not board.StageHasRoof():
+        if not board.StageHas6Rows():
+            num = theGridY * Sexy.Constants.New.Board_GridCellSizeY_5Rows + Sexy.Constants.LAWN_YMIN
+        else:
+            num = theGridY * Sexy.Constants.New.Board_GridCellSizeY_6Rows + Sexy.Constants.LAWN_YMIN
+    else:
+        num2 = 0
+        if theGridX < 5:
+            num2 = (5 - theGridX) * 20
+        num = theGridY * Sexy.Constants.New.Board_GridCellSizeY_6Rows + Sexy.Constants.LAWN_YMIN + num2 - 10
+    if theGridX in range(Sexy.Constants.GRIDSIZEX) and theGridY in range(Sexy.Constants.MAX_GRIDSIZEY) and board.mGridSquareType[theGridX, theGridY] == Lawn.GridSquareType.HighGround:
+        num += -Sexy.Constants.HIGH_GROUND_HEIGHT
+    return num
+
 # 行列转坐标，得到格子左上角坐标
 def GridToPixel(board: Lawn.Board, grid):
-    return board.GridToPixelX(*grid), board.GridToPixelY(*grid)
+    return board.GridToPixelX(*grid), SafeGridToPixelY(board, *grid)
 
 # 得到格子中间坐标（col为浮点数时按比例得到坐标）
 def RowColToPixel(board, row, col):  # type: (Lawn.Board, int, int | float) -> tuple[int, int]

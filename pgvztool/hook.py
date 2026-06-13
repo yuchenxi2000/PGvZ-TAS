@@ -598,6 +598,13 @@ def DrawEasyPlaceUI(board: Lawn.Board, g: Sexy.Graphics):
 
         placer._ep_rect = Sexy.TRect(btn_x, btn_y, btn_w, btn_h)
 
+        # draw selected portal
+        if placer.easyPlaceMode == 'portal' and placer.portal_placer.isSelected():
+            g.SetColorizeImages(True)
+            g.SetColor(Sexy.SexyColor(255, 0, 0).Color)
+            g.DrawRect(placer.portal_placer.select_portal_rect)
+            g.SetColorizeImages(False)
+
 def DrawWaveInfo(board: Lawn.Board, g: Sexy.Graphics):
     # 在进度条下面画波数信息
     if board.HasProgressMeter():

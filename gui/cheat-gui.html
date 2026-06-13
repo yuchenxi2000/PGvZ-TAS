@@ -66,6 +66,7 @@
                                 <el-button type="primary" style="margin-top:8px" @click="send('cheat_option.FailImmediately(Lawn.ZombieType.Normal)')">直接失败</el-button>
                                 <el-button type="primary" style="margin-top:8px" @click="send('cheat_option.GetFinishedAccount()')">通关存档</el-button>
                                 <el-button type="primary" style="margin-top:8px" @click="send('GetBoard().mShowShovel = True')">显示铲子</el-button>
+                                <el-button type="primary" style="margin-top:8px" @click="send('GetBoard().mChallenge.mChallengeStateCounter = 2147483647')">传送门不移动</el-button>
                             </el-row>
                         </el-card>
                     </el-col>
@@ -674,6 +675,7 @@
                     { label: '场地物品', value: 'griditem' },
                     { label: '掉落物', value: 'coin' },
                     { label: '割草机', value: 'mower' },
+                    { label: '传送门', value: 'portal' },
                 ];
 
                 const scaryPotType = [

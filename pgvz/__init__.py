@@ -1,7 +1,7 @@
 """
 植物娘大战僵尸键控框架 PGvZ-TAS
 by yuchenxi2000
-2026.06.09 PGvZ-TAS v1.5.2, PGvZ v1.1.0
+2026.06.13 PGvZ-TAS v1.5.4, PGvZ v1.1.0
 """
 from .card import Card, Shovel, SelectCards, LetsRock
 from .cob_manager import CobManager, GetCobRecoverTime
@@ -40,7 +40,7 @@ __all__ = [
     "ScriptManager", "ScriptRunMode", "ScriptType", "ScriptObj", "ScriptConf",
     "Delay", "Prejudge", "Until", "DelayA",
     "GetLawnApp", "GetBoard",
-    "PixelToGrid", "GridToPixel", "MouseDragGrid", 
+    "PixelToGrid", "GridToPixel", "MouseDragGrid", "PixelToGridRaw",
     "SeedTypeNone", "PottedPlantNeedNone", "SetPlantOnBoard", "SurvivalBackupGame",
     "IterAliveZombies", "IterAlivePlants", "IterAliveCoins", "IterAliveGridItems",
     "script_manager", "auto_collector",
