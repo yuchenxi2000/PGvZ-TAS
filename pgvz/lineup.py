@@ -36,7 +36,7 @@ class LineUpGrid:
         self.plantType = (data2 >> 2) - 1
         return self
     
-    def to_bytes(self):  # type: (LineUpGrid) -> tuple[int, int]
+    def to_bytes(self) -> 'tuple[int, int]':
         data1 = 0
         data2 = 0
         if self.hasLadder:
@@ -126,7 +126,7 @@ class LineUp:
         self.scene = 0
         self.rake_row = -1
         self.rake_col = -1
-        self.grids = []  # type: list[LineUpGrid]
+        self.grids: 'list[LineUpGrid]' = []
     
     @classmethod
     def from_str(cls, lineup_code_b64: str):
@@ -146,7 +146,7 @@ class LineUp:
             self.grids.append(LineUpGrid.from_bytes(data1, data2))
         return self
 
-    def to_str(self):  # type: () -> str
+    def to_str(self) -> str:
         last = 0
         last |= (self.rake_row + 1) << 4
         last |= self.scene

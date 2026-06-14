@@ -69,9 +69,9 @@ class ScriptManager:
         self.loaded = False
         self.scriptList = []
         self.globalScriptList = []
-        self.prev_scene: Lawn.GameScenes = None  # type: ignore
+        self.prev_scene: 'Lawn.GameScenes | None' = None
     
-    def Register(self, scriptGenFunc, gamemode: Lawn.GameMode = None, runmode: ScriptRunMode = ScriptRunMode.FOREVER, conf: ScriptConf = None) -> ScriptObj:  # type: ignore
+    def Register(self, scriptGenFunc, gamemode: 'Lawn.GameMode | None' = None, runmode: ScriptRunMode = ScriptRunMode.FOREVER, conf: 'ScriptConf | None' = None) -> ScriptObj:
         if conf is not None:
             runconf = conf
         else:

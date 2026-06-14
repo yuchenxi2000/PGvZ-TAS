@@ -9,7 +9,7 @@ import MonoMod.RuntimeDetour
 class RNGManip:
     def __init__(self) -> None:
         self.enabled = False
-        self.next_rand = []  # type: list[int | float]
+        self.next_rand: 'list[int | float]' = []
 
 rng_manip = RNGManip()
 

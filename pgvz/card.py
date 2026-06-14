@@ -42,7 +42,7 @@ def Card(seedtype: Lawn.SeedType, row: int, col, isImitater: bool = False) -> bo
         return RawCard(seedpacket, row, col)
     return False
 
-def Shovel(row: int, col: int, seedtype: Lawn.SeedType = None):  # type: ignore
+def Shovel(row: int, col: int, seedtype: 'Lawn.SeedType | None' = None):
     if gvar.opCanceled:
         return
     board = GetBoard()
@@ -90,8 +90,8 @@ def SelectCards(seedList: list, *args, waitTime: int = 200, selectRose: bool = T
     if not seedChooserScreen.mRoseButton.mDisabled and selectRose != seedChooserScreen.mRoseButton.mChecked:
         seedChooserScreen.ButtonDepress(111)
     # find seed position
-    seedsToChoose = []  # type: list[Lawn.SeedType]
-    seedsToKeep = []  # type: list[Lawn.SeedType]
+    seedsToChoose: 'list[Lawn.SeedType]' = []
+    seedsToKeep: 'list[Lawn.SeedType]' = []
     for seedtype in seedList:
         chosenSeed = seedChooserScreen.mChosenSeeds[int(seedtype)]
         if chosenSeed.mSeedState in (Lawn.ChosenSeedState.SEED_IN_CHOOSER, Lawn.ChosenSeedState.SEED_FLYING_TO_CHOOSER):

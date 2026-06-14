@@ -15,10 +15,10 @@ def UntilCountDown(t: int, huge_wave: bool):
             yield
         timePassed = board.mHugeWaveCountDown < t
     if timePassed:
-        gvar.opCanceled = True
+        gvar.timePassed = True
         Sexy.Debug.Log(f'warning: UntilCountDown time has passed!')
     else:
-        gvar.opCanceled = False
+        gvar.timePassed = False
 
 refresh_time = [
     599, 200, 200, 200, 200,
@@ -36,10 +36,10 @@ def Delay(t: int):
     while board.mMainCounter - prev_time < t:
         yield
     if board.mMainCounter - prev_time > t:
-        gvar.opCanceled = True
+        gvar.timePassed = True
         Sexy.Debug.Log(f'warning: Delay time has passed!')
     else:
-        gvar.opCanceled = False
+        gvar.timePassed = False
     Sexy.Debug.Log(f"Delay: time = {t}")
 
 def Prejudge(rel_time: int, wave: int):
@@ -66,7 +66,7 @@ def Prejudge(rel_time: int, wave: int):
         refresh_point = board.mMainCounter - delta_time
         yield from Delay(rel_time - delta_time)
     else:
-        gvar.opCanceled = True
+        gvar.timePassed = True
         Sexy.Debug.Log(f'warning: Prejudge time has passed!')
     Sexy.Debug.Log(f"Prejudge: time = {rel_time} wave = {wave}")
     Sexy.Debug.Log(f"TimeInfo: maincounter = {board.mMainCounter} wave = {board.mCurrentWave} cntdown = {board.mZombieCountDown} hugewavecnt = {board.mHugeWaveCountDown}")

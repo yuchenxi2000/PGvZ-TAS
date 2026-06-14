@@ -53,6 +53,12 @@ def Board__CanPlantAt(orig, board: Lawn.Board, gridX: int, gridY: int, seedtype:
         return Lawn.PlantingReason.Ok
     else:
         return orig(board, gridX, gridY, seedtype, ismove)
+@LawnMod.MonoModUtils.HookTo(Lawn.Challenge.CanPlantAt)
+def Challenge__CanPlantAt(orig, challenge: Lawn.Challenge, gridX: int, gridY: int, seedtype: Lawn.SeedType):
+    if cheat_option.plantAnyWhere:
+        return Lawn.PlantingReason.Ok
+    else:
+        return orig(challenge, gridX, gridY, seedtype)
 
 # 更好的自动收集，包括盆栽。PGvZ-TAS自带，只需引入pgvz模块。关闭只需把下面一句取消注释。
 # auto_collector.Off()
@@ -626,6 +632,22 @@ def DrawWaveInfo(board: Lawn.Board, g: Sexy.Graphics):
         Sexy.TodLib.TodCommon.TodDrawString(g, cdText, textX, textY + 16, waveFont, waveColor, Sexy.TodLib.DrawStringJustification.Center)
         g.SetColorizeImages(False)
 
+def DrawSquirrel(board: Lawn.Board, g: Sexy.Graphics):
+    if board.mApp.mGameMode == Lawn.GameMode.ChallengeSquirrel:
+        g.SetColorizeImages(True)
+        for i in range(board.mGridItems.Count):
+            gridItem = board.mGridItems[i]
+            if not gridItem.mDead and gridItem.mGridItemType == Lawn.GridItemType.Squirrel:
+                if gridItem.mGridItemState == Lawn.GridItemState.SquirrelZombie:
+                    color = Sexy.SexyColor(255, 51, 255, 255).Color
+                else:
+                    color = Sexy.SexyColor(204, 0, 0, 255).Color  # 深红
+                g.SetColor(color)
+                mX, mY = GridToPixel(board, (gridItem.mGridX, gridItem.mGridY))
+                margin = 10
+                g.DrawRect(Sexy.TRect(mX + margin, mY + margin, 80 - 2 * margin, 100 - 2 * margin))
+        g.SetColorizeImages(False)
+
 # 场地绘制统一钩子
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.Draw)
 def Board__Draw(orig, board: Lawn.Board, g: Sexy.Graphics):
@@ -636,6 +658,8 @@ def Board__Draw(orig, board: Lawn.Board, g: Sexy.Graphics):
         DrawPlantHpAll(board, g)
     if cheat_option.drawZombieHp:
         DrawZombieHpAll(board, g)
+    if cheat_option.drawSquirrel:
+        DrawSquirrel(board, g)
     board.mCamera.ResetTransform(g)
     # 屏幕坐标空间
     if placer.easyPlaceEnabled:

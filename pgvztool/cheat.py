@@ -46,6 +46,7 @@ class CheatOption:
         self.enableShovel = False
         self.enableTrashcan = False
         self.showWaveInfo = False
+        self.drawSquirrel = False
 
     def ShowErrorInGame(self, title: str, msg: str):
         lawnapp = GetLawnApp()
@@ -102,7 +103,7 @@ class CheatOption:
         pottedPlant.InitializePottedPlant(seedtype)
         pottedPlant.mPlantAge = Lawn.PottedPlantAge.Full
         pottedPlant.mFacing = Lawn.PottedPlant.FacingDirection.Left if reverse else Lawn.PottedPlant.FacingDirection.Right
-        pottedPlant.mPlantNeed = PottedPlantNeedNone
+        pottedPlant.mPlantNeed = none_of(Lawn.PottedPlantNeed)
         pottedPlant.mLastNeedFulfilledTime = System.DateTime.UtcNow
         zenGarden.AddPottedPlant(pottedPlant)
 
@@ -116,7 +117,7 @@ class CheatOption:
         pottedPlant.mX = x
         pottedPlant.mY = y
         pottedPlant.mWhichZenGarden = pos
-        pottedPlant.mPlantNeed = PottedPlantNeedNone
+        pottedPlant.mPlantNeed = none_of(Lawn.PottedPlantNeed)
         pottedPlant.mLastNeedFulfilledTime = System.DateTime.UtcNow
         player.mNumPottedPlants += 1
 
@@ -273,6 +274,8 @@ class CheatOption:
 
     def _EnterNewGame(self, gamemode: Lawn.GameMode):
         lawnapp = GetLawnApp()
+        if lawnapp.mGameScene == Lawn.GameScenes.Loading:
+            return
         # 删除所有对话框
         lawnapp.KillDialog(3)  # 图鉴
         lawnapp.KillDialog(4)  # 商店
@@ -315,7 +318,7 @@ class CheatOption:
         board.FadeOutLevel()
 
     @main_thread
-    def CheatSetZombies(self, zb_list, internal_spawn: bool = True):  # type: (list[Lawn.ZombieType], bool) -> None
+    def CheatSetZombies(self, zb_list: 'list[Lawn.ZombieType]', internal_spawn: bool = True) -> None:
         board = GetBoard()
         if board is None:
             return

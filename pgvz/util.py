@@ -52,7 +52,7 @@ def GridToPixel(board: Lawn.Board, grid):
     return board.GridToPixelX(*grid), SafeGridToPixelY(board, *grid)
 
 # 得到格子中间坐标（col为浮点数时按比例得到坐标）
-def RowColToPixel(board, row, col):  # type: (Lawn.Board, int, int | float) -> tuple[int, int]
+def RowColToPixel(board: Lawn.Board, row: int, col: 'int | float') -> 'tuple[int, int]':
     tCol = int(col + 0.5)
     x = int(col * 80.0 + 1e-3)
     y = board.GridToPixelY(tCol - 1, row - 1) + 40
@@ -66,9 +66,20 @@ def MouseDragGrid(board: Lawn.Board, grid_from, grid_to):
     board.MouseMove(*pixel_to)
     board.MouseUp(*pixel_to, 1)
 
+# 类型提示是给高版本类型检查器（如Pylance）看的。IronPython连typing库都没有
+try:
+    from typing import TypeVar, Type, SupportsInt
+    _EnumType = TypeVar('_EnumType', bound=SupportsInt)
+except:
+    pass
+
 # 和Python关键字冲突。用反射绕开
-SeedTypeNone: Lawn.SeedType = getattr(Lawn.SeedType, 'None')
-PottedPlantNeedNone: Lawn.PottedPlantNeed = getattr(Lawn.PottedPlantNeed, 'None')
+# 写个函数，而不是对每个包含None的Enum写一个变量，此类Enum太多了
+def none_of(enumType: 'Type[_EnumType]') -> '_EnumType':
+    return getattr(enumType, 'None')
+
+# 这个比较常用，就写个变量吧
+SeedTypeNone = none_of(Lawn.SeedType)
 
 def SetPlantOnBoard(plantList: list):
     board = GetBoard()

@@ -307,6 +307,7 @@
                             <el-checkbox v-model="cheatOption.drawPlantHp">显示植物血量</el-checkbox>
                             <el-checkbox v-model="cheatOption.drawZombieHp">显示僵尸血量</el-checkbox>
                             <el-checkbox v-model="cheatOption.selectZombieHp">血量只显示精英怪</el-checkbox>
+                            <el-checkbox v-model="cheatOption.drawSquirrel">显示松鼠</el-checkbox>
                         </el-card>
                     </el-col>
                     <el-col :span="8">
@@ -1317,6 +1318,7 @@
                     'enableTrashcan',
                     'showWaveInfo',
                     'mushroomAwake',
+                    'drawSquirrel',
                 ];
                 const cheatOption = reactive({});
                 optionConfig.forEach(item => {
@@ -1487,24 +1489,28 @@
                         var numSun;
                         var potType;
                         switch (selectedScaryPotType.value) {
+                            case 'None':
+                                numSun = 0;
+                                potType = 'none_of(Lawn.ScaryPotType)';
+                                break;
                             case 'Sun1':
                                 numSun = 1;
-                                potType = 'Sun';
+                                potType = 'Lawn.ScaryPotType.Sun';
                                 break;
                             case 'Sun2':
                                 numSun = 2;
-                                potType = 'Sun';
+                                potType = 'Lawn.ScaryPotType.Sun';
                                 break;
                             case 'Sun3':
                                 numSun = 3;
-                                potType = 'Sun';
+                                potType = 'Lawn.ScaryPotType.Sun';
                                 break;
                             default:
                                 numSun = 0;
-                                potType = selectedScaryPotType.value;
+                                potType = `Lawn.ScaryPotType.${selectedScaryPotType.value}`;
                                 break;
                         }
-                        send(`placer.AddScaryPotOnBoard(${selectedRow.value}, ${selectedCol.value}, Lawn.ScaryPotType.${potType}, Lawn.GridItemState.${selectedScaryPotAppearance.value}, Lawn.ZombieType.${selectedZombieType.value}, Lawn.SeedType.${selectedSeedType.value}, ${numSun})`);
+                        send(`placer.AddScaryPotOnBoard(${selectedRow.value}, ${selectedCol.value}, ${potType}, Lawn.GridItemState.${selectedScaryPotAppearance.value}, Lawn.ZombieType.${selectedZombieType.value}, Lawn.SeedType.${selectedSeedType.value}, ${numSun})`);
                     } else {
                         send(`placer.AddGridItemOnBoard(${selectedRow.value}, ${selectedCol.value}, Lawn.GridItemType.${selectedGridItem.value})`);
                     }

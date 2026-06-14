@@ -3,7 +3,7 @@ import Sexy
 from .rng import rng_manip
 from .util import GetBoard
 
-def SetZombies(zb_list, internal_spawn: bool = True):  # type: (list[Lawn.ZombieType], bool) -> None
+def SetZombies(zb_list: 'list[Lawn.ZombieType]', internal_spawn: bool = True) -> None:
     board = GetBoard()
     if internal_spawn:
         # enable RNG manipulation

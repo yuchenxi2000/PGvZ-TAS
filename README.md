@@ -116,6 +116,8 @@ TAS框架的模块是pgvz，编写脚本先要import这个模块。
     
     或者使用`SurvivalBackupGame`进行备份，破阵就回档（默认存档目录`C:\Users\你的用户名\AppData\Roaming\ZBC\PlantGirlsVsZombies\docs\userdata`）
 
+    如果想在时间点过去后仍执行操作（其他框架的行为），需要设置`gvar.doPassedOp`为True
+
 可以参考本仓库的示例脚本，`pe12.py`是泳池无尽的经典十二炮脚本（阻塞脚本），`beghouled.py`是宝石迷阵系列的自动脚本（非阻塞），`whackazombie.py`是锤僵尸自动脚本（非阻塞）。
 
 如果需要调试，可以运行`Lawn.Console.exe`，这是包含命令行界面的游戏版本。在脚本里使用`Sexy.Debug.Log`在命令行输出调试信息。
