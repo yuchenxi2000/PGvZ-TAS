@@ -35,4 +35,4 @@ def WhackZombie():
         Card(Lawn.SeedType.Gravebuster, grave_list[0][1] + 1, grave_list[0][0] + 1)
 
 # 锤僵尸
-script_manager.Register(WhackZombie, gamemode=Lawn.GameMode.ChallengeWhackAZombie)
+script_whackazombie = script_manager.Register(WhackZombie, gamemode=Lawn.GameMode.ChallengeWhackAZombie)

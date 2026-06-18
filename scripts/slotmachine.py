@@ -36,4 +36,4 @@ def SlotMachinePullHandle():
         board.MouseDown(handleX, handleY, 1)
 
 # 老虎机
-script_manager.Register(SlotMachinePullHandle, gamemode=Lawn.GameMode.ChallengeSlotMachine)
+script_slotmachine = script_manager.Register(SlotMachinePullHandle, gamemode=Lawn.GameMode.ChallengeSlotMachine)

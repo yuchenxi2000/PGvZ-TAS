@@ -127,6 +127,6 @@ def ScriptBeghouled():
     beghouled.doValidMove(board)
 
 # 宝石迷阵
-script_manager.Register(ScriptBeghouled, gamemode=Lawn.GameMode.ChallengeBeghouled)
+script_beghouled = script_manager.Register(ScriptBeghouled, gamemode=Lawn.GameMode.ChallengeBeghouled)
 # 宝石迷阵旋风
-script_manager.Register(ScriptBeghouledTwist, gamemode=Lawn.GameMode.ChallengeBeghouledTwist)
+script_beghouled_twist = script_manager.Register(ScriptBeghouledTwist, gamemode=Lawn.GameMode.ChallengeBeghouledTwist)

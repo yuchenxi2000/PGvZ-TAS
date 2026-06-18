@@ -587,7 +587,7 @@ def Board__MouseDownInternal(orig, board: Lawn.Board, x: int, y: int, theClickCo
         placer.active = False
 
 def DrawEasyPlaceUI(board: Lawn.Board, g: Sexy.Graphics):
-    if board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
+    if board.mApp.mGameScene == Lawn.GameScenes.Playing and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
         shovel_rect = board.GetShovelButtonRect()
         btn_w = shovel_rect.mWidth
         btn_h = shovel_rect.mHeight
@@ -666,3 +666,10 @@ def Board__Draw(orig, board: Lawn.Board, g: Sexy.Graphics):
         DrawEasyPlaceUI(board, g)
     if cheat_option.showWaveInfo:
         DrawWaveInfo(board, g)
+
+# BUG FIX: 猫尾草数量多时，发射子弹会崩游戏，因为Sexy.TodLib.TrailHolder.AllocTrailFromDef在需要扩容时直接返回null而不是触发扩容
+@LawnMod.MonoModUtils.HookTo(Sexy.TodLib.TrailHolder.AllocTrailFromDef)
+def TrailHolder__AllocTrailFromDef(orig, trailHolder: Sexy.TodLib.TrailHolder, theRenderOrder: int, theDefinition: Sexy.TodLib.TrailDefinition):
+    if trailHolder.mTrails.Count == trailHolder.mTrails.Capacity:
+        trailHolder.mTrails.Capacity *= 2
+    return orig(trailHolder, theRenderOrder, theDefinition)
