@@ -11,4 +11,8 @@ def AutoCollect():
         # 避免一直点掉落的卡片，真的很吵！
         if coin.mType == Lawn.CoinType.UsableSeedPacket:
             continue
+        # 还有不能点奖杯，因为游戏内置加速有些问题，导致有概率会跳过关卡通关数设置（拿不到奖杯）
+        # 这里干脆所有关底礼物都不点了
+        if coin.IsLevelAward():
+            continue
         coin.MouseDown(0, 0, 1)

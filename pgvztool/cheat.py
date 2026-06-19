@@ -184,6 +184,38 @@ class CheatOption:
             lawnapp.KillBoard()
             lawnapp.PreNewGame(Lawn.GameMode.ChallengeZenGarden, False)
 
+    def _GetTrophy(self, lawnapp: Lawn.LawnApp, playerinfo: Lawn.PlayerInfo, gamemode: Lawn.GameMode, idx: int):
+        if lawnapp.IsSurvivalNormal(gamemode):
+            if playerinfo.mChallengeRecords[idx] < 5:
+                playerinfo.mChallengeRecords[idx] = 5
+        elif lawnapp.IsSurvivalHard(gamemode):
+            if playerinfo.mChallengeRecords[idx] < 10:
+                playerinfo.mChallengeRecords[idx] = 10
+        elif lawnapp.IsSurvivalHell(gamemode):
+            if playerinfo.mChallengeRecords[idx] < 10:
+                playerinfo.mChallengeRecords[idx] = 10
+        elif not lawnapp.IsSurvivalEndless(gamemode) and not lawnapp.IsEndlessScaryPotter(gamemode) and not lawnapp.IsEndlessIZombie(gamemode):
+            if playerinfo.mChallengeRecords[idx] < 1:
+                playerinfo.mChallengeRecords[idx] = 1
+
+    @main_thread
+    def GetTrophy(self, gamemode: Lawn.GameMode):
+        lawnapp = GetLawnApp()
+        playerinfo = lawnapp.mPlayerInfo
+        idx = int(gamemode) - 1
+        # 冒险模式完成次数在另一个地方
+        if idx < 0:
+            if playerinfo.mFinishedAdventure < 2:
+                playerinfo.mFinishedAdventure = 2
+            return
+        # 获得奖杯
+        self._GetTrophy(lawnapp, playerinfo, gamemode, idx)
+        # 处于选关卡界面时刷新界面
+        if lawnapp.mGameScene == Lawn.GameScenes.Challenge:
+            page = lawnapp.mChallengeScreen.mPageIndex
+            lawnapp.KillChallengeScreen()
+            lawnapp.ShowChallengeScreen(page)
+
     @main_thread
     def GetFinishedAccount(self):
         lawnapp = GetLawnApp()
@@ -210,18 +242,7 @@ class CheatOption:
             if 138 <= gamemode < 141 or 146 <= gamemode < 148:
                 continue
             level = Lawn.GameMode(gamemode)
-            if lawnapp.IsSurvivalNormal(level):
-                if playerinfo.mChallengeRecords[gamemode - 1] < 5:
-                    playerinfo.mChallengeRecords[gamemode - 1] = 5
-            elif lawnapp.IsSurvivalHard(level):
-                if playerinfo.mChallengeRecords[gamemode - 1] < 10:
-                    playerinfo.mChallengeRecords[gamemode - 1] = 10
-            elif lawnapp.IsSurvivalHell(level):
-                if playerinfo.mChallengeRecords[gamemode - 1] < 10:
-                    playerinfo.mChallengeRecords[gamemode - 1] = 10
-            elif not lawnapp.IsSurvivalEndless(level) and not lawnapp.IsEndlessScaryPotter(level) and not lawnapp.IsEndlessIZombie(level):
-                if playerinfo.mChallengeRecords[gamemode - 1] < 1:
-                    playerinfo.mChallengeRecords[gamemode - 1] = 1
+            self._GetTrophy(lawnapp, playerinfo, level, gamemode - 1)
         # 为了在图鉴里显示红眼巨人
         if playerinfo.mChallengeRecords[12] < 10:
             playerinfo.mChallengeRecords[12] = 10

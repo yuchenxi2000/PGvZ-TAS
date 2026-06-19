@@ -447,7 +447,7 @@ def Plant__UpdateShooting(orig, plant: Lawn.Plant):
 
 # 显示植物/僵尸血量
 
-def DrawPlantHp(camera: Lawn.Board.Camera, plant: Lawn.Plant, g: Sexy.Graphics, marginX: int, offsetY: int, color1, color2):
+def DrawPlantHp(plant: Lawn.Plant, g: Sexy.Graphics, marginX: int, offsetY: int, color1, color2):
     if plant.mPlantHealth < plant.mPlantMaxHealth:
         # 一格80x80，画60x5
         numGrid = 2 if plant.mSeedType == Lawn.SeedType.Cobcannon else 1
@@ -466,20 +466,19 @@ def DrawPlantHpAll(board: Lawn.Board, g: Sexy.Graphics):
     color2 = Sexy.SexyColor(204, 0, 0, 255).Color  # 深红
     color3 = Sexy.SexyColor(102, 204, 0, 255).Color  # 绿色
     color4 = Sexy.SexyColor(0, 153, 153, 255).Color  # 青色
-    camera = board.mCamera
     NRow = 6 if board.StageHas6Rows() else 5
     NCol = 9
     for gridX in range(NCol):
         for gridY in range(NRow):
             plant = board.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.EatingOrder)
             if plant is not None:
-                DrawPlantHp(camera, plant, g, 10, 60, color1, color2)
+                DrawPlantHp(plant, g, 10, 60, color1, color2)
                 plant2 = board.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.CatapultOrder)
                 if plant2 is not None and plant is not plant2:
-                    DrawPlantHp(camera, plant2, g, 10, 50, color3, color4)
+                    DrawPlantHp(plant2, g, 10, 50, color3, color4)
     g.SetColorizeImages(False)
 
-def DrawZombieHp(camera: Lawn.Board.Camera, zombie: Lawn.Zombie, g: Sexy.Graphics, marginX: int, offsetY: int, color1, color2, color3, color4):
+def DrawZombieHp(zombie: Lawn.Zombie, g: Sexy.Graphics, marginX: int, offsetY: int, color1, color2, color3, color4):
     rect = zombie.GetZombieRect()
     totalWidth = rect.mWidth
     x = rect.mX + marginX
@@ -549,7 +548,7 @@ def DrawZombieHpAll(board: Lawn.Board, g: Sexy.Graphics):
         # 只画精英怪
         if cheat_option.selectZombieHp and zombie.mZombieType not in selectZbList:
             continue
-        DrawZombieHp(board.mCamera, zombie, g, 0, 0, color5, color6, color7, color8)
+        DrawZombieHp(zombie, g, 0, 0, color5, color6, color7, color8)
     g.SetColorizeImages(False)
 
 # 连续铲子
@@ -574,7 +573,8 @@ def Board__MouseDownInternal(orig, board: Lawn.Board, x: int, y: int, theClickCo
     if placer.active and theClickCount < 0:
         placer.active = False
         return
-    if placer.easyPlaceEnabled and placer._ep_rect.Contains(x, y) and board.CanInteractWithBoardButtons() and board.mCursorObject.mCursorType in (Lawn.CursorType.Normal, Lawn.CursorType.Hammer):
+    if placer.easyPlaceEnabled and placer._ep_rect.Contains(x, y) and board.CanInteractWithBoardButtons() and board.mCursorObject.mCursorType in (Lawn.CursorType.Normal, Lawn.CursorType.Hammer) \
+        and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
         placer.toggle()
         return
     if placer.active and theClickCount >= 0:
