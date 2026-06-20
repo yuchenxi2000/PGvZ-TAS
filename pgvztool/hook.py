@@ -6,7 +6,6 @@ import Lawn
 import LawnMod
 import Sexy
 import Sexy.TodLib
-import System
 from pgvz import *
 from .cheat import cheat_option
 from .placer import placer
@@ -558,15 +557,6 @@ def Board__MouseDownWithTool(orig, board: Lawn.Board, x: int, y: int, clickCnt: 
     if cheat_option.shovelNoReset and clickCnt >= 0 and cursorType == Lawn.CursorType.Shovel:
         board.mCursorObject.mCursorType = Lawn.CursorType.Shovel
 
-# 垃圾桶
-@LawnMod.MonoModUtils.HookTo(Lawn.Board.HasTrashcan)
-def Board__HasTrashcan(orig, board: Lawn.Board):
-    if cheat_option.enableTrashcan:
-        gamemode = board.mApp.mGameMode
-        return gamemode not in (Lawn.GameMode.Upsell, Lawn.GameMode.Intro, Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom)
-    else:
-        return orig(board)
-
 # 轻松放置：点击处理
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.MouseDownInternal)
 def Board__MouseDownInternal(orig, board: Lawn.Board, x: int, y: int, theClickCount: int, isTouch: bool):
@@ -648,6 +638,40 @@ def DrawSquirrel(board: Lawn.Board, g: Sexy.Graphics):
                 g.DrawRect(Sexy.TRect(mX + margin, mY + margin, 80 - 2 * margin, 100 - 2 * margin))
         g.SetColorizeImages(False)
 
+# 垃圾桶
+# 气死了，Board.HasTrashcan竟然被内联优化了，挂不上钩子！逼得写一堆代码
+def _HasTrashcan(board: Lawn.Board):
+    if cheat_option.enableTrashcan:
+        gamemode = board.mApp.mGameMode
+        return gamemode not in (Lawn.GameMode.Upsell, Lawn.GameMode.Intro, Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom)
+    else:
+        return board.mApp.IsRogueConveyorbeltLevel()
+
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.TrashcanHitTest)
+def Board__TrashcanHitTest(orig, board: Lawn.Board, x: int, y: int):
+    if _HasTrashcan(board):
+        return Sexy.TRect(0, 70, 50, 80).Contains(x, y)
+    return False
+
+def DrawTrashcan(board: Lawn.Board, g: Sexy.Graphics):
+    hasCamera = board.mCameraEnabled and board.mCamera is not None
+    if hasCamera:
+        board.mCamera.ApplyTransform(g)
+    graphics = Sexy.Graphics.GetNew(g)
+    graphics.SetScale(0.75)
+    if board.IsPlantInCursor() and board.TrashcanHitTest(board.mCursorObject.mX, board.mCursorObject.mY):
+        graphics.DrawImage(Sexy.AtlasResources.IMAGE_TRASHCAN, 0.0, 70.0 * Sexy.Constants.S)
+        graphics.SetColorizeImages(True)
+        graphics.SetColor(Sexy.SexyColor(255, 255, 255, 128, False).Color)
+    elif board.IsPlantInCursor():
+        flashingColor2 = Sexy.TodLib.TodCommon.GetFlashingColor(board.mMainCounter, 75)
+        graphics.SetColorizeImages(True)
+        graphics.SetColor(flashingColor2.Color)
+    graphics.DrawImage(Sexy.AtlasResources.IMAGE_TRASHCAN, 0.0, 70.0 * Sexy.Constants.S)
+    graphics.PrepareForReuse()
+    if hasCamera:
+        board.mCamera.ResetTransform(g)
+
 # 场地绘制统一钩子
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.Draw)
 def Board__Draw(orig, board: Lawn.Board, g: Sexy.Graphics):
@@ -666,6 +690,8 @@ def Board__Draw(orig, board: Lawn.Board, g: Sexy.Graphics):
         DrawEasyPlaceUI(board, g)
     if cheat_option.showWaveInfo:
         DrawWaveInfo(board, g)
+    if _HasTrashcan(board) and not board.mApp.IsRogueConveyorbeltLevel():
+        DrawTrashcan(board, g)
 
 # BUG FIX: 猫尾草数量多时，发射子弹会崩游戏，因为Sexy.TodLib.TrailHolder.AllocTrailFromDef在需要扩容时直接返回null而不是触发扩容
 @LawnMod.MonoModUtils.HookTo(Sexy.TodLib.TrailHolder.AllocTrailFromDef)

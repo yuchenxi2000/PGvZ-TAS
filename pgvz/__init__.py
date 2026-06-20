@@ -1,7 +1,7 @@
 """
 植物娘大战僵尸键控框架 PGvZ-TAS
 by yuchenxi2000
-2026.06.14 PGvZ-TAS v1.5.5, PGvZ v1.1.0
+2026.06.21 PGvZ-TAS v1.6.0, PGvZ v1.1.4
 """
 from .card import Card, Shovel, SelectCards, LetsRock
 from .cob_manager import CobManager, GetCobRecoverTime

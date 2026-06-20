@@ -286,7 +286,7 @@
                             <el-button type="primary" style="margin-top:8px"
                                 @click="send(`placer.OpenScaryPotterOnBoard()`)">砸开罐子</el-button>
                             <el-button type="primary" style="margin-top:8px"
-                                @click="send(`cheat_option.UnlockCrazyDaveSeed()`)">解锁戴夫卡片</el-button>
+                                @click="send(`cheat_option.UnlockCrazyDaveSeed()`)">解锁锁定卡片</el-button>
                         </el-card>
                     </el-col>
                 </el-row>
@@ -313,7 +313,7 @@
                     <el-col :span="8">
                         <el-card shadow="hover" class="command-card">
                             <template #header>速度控制</template>
-                            <el-radio-group v-model="speed" @change="SetSpeed">
+                            <el-radio-group v-model="speed" @change="(value) => send(`cheat_option.SetSpeed(${value})`)">
                                 <el-radio-button :label="0.1">0.1</el-radio-button>
                                 <el-radio-button :label="0.2">0.2</el-radio-button>
                                 <el-radio-button :label="0.5">0.5</el-radio-button>
@@ -877,6 +877,8 @@
                     { label: '大泳池（困难）', value: 'BigPoolSurvivalHardStage' },
                     { label: '大泳池（地狱）', value: 'BigPoolSurvivalHellStage' },
                     { label: '融合', value: 'ChallengeFusion' },
+                    { label: '随机挑战', value: 'ChallengeStageRandom' },
+                    { label: '占领高地', value: 'OccupyHighGround' },
                 ];
 
                 const lineupCodeMap = {
@@ -1468,9 +1470,6 @@
                 }
 
                 // ========== 复选框联动 ==========
-                function SetSpeed(val) {
-                    send(`cheat_option.SetSpeed(${val})`);
-                }
                 function sendCustomCode() {
                     if (!customCode.value.trim()) {
                         customCodeError.value = '代码不能为空';
@@ -1575,7 +1574,6 @@
                     potLeft,
                     lastResult,
                     send,
-                    SetSpeed,
                     customCode,
                     customCodeError,
                     sendCustomCode,
