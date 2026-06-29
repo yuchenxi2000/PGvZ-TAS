@@ -90,7 +90,7 @@ class Placer:
         col, row = PixelToGrid(board, (x, y))
         NRow = 6 if board.StageHas6Rows() else 5
         NCol = 9
-        if col < 0 or col >= NCol or row < 0 or row >= NRow:
+        if (col < 0 or col >= NCol or row < 0 or row >= NRow) and self.easyPlaceMode not in ('coin', 'mower'):
             return False
         if self.easyPlaceMode != 'portal':
             self.portal_placer.reset()
@@ -107,8 +107,12 @@ class Placer:
             self.AddCoinOnBoard(x, y, self.coinType, self.seedType, self.potReverse)
             return True
         elif self.easyPlaceMode == 'mower':
-            self._AddLawnMower(board.PixelToGridY(x, y), x)
-            return True
+            mower_row = PixelToGridRaw(board, (x, y))[1]
+            if 0 <= mower_row < NRow:
+                self._AddLawnMower(mower_row, x)
+                return True
+            else:
+                return False
         elif self.easyPlaceMode == 'portal':
             self.portal_placer.try_place(board, x, y)
             return True
@@ -354,7 +358,7 @@ class Placer:
         mower.LawnMowerInitialize(row)
         mower.mMowerState = Lawn.LawnMowerState.Ready
         offsetY = 35 if board.StageHasRoof() else 0
-        mower.mPosX = x
+        mower.mPosX = x - 40
         mower.mPosY = board.GetPosYBasedOnRow(mower.mPosX + 40, row) + 23 + offsetY
         board.mLawnMowers.Add(mower)
 

@@ -393,3 +393,18 @@ def ScriptMushroomAwake():
         plant.SetSleeping(False)
 script_mushroom_awake = script_manager.Register(ScriptMushroomAwake, runmode=ScriptRunMode.FOREVER)
 script_mushroom_awake.Off()
+
+# 自动补货
+def ScriptAutoRestock():
+    playerInfo = GetLawnApp().mPlayerInfo
+    if 1000 <= playerInfo.mPurchases[14] <= 1015:
+        while playerInfo.mPurchases[14] <= 1015 and playerInfo.mCoins >= 75:
+            playerInfo.mPurchases[14] += 5
+            playerInfo.mCoins -= 75
+    if 1000 <= playerInfo.mPurchases[15] <= 1015:
+        while playerInfo.mPurchases[15] <= 1015 and playerInfo.mCoins >= 100:
+            playerInfo.mPurchases[15] += 5
+            playerInfo.mCoins -= 100
+conf_auto_restock = ScriptConf(runmode=ScriptRunMode.FOREVER, canRunFunc=lambda: GetLawnApp().mGameMode in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom))
+script_auto_restock = script_manager.Register(ScriptAutoRestock, conf=conf_auto_restock)
+script_auto_restock.Off()

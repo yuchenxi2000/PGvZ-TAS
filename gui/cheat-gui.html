@@ -97,6 +97,7 @@
                             <el-checkbox v-model="cheatOption.disableTalisman">天尸不得施法</el-checkbox>
                             <el-checkbox v-model="cheatOption.disableNinja">女忍者显形</el-checkbox>
                             <el-checkbox v-model="cheatOption.diamondZenTools">全屏花园工具</el-checkbox>
+                            <el-checkbox v-model="cheatOption.autoRestock">花园自动补货</el-checkbox>
                             <el-checkbox v-model="cheatOption.mushroomAwake">蘑菇清醒</el-checkbox>
                             <el-checkbox v-model="cheatOption.cobNoCooling">玉米炮无冷却</el-checkbox>
                             <el-checkbox v-model="cheatOption.chomperNoCooling">大嘴花无冷却</el-checkbox>
@@ -1323,6 +1324,7 @@
                     'showWaveInfo',
                     'mushroomAwake',
                     'drawSquirrel',
+                    'autoRestock',
                 ];
                 const cheatOption = reactive({});
                 optionConfig.forEach(item => {
@@ -1365,6 +1367,14 @@
                                 send(`script_mushroom_awake.On()`);
                             } else {
                                 send(`script_mushroom_awake.Off()`);
+                            }
+                            break;
+                        
+                        case 'autoRestock':
+                            if (value) {
+                                send(`script_auto_restock.On()`);
+                            } else {
+                                send(`script_auto_restock.Off()`);
                             }
                             break;
                         
