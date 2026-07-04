@@ -9,6 +9,8 @@ cheat-gui.py (内嵌服务器)
     ↕ WebSocket (localhost:8080/Py)
 游戏 IronPython 引擎
     ↕ Python 对象
+pgvztool/sync.py (SyncRegistry)
+    ↕ Serializable
 pgvztool 模块 (cheat_option, placer, ...)
 ```
 
@@ -22,7 +24,7 @@ pgvztool 模块 (cheat_option, placer, ...)
 
 由游戏内 `IronPyInteractive` 启动（IronPyInteractive.cs:199-219）。行为类似 **Python 交互式控制台（REPL）**：
 
-- **表达式**（如 `1+1`、`get_cheat_state()`）：执行后返回 `repr()` 的字符串结果
+- **表达式**（如 `1+1`、`sync_reg.serialize()`）：执行后返回 `repr()` 的字符串结果
 - **语句**（如 `cheat_option.xxx = True`）：执行后无返回值
 
 服务端响应是统一的 JSON 格式：
@@ -38,18 +40,38 @@ pgvztool 模块 (cheat_option, placer, ...)
 {"statuscode": 1, "error": "error message", "errortype": "ExceptionType"}
 ```
 
-## 应用层协议
+### JSON 引号问题
 
-基于 WebSocket 的 REPL 特性，定义了两类 JSON 消息，通过嵌套在 `repr()` 字符串中传递。
+JSON 布尔值（`true`/`false`）不是有效的 Python 语法。从 Web 端发送 JSON 数据给 `json.loads()` 解析时，必须将 JSON 字符串整体包裹为 Python 字符串字面量（单引号）：
+
+```javascript
+// ✅ 正确：JSON 作为 Python 字符串传入
+send(`sync_reg.apply('${JSON.stringify(obj)}')`);
+
+// ❌ 错误：JSON 直接作为 Python 代码，true/false 会触发 UnboundNameException
+send(`sync_reg.apply(${JSON.stringify(obj)})`);
+```
+
+反之，WebSocket 返回的 `result` 字段是 `repr()` 输出，字符串会被额外包裹一层引号。GUI 解析前需去掉外层引号：
+
+```javascript
+let r = data.result;
+if ((r.startsWith("'") && r.endsWith("'")) || (r.startsWith('"') && r.endsWith('"'))) {
+    r = r.slice(1, -1);
+}
+const msg = JSON.parse(r);
+```
+
+## 应用层协议
 
 ### sync（状态同步）
 
-由 `pgvztool/sync_state.py:get_cheat_state()` 生成。将 `CheatOption` 所有属性及 `placer` 状态序列化。
+由 `sync_reg.serialize()` 生成。`sync_reg` 是 `SyncRegistry` 实例，注册了 `cheat`（`CheatOption`）和 `placer`（`Placer`）两个对象。序列化通过 `Serializable.to_dict()` 自动完成——包括简单属性和脚本单例的 `@property`。
 
-**发送**（手机端连接后拉取，或 PC 端初始化后推送）：
+**发送**（手机端连接后拉取）：
 
 ```
-get_cheat_state()
+sync_reg.serialize()
 ```
 
 **返回**：
@@ -57,26 +79,58 @@ get_cheat_state()
 ```json
 {
   "action": "sync",
-  "options": {
-    "wontLose": false,
-    "freePlant": false,
-    "drawPlantHp": true,
-    "autoCollect": true,
-    "seedType": "Peashooter",
-    "zombieType": "Normal",
-    "easyPlaceMode": "plant",
-    ...
+  "state": {
+    "cheat": {
+      "wontLose": false,
+      "freePlant": false,
+      "drawPlantHp": true,
+      "autoCollect": true,
+      "infSun": false,
+      "skillNoCooling": false,
+      "noCooldown": false,
+      "autoRestock": false,
+      "mushroomAwake": false,
+      ...
+    },
+    "placer": {
+      "seedType": "Peashooter",
+      "zombieType": "Normal",
+      "easyPlaceMode": "plant",
+      "easyPlaceEnabled": true,
+      ...
+    }
   }
 }
 ```
 
-GUI 收到后遍历 `options` 的 key，更新 `cheatOption` 响应式对象及 placer 相关状态。
+GUI 收到后分别遍历 `cheat` 和 `placer` 对象更新状态。
+
+### apply（Web → Python 控制）
+
+所有状态的修改统一走 `sync_reg.apply(json_str)`：
+
+**单个复选框切换**：
+
+```javascript
+send(`sync_reg.apply('${JSON.stringify({cheat: {[key]: value}})}')`);
+```
+
+**初始化同步全部状态**：
+
+```javascript
+send(`sync_reg.apply('${JSON.stringify({
+  cheat: cheatOption,           // Vue reactive 对象
+  placer: { seedType: ..., ... }
+})}')`);
+```
+
+Python 端 `SyncRegistry.apply()` 解析 JSON 后，遍历各对象调用 `Serializable.from_dict()`。`from_dict` 通过 `setattr` 写入——普通属性直接赋值，有 setter 的 `@property` 自动走 setter（如 `cheat_option.autoCollect = True` 会调用 `auto_collector.On()`）。
 
 ### lineup（布阵码）
 
 由 `pgvz/lineup.py:LineUp.from_board(...).to_str()` 生成。
 
-**发送**（点击"获取布阵码"按钮）：
+**发送**：
 
 ```
 '{"action":"lineup","code":"' + pgvz.lineup.LineUp.from_board(board).to_str() + '"}'
@@ -91,27 +145,25 @@ GUI 收到后遍历 `options` 的 key，更新 `cheatOption` 响应式对象及 
 }
 ```
 
-GUI 将 `code` 填入布阵码输入框。
-
 ## 状态同步策略
 
 ### PC 端：推送模式
 
-GUI 初始状态全为 `false`（除 `autoCollect` 和 `runBackground` 默认为 `true`）。用户勾选复选框时，`watch(cheatOption)` 检测变化，通过 `setCheatOption(key, value)` 发送赋值语句：
+GUI 初始状态全为 `false`（除 `autoCollect` 和 `runBackground` 默认为 `true`）。连接建立后，`syncCheatOptions()` 将当前 `cheatOption`（Vue reactive 对象）和 `placer` 状态合并为一次 `sync_reg.apply(...)` 发送。
+
+用户勾选复选框时，`watch(cheatOption)` 检测变化，通过 `setCheatOption(key, value)` 发送：
 
 ```javascript
-send(`cheat_option.${key} = ${value ? 'True' : 'False'}`);
+send(`sync_reg.apply('${JSON.stringify({cheat: {[key]: value}})}')`);
 ```
-
-这是变量赋值，WebSocket 返回 `{"statuscode": 0}`（无 result）。游戏端 `CheatOption` 实例的属性被直接赋值，hook 函数在下一帧读取新值。
 
 ### 手机端：拉取模式
 
-手机浏览器可能被系统杀死后台页面，导致 GUI 状态丢失。连接建立后，先发 `get_cheat_state()` 拉取当前游戏内的完整状态，通过 `sync` 消息同步回来。
+手机浏览器可能被系统杀死后台页面，导致 GUI 状态丢失。连接建立后，先发 `sync_reg.serialize()` 拉取当前游戏内的完整状态，通过返回的 `sync` 消息同步回来。
 
 ## 如何新增一个修改选项
 
-### 1. Python 端：定义状态 (pgvztool/cheat.py)
+### 1. 添加属性 (pgvztool/cheat.py)
 
 在 `CheatOption.__init__` 中添加属性：
 
@@ -119,49 +171,32 @@ send(`cheat_option.${key} = ${value ? 'True' : 'False'}`);
 self.xxx = False
 ```
 
-如果新选项不是简单的布尔开关，可能需要额外的辅助函数或脚本单例。参考已有的 `infSun`（脚本单例 + `On/Off`）或 `noCooldown`（直接设置游戏内部变量）。如果是简单的钩子，钩子函数放在 `pgvztool/hook.py`。
+如果新选项对应脚本单例（有 On/Off 方法），在 `CheatOption` 类末尾加 `@property`：
 
-### 2. Python 端：注册同步 (pgvztool/sync_state.py)
-
-在 `regular_attrs` 列表中添加字符串 `'xxx'`。这确保手机端拉取状态时包含该选项。
-
-如果新选项不是 `CheatOption` 的简单属性（如 `autoCollect` 对应 `auto_collector.enabled`），需要在 `get_cheat_state()` 中单独处理。
-
-### 3. GUI 端：注册选项 (gui/cheat-gui.html)
-
-**a)** 在 `optionConfig` 数组末尾添加 `'xxx'`。`reactive()` 初始化时会自动为该键创建响应式属性（默认 `false`）。
-
-**b)** 在对应分类的 `<el-card>` 中添加复选框：
-
-```html
-<el-checkbox v-model="cheatOption.xxx">显示标签</el-checkbox>
+```python
+@property
+def xxx(self):
+    return script_xxx.enabled
+@xxx.setter
+def xxx(self, value):
+    script_xxx.On() if value else script_xxx.Off()
 ```
 
-**c)** 如果该选项不走默认的 `setCheatOption`（即不是直接赋值 `cheat_option.xxx = True/False`），需要在 `setCheatOption` 的 switch 中添加对应分支。
+`Serializable.to_dict()` 会自动发现 `@property` 并包含在序列化中。
 
-### 4. 通信流程（默认分支）
+### 2. GUI 端：注册选项 (gui/cheat-gui.html)
+
+在 `optionConfig` 数组末尾添加 `'xxx'`，在对应 `<el-card>` 中添加 `<el-checkbox>`。
+
+### 3. 通信流程
 
 ```
 用户勾选复选框
   → Vue watch 检测 cheatOption.xxx 变化
   → setCheatOption('xxx', true)
-  → default 分支: send("cheat_option.xxx = True")
-  → WebSocket → 游戏 IronPython
-  → cheat_option.xxx = True
+  → send("sync_reg.apply('" + JSON.stringify({cheat: {xxx: true}}) + "')")
+  → WebSocket → IronPython 执行
+  → sync_reg.apply('{"cheat":{"xxx":true}}')
+  → json.loads → obj.from_dict → setattr(cheat_option, 'xxx', True)
   → 下一帧 hook 函数读取 cheat_option.xxx，执行对应逻辑
 ```
-
-### 特殊分支
-
-部分选项不走默认路径：
-
-| 选项 | 发送内容 | 原因 |
-|---|---|---|
-| `autoCollect` | `auto_collector.On()/Off()` | 控制脚本单例的启用/停用 |
-| `infSun` | `script_inf_sun.On()/Off()` | 同上 |
-| `skillNoCooling` | `script_skill_nocooling.On()/Off()` | 同上 |
-| `noCooldown` | `gLawnApp.mEasyPlantingCheat = True/False` | 直接设置游戏内部字段 |
-
-## 轻松放置的状态同步
-
-`placer` 对象的状态也需要同步（`seedType`、`zombieType`、`easyPlaceMode` 等）。这些在 `syncCheatOptions()` 中单独发送，不走 `setCheatOption`。`get_cheat_state()` 中也单独序列化 `placer` 的字段。

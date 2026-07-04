@@ -8,10 +8,11 @@ import Sexy
 from pgvz import *
 from pgvz.lineup import LineUp
 from .util import main_thread
+from .sync import Serializable
 
 # 作弊选项，其中成员设置为True就是开启。还包括一些包装好的函数
 # 推荐配合cheat-gui.html使用
-class CheatOption:
+class CheatOption(Serializable):
     def __init__(self) -> None:
         self.wontLose = False
         self.freePlant = False
@@ -43,7 +44,6 @@ class CheatOption:
         self.shovelNoReset = False
         self.runBackground = False
         self.gloveNoCooling = False
-        self.enableShovel = False
         self.enableTrashcan = False
         self.showWaveInfo = False
         self.drawSquirrel = False
@@ -368,6 +368,50 @@ class CheatOption:
         if lawnApp.mGameScene == Lawn.GameScenes.Menu:
             lawnApp.KillGameSelector()
             lawnApp.ShowGameSelector()
+
+    # ===== 脚本单例状态（通过 property 暴露给 sync） =====
+
+    @property
+    def autoCollect(self):
+        return auto_collector.enabled
+    @autoCollect.setter
+    def autoCollect(self, value):
+        auto_collector.On() if value else auto_collector.Off()
+
+    @property
+    def infSun(self):
+        return script_inf_sun.enabled
+    @infSun.setter
+    def infSun(self, value):
+        script_inf_sun.On() if value else script_inf_sun.Off()
+
+    @property
+    def skillNoCooling(self):
+        return script_skill_nocooling.enabled
+    @skillNoCooling.setter
+    def skillNoCooling(self, value):
+        script_skill_nocooling.On() if value else script_skill_nocooling.Off()
+
+    @property
+    def mushroomAwake(self):
+        return script_mushroom_awake.enabled
+    @mushroomAwake.setter
+    def mushroomAwake(self, value):
+        script_mushroom_awake.On() if value else script_mushroom_awake.Off()
+
+    @property
+    def autoRestock(self):
+        return script_auto_restock.enabled
+    @autoRestock.setter
+    def autoRestock(self, value):
+        script_auto_restock.On() if value else script_auto_restock.Off()
+
+    @property
+    def noCooldown(self):
+        return GetLawnApp().mEasyPlantingCheat
+    @noCooldown.setter
+    def noCooldown(self, value):
+        GetLawnApp().mEasyPlantingCheat = value
 
 cheat_option = CheatOption()
 

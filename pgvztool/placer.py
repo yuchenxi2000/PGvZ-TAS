@@ -7,6 +7,7 @@ import Sexy
 from enum import Enum
 from pgvz import *
 from .util import main_thread
+from .sync import Serializable
 
 def IterPortals(board: Lawn.Board):
     for i in range(board.mGridItems.Count):
@@ -53,7 +54,7 @@ class PortalPlacer:
     def reset(self):
         self.state = self.PortalPlacerState.Normal
 
-class Placer:
+class Placer(Serializable):
     def __init__(self):
         # 轻松放置状态
         self.easyPlaceEnabled = True

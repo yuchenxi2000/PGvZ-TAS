@@ -1333,69 +1333,21 @@
                 cheatOption['autoCollect'] = true;
                 cheatOption['runBackground'] = true;
                 function setCheatOption(key, value) {
-                    switch (key) {
-                        case 'autoCollect':
-                            if (value) {
-                                send(`auto_collector.On()`);
-                            } else {
-                                send(`auto_collector.Off()`);
-                            }
-                            break;
-                        
-                        case 'skillNoCooling':
-                            if (value) {
-                                send(`script_skill_nocooling.On()`);
-                            } else {
-                                send(`script_skill_nocooling.Off()`);
-                            }
-                            break;
-
-                        case 'noCooldown':
-                            send(`Sexy.GlobalStaticVars.gLawnApp.mEasyPlantingCheat = ${value ? 'True' : 'False'}`);
-                            break;
-                        
-                        case 'infSun':
-                            if (value) {
-                                send(`script_inf_sun.On()`);
-                            } else {
-                                send(`script_inf_sun.Off()`);
-                            }
-                            break;
-                        
-                        case 'mushroomAwake':
-                            if (value) {
-                                send(`script_mushroom_awake.On()`);
-                            } else {
-                                send(`script_mushroom_awake.Off()`);
-                            }
-                            break;
-                        
-                        case 'autoRestock':
-                            if (value) {
-                                send(`script_auto_restock.On()`);
-                            } else {
-                                send(`script_auto_restock.Off()`);
-                            }
-                            break;
-                        
-                        default:
-                            send(`cheat_option.${key} = ${value ? 'True' : 'False'}`);
-                            break;
-                    }
+                    send(`sync_reg.apply('${JSON.stringify({cheat: {[key]: value}})}')`);
                 }
                 function syncCheatOptions() {
-                    optionConfig.forEach(item => {
-                        setCheatOption(item, cheatOption[item]);
-                    });
-                    send(`placer.seedType = Lawn.SeedType.${selectedSeedType.value}`);
-                    send(`placer.zombieType = Lawn.ZombieType.${selectedZombieType.value}`);
-                    send(`placer.gridItemType = Lawn.GridItemType.${selectedGridItem.value}`);
-                    send(`placer.coinType = Lawn.CoinType.${selectedCoin.value}`);
-                    send(`placer.mindCtrl = ${mindCtrl.value ? 'True' : 'False'}`);
-                    send(`placer.potReverse = ${potLeft.value ? 'True' : 'False'}`);
-                    send(`placer.imitater = ${isImitater.value ? 'True' : 'False'}`);
-                    send(`placer.easyPlaceMode = '${easyPlaceMode.value}'`);
-                    send(`placer.easyPlaceEnabled = '${easyPlaceEnabled.value ? 'True' : 'False'}'`);
+                    const placerUpdates = {
+                        seedType: selectedSeedType.value,
+                        zombieType: selectedZombieType.value,
+                        gridItemType: selectedGridItem.value,
+                        coinType: selectedCoin.value,
+                        mindCtrl: mindCtrl.value,
+                        potReverse: potLeft.value,
+                        imitater: isImitater.value,
+                        easyPlaceMode: easyPlaceMode.value,
+                        easyPlaceEnabled: easyPlaceEnabled.value,
+                    };
+                    send(`sync_reg.apply('${JSON.stringify({cheat: cheatOption, placer: placerUpdates})}')`);
                 }
                 watch(
                     () => ({ ...cheatOption }),
@@ -1417,7 +1369,7 @@
                         statusText.value = '✅ 已连接到游戏服务器';
                         if (isMobile) {
                             // 手机端：先拉取游戏当前状态，原因是手机后台应用（比如浏览器网页）可能被系统杀死，所以应该从游戏同步作弊选项到网页而不是相反
-                            send('from pgvz import *\nfrom pgvztool import *\nimport Lawn\nimport Sexy\nimport Sexy.TodLib\nimport LawnMod\nimport pgvz.lineup\nget_cheat_state()');
+                            send('from pgvz import *\nfrom pgvztool import *\nimport Lawn\nimport Sexy\nimport Sexy.TodLib\nimport LawnMod\nimport pgvz.lineup\nsync_reg.serialize()');
                         } else {
                             // PC端：网页状态推送到游戏，这个行为和原版修改器PvZToolkit一致
                             send('from pgvz import *\nfrom pgvztool import *\nimport Lawn\nimport Sexy\nimport Sexy.TodLib\nimport LawnMod\nimport pgvz.lineup');
@@ -1437,21 +1389,26 @@
                                             r = r.slice(1, -1);
                                         }
                                         const msg = JSON.parse(r);
-                                        // 同步协议：{action:"sync", options:{...}}
-                                        if (msg.action === 'sync' && msg.options) {
+                                        // 同步协议：{action:"sync", state:{cheat:{...}, placer:{...}}}
+                                        if (msg.action === 'sync' && msg.state) {
                                             lastResult.text = '✅ 状态已同步';
-                                            Object.keys(msg.options).forEach(k => {
-                                                if (k in cheatOption) cheatOption[k] = msg.options[k];
-                                            });
-                                            selectedSeedType.value = msg.options.seedType;
-                                            selectedZombieType.value = msg.options.zombieType;
-                                            selectedGridItem.value = msg.options.gridItemType;
-                                            selectedCoin.value = msg.options.coinType;
-                                            mindCtrl.value = msg.options.mindCtrl;
-                                            potLeft.value = msg.options.potReverse;
-                                            isImitater.value = msg.options.imitater;
-                                            easyPlaceMode.value = msg.options.easyPlaceMode;
-                                            easyPlaceEnabled.value = msg.options.easyPlaceEnabled;
+                                            if (msg.state.cheat) {
+                                                Object.keys(msg.state.cheat).forEach(k => {
+                                                    if (k in cheatOption) cheatOption[k] = msg.state.cheat[k];
+                                                });
+                                            }
+                                            if (msg.state.placer) {
+                                                const p = msg.state.placer;
+                                                if (p.seedType)       selectedSeedType.value = p.seedType;
+                                                if (p.zombieType)     selectedZombieType.value = p.zombieType;
+                                                if (p.gridItemType)   selectedGridItem.value = p.gridItemType;
+                                                if (p.coinType)       selectedCoin.value = p.coinType;
+                                                if (p.mindCtrl !== undefined)   mindCtrl.value = p.mindCtrl;
+                                                if (p.potReverse !== undefined) potLeft.value = p.potReverse;
+                                                if (p.imitater !== undefined)   isImitater.value = p.imitater;
+                                                if (p.easyPlaceMode)       easyPlaceMode.value = p.easyPlaceMode;
+                                                if (p.easyPlaceEnabled !== undefined) easyPlaceEnabled.value = p.easyPlaceEnabled;
+                                            }
                                             return;
                                         } else if (msg.action === 'lineup' && msg.code) {
                                             lastResult.text = '已获得布阵码';

@@ -31,14 +31,14 @@ cheat-gui.py     Embedded HTTP server on localhost:58080; serves gui/ to browser
 
 ## Hooks
 
-All `@HookTo` functions are in **`pgvztool/hook.py`**. `pgvztool/__init__.py` imports `cheat` → `placer` → `sync_state` → `hook`, so all dependencies are available when hooks register.
+All `@HookTo` functions are in **`pgvztool/hook.py`**. `pgvztool/__init__.py` imports `cheat` → `placer` → `sync` → `hook`, so all dependencies are available when hooks register.
 
 | File | Purpose |
 |---|---|
-| `pgvztool/cheat.py` | `CheatOption` class (all toggle state), drawing helpers, script singletons |
+| `pgvztool/cheat.py` | `CheatOption` class (all toggle state), script singletons |
 | `pgvztool/placer.py` | `Placer` class (easy-place state and placement methods) |
 | `pgvztool/hook.py` | All `@HookTo` functions |
-| `pgvztool/sync_state.py` | `get_cheat_state()` for bidirectional GUI sync |
+| `pgvztool/sync.py` | `Serializable`, `SyncRegistry` — state sync |
 
 `pgvz/__init__.py` also has two hooks (`LawnApp.UpdateFrames`, `Board.UpdateGame`) to drive `script_manager`.
 
@@ -54,6 +54,7 @@ See [docs/rendering.md](docs/rendering.md) for full details.
 
 - **C# enum `None` members**: Conflicts with Python keyword. Use `none_of(enum_type)` from `pgvz/util.py` (reflects via `getattr`).
 - **Type annotations**: IronPython cannot handle annotations like `list[int]` or `tuple[int, int]` (tries to resolve them as .NET generics). Wrap them in quotes: `'list[int]'`, `'tuple[int, int]'`.
+- **WebSocket JSON**: JSON booleans (`true`/`false`) are not valid Python. When sending JSON over WebSocket to be parsed by `json.loads()`, always wrap it as a Python string literal (single quotes). The receiver side must strip outer quotes before `JSON.parse()` — the `repr()` response from the WebSocket wraps the result in quotes.
 
 ## Script framework (pgvz)
 
