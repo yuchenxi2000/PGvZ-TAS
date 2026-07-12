@@ -89,6 +89,7 @@
                             <el-checkbox v-model="cheatOption.wontLose">房主无敌</el-checkbox>
                             <el-checkbox v-model="cheatOption.zombieStop">僵尸停滞</el-checkbox>
                             <el-checkbox v-model="cheatOption.stopSpawning">暂停出怪</el-checkbox>
+                            <el-checkbox v-model="cheatOption.tasEnabled">启用TAS</el-checkbox>
                         </el-card>
                     </el-col>
                     <el-col :span="8">
@@ -1325,6 +1326,7 @@
                     'mushroomAwake',
                     'drawSquirrel',
                     'autoRestock',
+                    'tasEnabled',
                 ];
                 const cheatOption = reactive({});
                 optionConfig.forEach(item => {
@@ -1332,6 +1334,7 @@
                 });
                 cheatOption['autoCollect'] = true;
                 cheatOption['runBackground'] = true;
+                cheatOption['tasEnabled'] = true;
                 function setCheatOption(key, value) {
                     send(`sync_reg.apply('${JSON.stringify({cheat: {[key]: value}})}')`);
                 }

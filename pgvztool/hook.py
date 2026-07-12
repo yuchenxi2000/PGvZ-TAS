@@ -9,6 +9,7 @@ import Sexy.TodLib
 from pgvz import *
 from .cheat import cheat_option
 from .placer import placer
+from .tas import tas_manager
 
 # 关闭assertion，不然启动带命令行的游戏（Lawn.Console.exe）在输出过多时会卡死
 @LawnMod.MonoModUtils.HookTo(Sexy.Debug.ASSERT)
@@ -572,6 +573,22 @@ def Board__MouseDownInternal(orig, board: Lawn.Board, x: int, y: int, theClickCo
         x, y = board.mCamera.ScreenToBoardReplace(x, y)  # type: ignore
         if placer.try_place(board, x, y):
             return
+    # TAS 按钮点击
+    if cheat_option.tasEnabled and board.mApp.mGameScene == Lawn.GameScenes.Playing \
+        and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro) \
+        and theClickCount >= 0:
+        if tas_manager.buttons is not None:
+            for i, btn in enumerate(tas_manager.buttons):
+                if btn.mX <= x < btn.mX + btn.mWidth and btn.mY <= y < btn.mY + btn.mHeight:  # 必须要这样，不能用IsButtonDown()以及IsMouseOver()，不然手机上按按钮无效
+                    if i == 0:
+                        tas_manager.save()
+                    elif i == 1:
+                        tas_manager.undo()
+                    elif i == 2:
+                        tas_manager.redo()
+                    elif i == 3:
+                        tas_manager.frame_advance()
+                    return
     orig(board, x, y, theClickCount, isTouch)
     if placer.active and board.mCursorObject.mCursorType not in (Lawn.CursorType.Normal, Lawn.CursorType.Hammer):
         placer.active = False
@@ -692,6 +709,43 @@ def Board__Draw(orig, board: Lawn.Board, g: Sexy.Graphics):
         DrawWaveInfo(board, g)
     if _HasTrashcan(board) and not board.mApp.IsRogueConveyorbeltLevel():
         DrawTrashcan(board, g)
+    # TAS 按钮
+    if cheat_option.tasEnabled and board.mApp.mGameScene == Lawn.GameScenes.Playing \
+        and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
+        _DrawTasButtons(board, g)
+        _DrawTasFrameCounter(board, g)
+
+# TAS 按钮 — 右下角，懒初始化
+def _DrawTasButtons(board: Lawn.Board, g: Sexy.Graphics):
+    if tas_manager.buttons is None:
+        labels = ['Save', 'Undo', 'Redo', 'Adv']
+        btnH = Sexy.AtlasResources.IMAGE_BUTTON_LEFT.mHeight
+        tas_manager.buttons = []  # type: ignore
+        for i, label in enumerate(labels):
+            btn = Lawn.GameButton(9000 + i, board)
+            btn.mDrawStoneButton = True
+            btn.SetLabel(label)
+            btn.Resize(0, 0, 70, btnH)
+            tas_manager.buttons.append(btn)    # type: ignore
+    # 右下角竖排，等距
+    gap = 2
+    btnH = tas_manager.buttons[0].mHeight   # type: ignore
+    totalH = btnH * 4 + gap * 3
+    baseX = board.mWidth - 200
+    baseY = board.mHeight - totalH - 30
+    for i, btn in enumerate(tas_manager.buttons):    # type: ignore
+        btn.Resize(baseX, baseY + i * (btnH + gap), 70, btnH)
+        btn.Update()
+        btn.Draw(g)
+
+def _DrawTasFrameCounter(board: Lawn.Board, g: Sexy.Graphics):
+    """右下角显示 mMainCounter"""
+    font = Sexy.Resources.FONT_DWARVENTODCRAFT12
+    color = Sexy.SexyColor(255, 255, 255)
+    text = f'Frame: {board.mMainCounter}'
+    x = board.mWidth - 120
+    y = board.mHeight - 30
+    Sexy.TodLib.TodCommon.TodDrawString(g, text, x, y, font, color, Sexy.TodLib.DrawStringJustification.Right)
 
 # BUG FIX: 猫尾草数量多时，发射子弹会崩游戏，因为Sexy.TodLib.TrailHolder.AllocTrailFromDef在需要扩容时直接返回null而不是触发扩容
 @LawnMod.MonoModUtils.HookTo(Sexy.TodLib.TrailHolder.AllocTrailFromDef)

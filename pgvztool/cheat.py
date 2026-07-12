@@ -47,6 +47,7 @@ class CheatOption(Serializable):
         self.enableTrashcan = False
         self.showWaveInfo = False
         self.drawSquirrel = False
+        self.tasEnabled = True
 
     def ShowErrorInGame(self, title: str, msg: str):
         lawnapp = GetLawnApp()
