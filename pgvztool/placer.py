@@ -369,7 +369,7 @@ class Placer(Serializable):
             return
         NRow = 6 if board.StageHas6Rows() else 5
         for row in range(NRow):
-            self._AddLawnMower(row, Sexy.Constants.BOARD_EXTRA_ROOM - 21)
+            self._AddLawnMower(row, Sexy.Constants.BOARD_EXTRA_ROOM - 21 + 40)
     
     def StartLawnMower(self):
         board = GetBoard()
