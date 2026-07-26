@@ -10,7 +10,8 @@ from pgvz import *
 from .cheat import cheat_option
 from .placer import placer
 from .tas import tas_manager
-
+from .keybinds import build_reverse_map
+import System
 # 关闭assertion，不然启动带命令行的游戏（Lawn.Console.exe）在输出过多时会卡死
 @LawnMod.MonoModUtils.HookTo(Sexy.Debug.ASSERT)
 def Debug__ASSERT(orig, value: bool):
@@ -753,3 +754,13 @@ def TrailHolder__AllocTrailFromDef(orig, trailHolder: Sexy.TodLib.TrailHolder, t
     if trailHolder.mTrails.Count == trailHolder.mTrails.Capacity:
         trailHolder.mTrails.Capacity *= 2
     return orig(trailHolder, theRenderOrder, theDefinition)
+
+_key_reverse_map = build_reverse_map()
+
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.KeyChar)
+def Board__KeyChar(orig, board: Lawn.Board, theChar: Sexy.SexyChar):
+    ch = str(theChar.value_type)
+    mapped = _key_reverse_map.get(ch)
+    if mapped is not None:
+        theChar = Sexy.SexyChar(System.Char(ord(mapped)))  # type: ignore
+    orig(board, theChar)

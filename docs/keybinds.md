@@ -1,0 +1,68 @@
+# 自定义快捷键
+
+## 配置文件
+
+位置：和 `user_config.json` 同级目录下的 `keybinds.txt`
+
+| 平台 | 路径 |
+|---|---|
+| PC | `C:\Users\{用户名}\AppData\Roaming\ZBC\PlantGirlsVsZombies\keybinds.txt` |
+| 安卓 | `/storage/emulated/0/Android/data/net.pvz.pgvz.zbcteam/files/keybinds.txt` |
+
+格式：一行一个，`功能名 = 按键`，空行和 `#` 开头的行忽略。
+
+## 可用的功能名
+
+| 功能名 | 默认按键 | 说明 |
+|---|---|---|
+| `pause` | Space | 暂停/继续 |
+| `shovel` | `` ` `` | 拿起铲子 |
+| `accelerate` | Tab | 切换加速 |
+| `seed_1` ~ `seed_10` | 1~0 | 选种子包 |
+
+### 玉米炮快捷键 (cob)
+
+功能名格式：`cob_{col}_{row}`。只覆盖 col=2,4,6（泳池无尽经典布阵的炮位）。以下 = 左边是功能名，右边是默认按键：
+
+| ↓row \ col→ | col 2 | col 4 | col 6 |
+|---|---|---|---|
+| **row 1** | `cob_2_1 = q` | `cob_4_1 = a` | `cob_6_1 = z` |
+| **row 2** | `cob_2_2 = w` | `cob_4_2 = s` | `cob_6_2 = x` |
+| **row 3** | `cob_2_3 = e` | `cob_4_3 = d` | `cob_6_3 = c` |
+| **row 4** | `cob_2_4 = r` | `cob_4_4 = f` | `cob_6_4 = v` |
+| **row 5** | `cob_2_5 = t` | `cob_4_5 = g` | `cob_6_5 = b` |
+| **row 6** | `cob_2_6 = y` | `cob_4_6 = h` | `cob_6_6 = n` |
+
+> 默认按键是无大写的字符，如 `q` 而非 `Q`。配置文件里大小写均可。
+
+## 按键写法
+
+**可打印字符**直接写：`Q`, `1`, `` ` ``, `[`, `-` 等。
+
+**不可打印字符**写名字：
+
+| 名字 | 对应按键 |
+|---|---|
+| `Space` | 空格 |
+| `Tab` | 制表符 |
+| `Enter` | 回车 |
+
+以下按键**不能产生字符**，无法绑定：Shift, Ctrl, Alt, F1~F12, 方向键, Backspace, Delete, Esc。
+
+## 示例
+
+```
+# 将种子包1绑定到Q键
+seed_1 = Q
+
+# 暂停改成回车
+pause = Enter
+```
+
+## 注意事项
+
+- 编辑后需重启游戏，并打开网页连接修改器后才能生效（`pgvztool` 包在 WebSocket 连接时才被加载）
+- 语法错误的行会被忽略
+- 未知的功能名会被忽略
+- 每个按键只能绑定一个功能
+- 未绑定功能的按键会走游戏默认逻辑
