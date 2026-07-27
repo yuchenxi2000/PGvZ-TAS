@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>植物娘修改器</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.14.0/dist/index.min.css">
+    <link rel="stylesheet" href="./styles.css">
+</head>
+
+<body>
+    <div id="app" v-cloak>
+        <header class="app-header">
+            <div>
+                <h1>{{ t('app.title') }}</h1>
+                <p>{{ t('app.subtitle') }}</p>
+            </div>
+            <div class="header-actions">
+                <el-tag :type="connected ? 'success' : 'danger'" effect="light" size="large">
+                    {{ statusText }}
+                </el-tag>
+                <el-segmented v-model="language" :options="languageOptions" @change="setLanguage" />
+            </div>
+        </header>
+
+        <main class="app-shell">
+            <el-tabs v-model="activeTab" class="main-tabs">
+                <el-tab-pane :label="t('tabs.player')" name="player">
+                    <section class="panel-grid three">
+                        <div class="card-stack">
+                            <el-card shadow="never" class="tool-card">
+                                <template #header>{{ t('sections.resources') }}</template>
+                                <div class="form-stack">
+                                    <div class="resource-row">
+                                        <div class="resource-value">
+                                            <el-input-number v-model="sunValue" :min="0" :max="9990" size="small" />
+                                        </div>
+                                        <div class="resource-action">
+                                            <el-button type="primary" @click="send(`Sexy.GlobalStaticVars.gLawnApp.mBoard.mSunMoney = ${sunValue}`)">
+                                                {{ t('actions.setSun') }}
+                                            </el-button>
+                                        </div>
+                                    </div>
+                                    <div class="resource-row">
+                                        <div class="resource-value">
+                                            <el-input-number v-model="moneyValue" :min="0" :max="999999" size="small" />
+                                        </div>
+                                        <div class="resource-action">
+                                            <el-button type="warning" @click="send(`Sexy.GlobalStaticVars.gLawnApp.mPlayerInfo.mCoins = ${moneyValue}`)">
+                                                {{ t('actions.setMoney') }}
+                                            </el-button>
+                                        </div>
+                                    </div>
+                                    <div class="resource-row">
+                                        <div class="resource-value">
+                                            <el-input-number v-model="treeHeight" :min="0" :max="2147483647" size="small" />
+                                        </div>
+                                        <div class="resource-action">
+                                            <el-button type="warning" @click="send(`Sexy.GlobalStaticVars.gLawnApp.mPlayerInfo.mChallengeRecords[48] = ${treeHeight}`)">
+                                                {{ t('actions.setTreeHeight') }}
+                                            </el-button>
+                                        </div>
+                                    </div>
+                                    <div class="resource-row">
+                                        <div class="resource-value">
+                                            <el-input-number v-model="level" :min="1" :max="50" size="small" />
+                                        </div>
+                                        <div class="resource-action">
+                                            <el-button type="primary" @click="send(`cheat_option.SetAdventureLevel(${level})`)">
+                                                {{ t('actions.setAdventureLevel') }}
+                                            </el-button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </el-card>
+
+                            <el-card shadow="never" class="tool-card">
+                                <template #header>{{ t('sections.quickActions') }}</template>
+                                <div class="button-grid two">
+                                    <el-button type="primary" @click="send('Sexy.GlobalStaticVars.gLawnApp.KillDialog(19)\nSexy.GlobalStaticVars.gLawnApp.mBoard.FadeOutLevel()')">{{ t('actions.winNow') }}</el-button>
+                                    <el-button type="danger" @click="send('cheat_option.FailImmediately(Lawn.ZombieType.Normal)')">{{ t('actions.loseNow') }}</el-button>
+                                    <el-button type="success" @click="send('cheat_option.GetFinishedAccount()')">{{ t('actions.finishedAccount') }}</el-button>
+                                    <el-button @click="send('GetBoard().mShowShovel = True')">{{ t('actions.showShovel') }}</el-button>
+                                    <el-button @click="send('GetBoard().mChallenge.mChallengeStateCounter = 2147483647')">{{ t('actions.freezePortal') }}</el-button>
+                                </div>
+                            </el-card>
+                        </div>
+
+                        <check-group-card :title="t('sections.commonCheats')" :items="switchGroups.common" :model="cheatOption" :label="optionLabel"></check-group-card>
+                        <check-group-card :title="t('sections.featureCheats')" :items="switchGroups.features" :model="cheatOption" :label="optionLabel"></check-group-card>
+                    </section>
+                </el-tab-pane>
+
+                <el-tab-pane :label="t('tabs.world')" name="world">
+                    <section class="panel-grid four">
+                        <el-card shadow="never" class="tool-card">
+                            <template #header>{{ t('sections.typeSelection') }}</template>
+                            <div class="form-stack">
+                                <label class="field">
+                                    <span>{{ t('fields.seedType') }}</span>
+                                    <el-select v-model="selectedSeedType" filterable :placeholder="t('placeholders.seed')" @change="val => send(`placer.seedType = Lawn.SeedType.${val}`)">
+                                        <el-option v-for="item in seedTypes" :key="item.value" :label="dataLabel(item)" :value="item.value" />
+                                    </el-select>
+                                </label>
+                                <label class="field">
+                                    <span>{{ t('fields.zombieType') }}</span>
+                                    <el-select v-model="selectedZombieType" filterable :placeholder="t('placeholders.zombie')" @change="val => send(`placer.zombieType = Lawn.ZombieType.${val}`)">
+                                        <el-option v-for="item in zombieTypes" :key="item.value" :label="dataLabel(item)" :value="item.value" />
+                                    </el-select>
+                                </label>
+                                <div class="split-row">
+                                    <label class="field">
+                                        <span>{{ t('fields.row') }}</span>
+                                        <el-select v-model="selectedRow" filterable :placeholder="t('fields.row')">
+                                            <el-option v-for="item in selectRows" :key="item.value" :label="dataLabel(item)" :value="item.value" />
+                                        </el-select>
+                                    </label>
+                                    <label class="field">
+                                        <span>{{ t('fields.col') }}</span>
+                                        <el-select v-model="selectedCol" filterable :placeholder="t('fields.col')">
+                                            <el-option v-for="item in selectCols" :key="item.value" :label="dataLabel(item)" :value="item.value" />
+                                        </el-select>
+                                    </label>
+                                </div>
+                                <label class="field">
+                                    <span>{{ t('fields.packet') }}</span>
+                                    <el-select v-model="selectedPacketIdx" filterable :placeholder="t('fields.packet')">
+                                        <el-option v-for="item in packetIdx" :key="item.value" :label="dataLabel(item)" :value="item.value" />
+                                    </el-select>
+                                </label>
+                                <switch-row :label="t('fields.imitater')" v-model="isImitater" @change="val => send(`placer.imitater = ${pyBool(val)}`)"></switch-row>
+                                <switch-row :label="t('fields.mindCtrl')" v-model="mindCtrl" @change="val => send(`placer.mindCtrl = ${pyBool(val)}`)"></switch-row>
+                                <switch-row :label="t('fields.potReverse')" v-model="potLeft" @change="val => send(`placer.potReverse = ${pyBool(val)}`)"></switch-row>
+                            </div>
+                        </el-card>
+
+                        <el-card shadow="never" class="tool-card">
+                            <template #header>{{ t('sections.objectSelection') }}</template>
+                            <div class="form-stack">
+                                <label class="field">
+                                    <span>{{ t('fields.gridItem') }}</span>
+                                    <el-select v-model="selectedGridItem" filterable :placeholder="t('placeholders.gridItem')" @change="val => send(`placer.gridItemType = Lawn.GridItemType.${val}`)">
+                                        <el-option v-for="item in gridItemTypes" :key="item.value" :label="dataLabel(item)" :value="item.value" />
+                                    </el-select>
+                                </label>
+                                <label class="field">
+                                    <span>{{ t('fields.coinType') }}</span>
+                                    <el-select v-model="selectedCoin" filterable :placeholder="t('placeholders.coin')" @change="val => send(`placer.coinType = Lawn.CoinType.${val}`)">
+                                        <el-option v-for="item in coinTypes" :key="item.value" :label="dataLabel(item)" :value="item.value" />
+                                    </el-select>
+                                </label>
+                                <div class="split-row">
+                                    <label class="field">
+                                        <span>{{ t('fields.coinX') }}</span>
+                                        <el-input-number v-model="coinX" :min="0" :max="800" size="small" />
+                                    </label>
+                                    <label class="field">
+                                        <span>{{ t('fields.coinY') }}</span>
+                                        <el-input-number v-model="coinY" :min="0" :max="600" size="small" />
+                                    </label>
+                                </div>
+                                <label class="field">
+                                    <span>{{ t('fields.scaryPotType') }}</span>
+                                    <el-select v-model="selectedScaryPotType" filterable :placeholder="t('placeholders.scaryPotType')">
+                                        <el-option v-for="item in scaryPotType" :key="item.value" :label="dataLabel(item)" :value="item.value" />
+                                    </el-select>
+                                </label>
+                                <label class="field">
+                                    <span>{{ t('fields.scaryPotAppearance') }}</span>
+                                    <el-select v-model="selectedScaryPotAppearance" filterable :placeholder="t('placeholders.scaryPotAppearance')">
+                                        <el-option v-for="item in scaryPotAppearance" :key="item.value" :label="dataLabel(item)" :value="item.value" />
+                                    </el-select>
+                                </label>
+                                <label class="field">
+                                    <span>{{ t('fields.easyPlaceMode') }}</span>
+                                    <el-select v-model="easyPlaceMode" filterable :placeholder="t('placeholders.easyPlaceMode')" @change="value => send(`placer.SetEasyPlaceMode('${value}')`)">
+                                        <el-option v-for="item in easyPlaceModeList" :key="item.value" :label="dataLabel(item)" :value="item.value" />
+                                    </el-select>
+                                </label>
+                                <switch-row :label="t('fields.easyPlaceEnabled')" v-model="easyPlaceEnabled" @change="value => send(`placer.easyPlaceEnabled = ${pyBool(value)}`)"></switch-row>
+                            </div>
+                        </el-card>
+
+                        <el-card shadow="never" class="tool-card">
+                            <template #header>{{ t('sections.place') }}</template>
+                            <div class="button-stack">
+                                <el-button type="primary" @click="send(`placer.PlantOnBoard(${selectedRow}, ${selectedCol}, Lawn.SeedType.${selectedSeedType}, ${pyBool(isImitater)})`)">{{ t('actions.placePlant') }}</el-button>
+                                <el-button type="primary" @click="send(`placer.ZombieOnBoard(${selectedRow}, ${selectedCol}, Lawn.ZombieType.${selectedZombieType}, mind_ctrl=${pyBool(mindCtrl)})`)">{{ t('actions.placeZombie') }}</el-button>
+                                <el-button type="primary" @click="send(`placer.SetSeedPacket(${selectedPacketIdx}, Lawn.SeedType.${selectedSeedType}, ${pyBool(isImitater)})`)">{{ t('actions.setSeedPacket') }}</el-button>
+                                <el-button type="primary" @click="AddGridItem">{{ t('actions.placeGridItem') }}</el-button>
+                                <el-button type="primary" @click="send(`placer.AddCoinOnBoard(${coinX}, ${coinY}, Lawn.CoinType.${selectedCoin}, Lawn.SeedType.${selectedSeedType}, ${pyBool(potLeft)})`)">{{ t('actions.dropCoin') }}</el-button>
+                                <el-button @click="send(`placer.AddLadderSmart()`)">{{ t('actions.smartLadder') }}</el-button>
+                                <el-button @click="send(`cheat_option.GivePottedPlant(Lawn.SeedType.${selectedSeedType}, reverse=${pyBool(potLeft)})`)">{{ t('actions.givePottedPlant') }}</el-button>
+                                <el-button @click="send(`cheat_option.GiveAllPottedPlants()`)">{{ t('actions.giveAllPottedPlants') }}</el-button>
+                                <el-button @click="send(`placer.AddLawnMower()`)">{{ t('actions.placeMower') }}</el-button>
+                                <el-button @click="send(`placer.StartLawnMower()`)">{{ t('actions.startMower') }}</el-button>
+                                <el-button @click="send(`Sexy.GlobalStaticVars.gLawnApp.mBoard.mBonusLawnMowersRemaining = 2147483647`)">{{ t('actions.infiniteMowers') }}</el-button>
+                            </div>
+                        </el-card>
+
+                        <el-card shadow="never" class="tool-card">
+                            <template #header>{{ t('sections.remove') }}</template>
+                            <div class="button-stack">
+                                <el-button type="danger" @click="send(`placer.RemovePlantOnBoard()`)">{{ t('actions.removePlant') }}</el-button>
+                                <el-button type="danger" @click="send(`placer.RemoveZombieOnBoard()`)">{{ t('actions.removeZombie') }}</el-button>
+                                <el-button type="danger" @click="send(`placer.RemoveCoinOnBoard(Lawn.CoinType.${selectedCoin})`)">{{ t('actions.removeCoin') }}</el-button>
+                                <el-button type="danger" @click="send(`placer.RemoveGridItemOnBoard(-1, -1, Lawn.GridItemType.${selectedGridItem})`)">{{ t('actions.removeGridItem') }}</el-button>
+                                <el-button type="danger" @click="send(`placer.RemoveGridItemOnBoard(${selectedRow}, ${selectedCol}, Lawn.GridItemType.${selectedGridItem})`)">{{ t('actions.removeSelectedGridItem') }}</el-button>
+                                <el-button @click="send(`placer.RemoveTalisman()`)">{{ t('actions.removeTalisman') }}</el-button>
+                                <el-button @click="send(`placer.RemoveLawnMower()`)">{{ t('actions.removeMower') }}</el-button>
+                                <el-button @click="send(`placer.OpenScaryPotterOnBoard()`)">{{ t('actions.openScaryPot') }}</el-button>
+                                <el-button @click="send(`cheat_option.UnlockCrazyDaveSeed()`)">{{ t('actions.unlockSeeds') }}</el-button>
+                            </div>
+                        </el-card>
+                    </section>
+                </el-tab-pane>
+
+                <el-tab-pane :label="t('tabs.stage')" name="stage">
+                    <section class="panel-grid two">
+                        <check-group-card :title="t('sections.sceneCheats')" :items="switchGroups.scene" :model="cheatOption" :label="optionLabel"></check-group-card>
+                        <div class="card-stack">
+                            <el-card shadow="never" class="tool-card">
+                                <template #header>{{ t('sections.speed') }}</template>
+                                <el-radio-group v-model="speed" @change="value => send(`cheat_option.SetSpeed(${value})`)">
+                                    <el-radio-button v-for="item in speedOptions" :key="item" :label="item">{{ item }}</el-radio-button>
+                                </el-radio-group>
+                            </el-card>
+                            <el-card shadow="never" class="tool-card">
+                                <template #header>{{ t('sections.level') }}</template>
+                                <div class="form-stack">
+                                    <label class="field">
+                                        <span>{{ t('fields.level') }}</span>
+                                        <el-select v-model="selectedLevel" filterable :placeholder="t('placeholders.level')">
+                                            <el-option v-for="item in gameModes" :key="item.value" :label="dataLabel(item)" :value="item.value" />
+                                        </el-select>
+                                    </label>
+                                    <div class="button-grid two">
+                                        <el-button type="primary" @click="send(`cheat_option.EnterNewGame(Lawn.GameMode.${selectedLevel})`)">{{ t('actions.enterLevel') }}</el-button>
+                                        <el-button @click="send(`Sexy.GlobalStaticVars.gLawnApp.mGameMode = Lawn.GameMode.${selectedLevel}`)">{{ t('actions.chaosLevel') }}</el-button>
+                                    </div>
+                                    <div class="control-line">
+                                        <span>{{ t('fields.survivalStage') }}</span>
+                                        <el-input-number v-model="numSurvivalStage" :min="0" :max="2147483647" size="small" />
+                                        <el-button @click="send(`Sexy.GlobalStaticVars.gLawnApp.mBoard.mChallenge.mSurvivalStage = ${numSurvivalStage}`)">{{ t('actions.apply') }}</el-button>
+                                    </div>
+                                    <el-button type="primary" @click="send(`cheat_option.EnterMoonEndless()`)">{{ t('actions.enterMoonEndless') }}</el-button>
+                                </div>
+                            </el-card>
+                        </div>
+                    </section>
+                </el-tab-pane>
+
+                <el-tab-pane :label="t('tabs.lineup')" name="lineup">
+                    <section class="panel-grid two">
+                        <el-card shadow="never" class="tool-card">
+                            <template #header>{{ t('sections.zombieSpawn') }}</template>
+                            <el-checkbox-group v-model="selectedSetZbType" class="check-grid">
+                                <el-checkbox v-for="item in setZombieTypes" :key="item.value" :label="item.value">
+                                    {{ dataLabel(item) }}
+                                </el-checkbox>
+                            </el-checkbox-group>
+                            <div class="button-grid two">
+                                <el-button type="primary" @click="setZombies(true)">{{ t('actions.setNaturalSpawn') }}</el-button>
+                                <el-button type="warning" @click="setZombies(false)">{{ t('actions.setForcedSpawn') }}</el-button>
+                            </div>
+                        </el-card>
+
+                        <el-card shadow="never" class="tool-card">
+                            <template #header>{{ t('sections.lineup') }}</template>
+                            <div class="form-stack">
+                                <el-radio-group v-model="selectedScene" @change="selectedLineUp = ''">
+                                    <el-radio-button v-for="scene in scenes" :key="scene.value" :label="scene.value">
+                                        {{ scene.label }}
+                                    </el-radio-button>
+                                </el-radio-group>
+                                <el-select v-model="selectedLineUp" clearable :disabled="!selectedScene" :placeholder="t('placeholders.lineup')" @change="onSelectLineUp">
+                                    <el-option v-for="opt in currentLineupList" :key="opt.value" :label="opt.label" :value="opt.value" />
+                                </el-select>
+                                <el-input v-model="lineupCode" type="textarea" :rows="7" resize="vertical" />
+                                <div class="button-grid two">
+                                    <el-button type="primary" @click="sendLineupCode">{{ t('actions.applyLineup') }}</el-button>
+                                    <el-button @click="getLineupCode">{{ t('actions.getLineup') }}</el-button>
+                                </div>
+                            </div>
+                        </el-card>
+                    </section>
+                </el-tab-pane>
+
+                <el-tab-pane :label="t('tabs.custom')" name="custom">
+                    <el-card shadow="never" class="tool-card">
+                        <template #header>{{ t('sections.customCode') }}</template>
+                        <div class="button-grid two custom-actions">
+                            <el-button type="primary" @click="sendCustomCode">{{ t('actions.sendCode') }}</el-button>
+                            <el-button @click="customCode = ''">清空</el-button>
+                        </div>
+                        <el-input v-model="customCode" type="textarea" :rows="12" resize="vertical" :placeholder="t('placeholders.customCode')" />
+                        <p v-if="customCodeError" class="error-text">{{ customCodeError }}</p>
+                    </el-card>
+                </el-tab-pane>
+            </el-tabs>
+
+            <el-card shadow="never" class="result-card">
+                <template #header>
+                    <div class="result-header">
+                        <span>{{ t('sections.result') }}</span>
+                        <el-tag :type="lastResult.ok ? 'success' : 'danger'" effect="plain">
+                            {{ lastResult.ok ? t('status.ok') : t('status.failed') }}
+                        </el-tag>
+                    </div>
+                </template>
+                <pre>{{ resultText }}</pre>
+            </el-card>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.5.34/dist/vue.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/element-plus@2.14.0/dist/index.full.min.js"></script>
+    <script src="./js/i18n.js"></script>
+    <script src="./js/data.js"></script>
+    <script src="./js/protocol.js"></script>
+    <script src="./js/app.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,384 @@
+:root {
+    --page-bg: #f3f6f2;
+    --panel-bg: #ffffff;
+    --text-main: #202421;
+    --text-muted: #667067;
+    --border-soft: #dce5dd;
+    --accent: #2f7d4b;
+    --accent-soft: #e6f3ea;
+    --warning-soft: #fff4dd;
+    --danger-soft: #fff0f0;
+    --shadow-soft: 0 10px 30px rgba(36, 54, 44, 0.08);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-width: 320px;
+    color: var(--text-main);
+    background: var(--page-bg);
+    font-family: Inter, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+}
+
+[v-cloak] {
+    display: none;
+}
+
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border-soft);
+    background: rgba(255, 255, 255, 0.92);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.app-header h1 {
+    margin: 0;
+    font-size: 22px;
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+.app-header p {
+    margin: 4px 0 0;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.app-shell {
+    width: min(1480px, calc(100vw - 32px));
+    margin: 18px auto 28px;
+}
+
+.main-tabs {
+    --el-tabs-header-height: 44px;
+}
+
+.main-tabs > .el-tabs__header {
+    margin-bottom: 16px;
+}
+
+.panel-grid {
+    display: grid;
+    gap: 16px;
+    align-items: start;
+}
+
+.panel-grid.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.panel-grid.three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.panel-grid.four {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.tool-card,
+.result-card {
+    border-radius: 8px;
+    border-color: var(--border-soft);
+    box-shadow: var(--shadow-soft);
+}
+
+.tool-card.wide {
+    grid-column: 1 / -1;
+}
+
+.tool-card .el-card__header,
+.result-card .el-card__header {
+    padding: 13px 16px;
+    font-weight: 650;
+}
+
+.tool-card .el-card__body,
+.result-card .el-card__body {
+    padding: 16px;
+}
+
+.form-stack,
+.button-stack,
+.card-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.field > span,
+.switch-row span {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.3;
+}
+
+.split-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.control-line {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.8fr) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+}
+
+.control-line > span {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.3;
+}
+
+.control-line .el-button {
+    margin-left: 0;
+}
+
+.resource-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+}
+
+.resource-value,
+.resource-action {
+    min-width: 0;
+}
+
+.resource-value .el-input-number {
+    width: 100%;
+}
+
+.resource-action {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.resource-action .el-button {
+    min-width: 88px;
+}
+
+.control-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    min-width: 0;
+}
+
+.control-actions .el-input-number {
+    flex: 1 1 130px;
+    min-width: 120px;
+}
+
+.control-actions .el-button {
+    flex: 0 0 auto;
+    min-width: 64px;
+    margin-left: 0;
+}
+
+.switch-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    min-height: 36px;
+    gap: 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: #fbfdfb;
+}
+
+.button-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.button-grid.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.button-stack .el-button,
+.button-grid .el-button,
+.send-button {
+    width: 100%;
+    margin-left: 0;
+}
+
+.check-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px 12px;
+    margin-bottom: 14px;
+}
+
+.check-grid .el-checkbox,
+.option-check-grid .el-checkbox {
+    margin-right: 0;
+    min-width: 0;
+}
+
+.option-check-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+}
+
+.option-check-grid .el-checkbox {
+    min-height: 28px;
+    align-items: center;
+}
+
+.option-check-grid .el-checkbox__label {
+    white-space: normal;
+    line-height: 1.25;
+}
+
+.result-card {
+    margin-top: 16px;
+    background: #fbfcfb;
+}
+
+.result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+pre {
+    margin: 0;
+    max-height: 180px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #283028;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.error-text {
+    margin: 8px 0 0;
+    color: #c03639;
+    font-size: 13px;
+}
+
+.send-button {
+    margin-top: 12px;
+}
+
+.custom-actions {
+    margin-bottom: 12px;
+}
+
+.el-select,
+.el-input-number {
+    width: 100%;
+}
+
+@media (max-width: 1180px) {
+    .panel-grid.four {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .panel-grid.three {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .check-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .app-header {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 16px;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .app-shell {
+        width: min(100vw - 20px, 680px);
+        margin-top: 12px;
+    }
+
+    .panel-grid,
+    .panel-grid.two,
+    .panel-grid.three,
+    .panel-grid.four,
+    .button-grid,
+    .button-grid.two {
+        grid-template-columns: 1fr;
+    }
+
+    .check-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .option-check-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .resource-row {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .control-line {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .resource-action {
+        justify-content: stretch;
+    }
+
+    .resource-action .el-button {
+        width: 100%;
+    }
+
+    .split-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 520px) {
+    .check-grid,
+    .option-check-grid {
+        grid-template-columns: 1fr;
+    }
+}

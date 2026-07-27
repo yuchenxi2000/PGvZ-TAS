@@ -1,8 +1,8 @@
 """
 植物娘大战僵尸键控框架 PGvZ-TAS
 by yuchenxi2000
-2026.07.13 PGvZ-TAS v1.8.1, PGvZ v1.1.4-v1.1.8
 """
+from .version import PROJECT_VERSION, TOOL_VERSION, MOD_VERSION, SUPPORTED_GAME_VERSIONS
 from .card import Card, Shovel, SelectCards, LetsRock
 from .cob_manager import CobManager, GetCobRecoverTime
 from .global_var import gvar
@@ -16,6 +16,9 @@ import LawnMod
 script_manager = ScriptManager()
 # 默认注册一个自动收集（可收集盆栽），要关掉就调用auto_collector.Off()方法
 auto_collector = script_manager.Register(AutoCollect, runmode=ScriptRunMode.FOREVER)
+
+__version__ = PROJECT_VERSION
+__supported_game_versions__ = SUPPORTED_GAME_VERSIONS
 
 # 这个钩子起到补充作用，为了在主界面、选卡界面等仍能运行/管理脚本
 @LawnMod.MonoModUtils.HookTo(Lawn.LawnApp.UpdateFrames)
@@ -45,4 +48,6 @@ __all__ = [
     "IterAliveZombies", "IterAlivePlants", "IterAliveCoins", "IterAliveGridItems",
     "script_manager", "auto_collector",
     "SetZombies",
+    "PROJECT_VERSION", "TOOL_VERSION", "MOD_VERSION", "SUPPORTED_GAME_VERSIONS",
+    "__version__", "__supported_game_versions__",
 ]

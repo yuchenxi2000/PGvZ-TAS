@@ -1,11 +1,8 @@
-## Tests
-test*.py
-test/
+## Archives
+_archive/
 
 ## Coding Agent
 .claude/
-# .mcp.json
-# CLAUDE.md
 
 ## Python
 # Byte-compiled / optimized / DLL files

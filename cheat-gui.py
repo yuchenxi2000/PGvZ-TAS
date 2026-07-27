@@ -31,11 +31,6 @@ class _GUIHandler(http.server.SimpleHTTPRequestHandler):
         path = urllib.parse.unquote(path.split('?', 1)[0]).lstrip('/')
         gui_dir = os.path.join(modsDirPath, 'gui')
         result = os.path.join(gui_dir, path) if path else gui_dir
-        # 目录请求自动返回cheat-gui.html
-        if os.path.isdir(result):
-            gui = os.path.join(result, 'cheat-gui.html')
-            if os.path.exists(gui):
-                return gui
         return result
 
     def end_headers(self):
