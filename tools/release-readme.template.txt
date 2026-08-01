@@ -70,6 +70,18 @@ Adv：逐帧，运行一帧后暂停
 
 右下角还会显示 Frame 计数器，可用于精确控制操作时机。
 
+===== 自定义快捷键 =====
+
+可以重新绑定选择种子包、使用铲子、暂停、加速和玉米炮等快捷键。
+在 user_config.json 同级目录新建 keybinds.txt，每行填写一个“功能名 = 按键”，例如：
+
+seed_1 = Q
+pause = Enter
+
+修改后需重启游戏，并打开网页连接修改器后才能生效。
+已适配中文等常见非英文输入法下的字母和数字快捷键，桌面版还会自动关闭输入法选词框。
+完整配置说明：https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/keybinds.md
+
 ===== 常见问题排查 =====
 
 1. 打不开 http://localhost:58080
@@ -89,6 +101,10 @@ Adv：逐帧，运行一帧后暂停
 
 5. 文件复制后仍然异常
    请重新解压并复制。某些安卓文件管理器在解压或覆盖复制时可能漏文件。
+
+6. 自定义快捷键无效
+   修改 keybinds.txt 后请重启游戏，并打开网页连接修改器。
+   本修改器已适配常见非英文输入法；如果当前输入法仍然拦截快捷键，请切换到英文输入法后再试。
 
 ===== 源码和许可证 =====
 
@@ -176,6 +192,18 @@ Adv: advance exactly one frame and pause
 
 A Frame counter is also shown for frame-precise play.
 
+===== Custom Keybinds =====
+
+You can rebind seed packet selection, shovel, pause, acceleration, cob cannons, and other shortcuts.
+Create keybinds.txt next to user_config.json and add one "action = key" entry per line, for example:
+
+seed_1 = Q
+pause = Enter
+
+Restart the game after editing the file, then open and connect the web console to load the keybinds.
+Letter and number shortcuts support common non-English input methods. On desktop, IME candidate windows are also dismissed automatically.
+Full configuration guide: https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/keybinds.md
+
 ===== Troubleshooting =====
 
 1. Cannot open http://localhost:58080
@@ -195,6 +223,10 @@ A Frame counter is also shown for frame-precise play.
 
 5. Still broken after copying files
    Extract and copy again. Some Android file managers may skip or damage files during extraction or overwrite.
+
+6. Custom keybinds do not work
+   Restart the game after editing keybinds.txt, then open and connect the web console.
+   Common non-English input methods are supported. If the current input method still intercepts shortcuts, switch to an English input method and try again.
 
 ===== Source and License =====
 

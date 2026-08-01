@@ -10,7 +10,7 @@ from pgvz import *
 from .cheat import cheat_option
 from .placer import placer
 from .tas import tas_manager
-from .keybinds import build_reverse_map
+from .keybinds import build_physical_key_map, build_reverse_map
 import System
 # 关闭assertion，不然启动带命令行的游戏（Lawn.Console.exe）在输出过多时会卡死
 @LawnMod.MonoModUtils.HookTo(Sexy.Debug.ASSERT)
@@ -756,10 +756,59 @@ def TrailHolder__AllocTrailFromDef(orig, trailHolder: Sexy.TodLib.TrailHolder, t
     return orig(trailHolder, theRenderOrder, theDefinition)
 
 _key_reverse_map = build_reverse_map()
+_physical_key_map = build_physical_key_map()
+_dispatching_physical_key = False
+
+
+def _reset_desktop_ime_composition(board: Lawn.Board):
+    """取消桌面 SDL 输入法的当前组合串，关闭候选框。"""
+    ime_handler = board.mWidgetManager.mIMEHandler
+    if ime_handler is None or str(ime_handler.GetType().Name) != 'SdlIMEHandler':  # type: ignore
+        return
+    # MonoGame 启动时 SDL 文本输入可能已开启，但 IMEHandler.Enabled 仍为
+    # False。先 Start 同步状态，再 Stop 取消组合，最后 Start 恢复标点输入。
+    ime_handler.StartTextComposition()
+    ime_handler.StopTextComposition()
+    ime_handler.StartTextComposition()
+
+
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.KeyDown)
+def Board__KeyDown(orig, board: Lawn.Board, theKey: Sexy.KeyCode):
+    """用物理字母/数字键触发快捷键，绕过输入法对 KeyChar 的截获。"""
+    global _dispatching_physical_key
+    orig(board, theKey)
+    keycode = int(theKey)
+    mapped = _physical_key_map.get(keycode)
+    if mapped is None:
+        return
+    # Shift+顶排数字输入的是标点，仍交给 KeyChar 按键盘布局处理。
+    if ord('0') <= keycode <= ord('9'):
+        key_down = board.mWidgetManager.mKeyDown
+        if key_down[160] or key_down[161]:  # LeftShift / RightShift
+            return
+    _dispatching_physical_key = True
+    try:
+        board.KeyChar(Sexy.SexyChar(System.Char(ord(mapped))))  # type: ignore
+    finally:
+        _dispatching_physical_key = False
+    if ord('A') <= keycode <= ord('Z'):
+        _reset_desktop_ime_composition(board)
 
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.KeyChar)
 def Board__KeyChar(orig, board: Lawn.Board, theChar: Sexy.SexyChar):
     ch = str(theChar.value_type)
+    if _dispatching_physical_key:
+        # KeyDown 传入的已经是默认功能字符，不能再次经过自定义映射。
+        orig(board, theChar)
+        return
+    # 英文输入法还会在 KeyDown 后产生 KeyChar。字母/数字快捷键已由上面的
+    # KeyDown 钩子处理，这里丢弃文本事件，避免一次按键触发两次。
+    if len(ch) == 1:
+        lower = ch.lower()
+        if 'a' <= lower <= 'z' and ord(lower.upper()) in _physical_key_map:
+            return
+        if '0' <= ch <= '9' and ord(ch) in _physical_key_map:
+            return
     mapped = _key_reverse_map.get(ch)
     if mapped is not None:
         theChar = Sexy.SexyChar(System.Char(ord(mapped)))  # type: ignore

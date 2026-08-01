@@ -78,3 +78,36 @@ def build_reverse_map() -> 'dict[str, str]':
         if cfg_ch.isalpha():
             result[cfg_ch.swapcase()] = def_ch
     return result
+
+
+def _physical_keycodes(ch: str) -> 'tuple[int, ...]':
+    """返回 ASCII 字母或数字对应的 MonoGame KeyCode。"""
+    lower = ch.lower()
+    if len(ch) == 1 and 'a' <= lower <= 'z':
+        return (ord(lower.upper()),)
+    if len(ch) == 1 and '0' <= ch <= '9':
+        # 顶排数字和 NumPad0~9。
+        return (ord(ch), 96 + int(ch))
+    return ()
+
+
+def build_physical_key_map() -> 'dict[int, str]':
+    """返回 {字母/数字 KeyCode -> 默认按键字符} 映射。
+
+    字母和数字的 KeyChar 都可能被输入法截获，但 MonoGame 的 KeyDown
+    仍会产生。标点依赖键盘布局和 Shift 状态，因此不在这里猜测。
+    """
+    result = {}
+    # 未被重绑定的游戏原生字母和数字快捷键也要走 KeyDown。
+    for def_ch in _DEFAULT.values():
+        for keycode in _physical_keycodes(def_ch):
+            result[keycode] = def_ch
+
+    binds = _load_config()
+    for name, def_ch in _DEFAULT.items():
+        cfg_ch = binds.get(name, def_ch)
+        if cfg_ch == def_ch:
+            continue
+        for keycode in _physical_keycodes(cfg_ch):
+            result[keycode] = def_ch
+    return result
