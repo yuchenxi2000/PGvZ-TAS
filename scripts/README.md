@@ -26,10 +26,6 @@
    script_manager.Unregister(script_pe12)
    ```
 
-> `__init__.py`没什么用，单纯为了让第二种方法能够成功import
-> 
-> 因为IronPython的Python版本太老了，竟然不支持无`__init__.py`的Python模块！
-
 ## 脚本功能简介
 
 1. beghouled.py: 宝石迷阵、宝石迷阵转转看自动脚本
