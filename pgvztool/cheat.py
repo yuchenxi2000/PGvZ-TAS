@@ -33,6 +33,7 @@ class CheatOption(Serializable):
         self.butterPult = False
         self.doubleGatlingpea = False
         self.fullAreaGloomshroom = False
+        self.planternAlwaysTransform = False
         self.enableGlove = False
         self.zombieStop = False
         self.chomperNoCooling = False
@@ -247,45 +248,59 @@ class CheatOption(Serializable):
         # 为了在图鉴里显示红眼巨人
         if playerinfo.mChallengeRecords[12] < 10:
             playerinfo.mChallengeRecords[12] = 10
-        # 紫卡
-        for i in range(9):
-            playerinfo.mPurchases[i] = 1
-        # 花园用具，注意钻石水壶需要填2
-        playerinfo.mPurchases[13] = 2
-        playerinfo.mPurchases[14] = 1020
-        playerinfo.mPurchases[15] = 1020
-        for i in range(16, 20):
-            playerinfo.mPurchases[i] = 1
-        # 蜗牛
-        playerinfo.mPurchases[20] = 1
-        # 卡槽
-        playerinfo.mPurchases[21] = 4
-        # 割草机
-        playerinfo.mPurchases[22] = 1
-        playerinfo.mPurchases[23] = 1
-        # 钉耙
-        playerinfo.mPurchases[24] = 10
-        # 水族馆
-        playerinfo.mPurchases[25] = 1
-        # 巧克力，最多999
-        playerinfo.mPurchases[26] = 1999
-        # 不知道什么
-        playerinfo.mPurchases[27] = 1
-        # 树肥
-        playerinfo.mPurchases[28] = 1010
-        # （懒得写注释了）
-        for i in range(29, 36):
-            playerinfo.mPurchases[i] = 1
-        # 卡组
-        playerinfo.mPurchases[36] = 4
-        # 夜晚绿房
-        playerinfo.mPurchases[37] = 1
-        # 猫尾草皮肤
-        playerinfo.mPurchases[38] = 1
+        store_purchases = [
+            (Lawn.StoreItem.STORE_ITEM_PLANT_GATLINGPEA, 1),         # 紫卡：机枪豌豆
+            (Lawn.StoreItem.STORE_ITEM_PLANT_TWINSUNFLOWER, 1),      # 紫卡：双子向日葵
+            (Lawn.StoreItem.STORE_ITEM_PLANT_GLOOMSHROOM, 1),        # 紫卡：忧郁菇
+            (Lawn.StoreItem.STORE_ITEM_PLANT_CATTAIL, 1),            # 紫卡：猫尾草
+            (Lawn.StoreItem.STORE_ITEM_PLANT_WINTERMELON, 1),        # 紫卡：冰瓜
+            (Lawn.StoreItem.STORE_ITEM_PLANT_GOLD_MAGNET, 1),        # 紫卡：吸金磁
+            (Lawn.StoreItem.STORE_ITEM_PLANT_SPIKEROCK, 1),          # 紫卡：地刺王
+            (Lawn.StoreItem.STORE_ITEM_PLANT_COBCANNON, 1),          # 紫卡：玉米加农炮
+            (Lawn.StoreItem.STORE_ITEM_PLANT_IMITATER, 1),           # 模仿者
+            (Lawn.StoreItem.STORE_ITEM_GOLD_WATERINGCAN, 2),         # 花园用具：钻石水壶，购买状态需要填2
+            (Lawn.StoreItem.STORE_ITEM_FERTILIZER, 1020),            # 花园用具：花肥
+            (Lawn.StoreItem.STORE_ITEM_BUG_SPRAY, 1020),             # 花园用具：杀虫剂
+            (Lawn.StoreItem.STORE_ITEM_PHONOGRAPH, 1),               # 花园用具：留声机
+            (Lawn.StoreItem.STORE_ITEM_GARDENING_GLOVE, 1),          # 花园用具：园艺手套
+            (Lawn.StoreItem.STORE_ITEM_MUSHROOM_GARDEN, 1),          # 花园：蘑菇园
+            (Lawn.StoreItem.STORE_ITEM_WHEEL_BARROW, 1),             # 花园用具：手推车
+            (Lawn.StoreItem.STORE_ITEM_STINKY_THE_SNAIL, 1),         # 蜗牛
+            (Lawn.StoreItem.STORE_ITEM_PACKET_UPGRADE, 4),           # 卡槽
+            (Lawn.StoreItem.STORE_ITEM_POOL_CLEANER, 1),             # 泳池割草机
+            (Lawn.StoreItem.STORE_ITEM_ROOF_CLEANER, 1),             # 屋顶割草机
+            (Lawn.StoreItem.STORE_ITEM_RAKE, 10),                    # 钉耙
+            (Lawn.StoreItem.STORE_ITEM_AQUARIUM_GARDEN, 1),          # 花园：水族馆
+            (Lawn.StoreItem.STORE_ITEM_CHOCOLATE, 1999),             # 巧克力，最多999
+            (Lawn.StoreItem.STORE_ITEM_TREE_OF_WISDOM, 1),           # 智慧树
+            (Lawn.StoreItem.STORE_ITEM_TREE_FOOD, 1010),             # 树肥
+            (Lawn.StoreItem.STORE_ITEM_FIRSTAID, 1),                 # 坚果急救术
+            (Lawn.StoreItem.STORE_ITEM_GARLICFIRSTAID, 1),           # 大蒜急救术
+            (Lawn.StoreItem.STORE_ITEM_PLANT_SUPER_CHOMPER, 1),      # 超级大嘴花
+            (Lawn.StoreItem.STORE_ITEM_PLANT_PICKLED_PEPPER, 1),     # 泡椒
+            (Lawn.StoreItem.STORE_ITEM_PLANT_FIRE_SHROOM, 1),        # 火蘑菇
+            (Lawn.StoreItem.STORE_ITEM_PLANT_AGAVE, 1),              # 龙舌兰
+            (Lawn.StoreItem.STORE_ITEM_AGAVE_SKILL, 1),              # 龙舌兰技能
+            (Lawn.StoreItem.STORE_ITEM_CARD_GROUP_UPGRADE, 4),       # 卡组
+            (Lawn.StoreItem.STORE_ITEM_GREENHOUSE_NIGHT, 1),         # 花园：夜晚绿房
+            (Lawn.StoreItem.STORE_ITEM_CATTAIL_DRIVER_HYPNO, 1),     # 猫尾草皮肤
+            (Lawn.StoreItem.STORE_ITEM_FUMESHROOM_GNOME, 1),         # 菲米爱的互动小屋
+        ]
+        for store_item, purchase_count in store_purchases:
+            playerinfo.mPurchases[int(store_item)] = purchase_count
         # 刷新显示
         if lawnapp.mGameScene == Lawn.GameScenes.Menu:
+            almanac_dialog = lawnapp.GetDialog(3)
             lawnapp.KillGameSelector()
             lawnapp.ShowGameSelector()
+            # 图鉴的返回监听器指向旧主菜单，需要改绑并恢复图鉴焦点
+            if almanac_dialog is not None:
+                almanac_dialog.mListener = lawnapp.mGameSelector  # type: ignore
+                lawnapp.mWidgetManager.SetFocus(almanac_dialog)
+        elif lawnapp.mGameScene == Lawn.GameScenes.Challenge:
+            page = lawnapp.mChallengeScreen.mPageIndex
+            lawnapp.KillChallengeScreen()
+            lawnapp.ShowChallengeScreen(page)
 
     def SetSpeed(self, speed: float):
         fast = speed >= 1.0

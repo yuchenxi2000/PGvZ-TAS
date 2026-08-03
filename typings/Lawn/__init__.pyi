@@ -3,7 +3,8 @@ from Sexy import Widget, TRect, Insets, WidgetContainer, FlagsMod, WidgetManager
 from System.Collections.Generic import List_1, LinkedListNode_1, LinkedList_1, Dictionary_2, IEnumerable_1
 from Microsoft.Xna.Framework import Color, Vector2, GameTime
 from System import Array_1, IEquatable_1, TimeSpan, DateTime, IComparable, Exception
-from Sexy.TodLib import Reanimation, TodWeightedGridArray, TodWeightedArray, TodParticleSystem, TodSmoothArray, ParticleEffect, TodCurves, DrawStringJustification, FilterEffectType, ParticleParams, ReanimationParams, TodStringListFormat, TrailParams, EffectSystem, TodFoley, FoleyType, ReanimationType, ReanimLoopType, Attachment, DataArray_1
+from Sexy.TodLib import Reanimation, TodWeightedGridArray, TodWeightedArray, TodParticleSystem, TodSmoothArray, ParticleEffect, TodCurves, DrawStringJustification, FilterEffectType, DataArray_1, ParticleParams, ReanimationParams, TodStringListFormat, TrailParams, EffectSystem, TodFoley, FoleyType, ReanimationType, ReanimLoopType, Attachment
+from Spine import AnimationState
 from Microsoft.Xna.Framework.Content import ContentManager
 from Microsoft.Xna.Framework.Graphics import Texture2D, SpriteFont, GraphicsDevice
 from System.Collections.Concurrent import ConcurrentQueue_1
@@ -2029,7 +2030,8 @@ class Comics(typing.SupportsInt):
     CartoonImitater : Comics # 17
     CartoonSun : Comics # 18
     CartoonHypnoshroom : Comics # 19
-    ComicsCount : Comics # 20
+    CartoonFumeshroom : Comics # 20
+    ComicsCount : Comics # 21
 
 
 class ComicSelector(LawnDialog):
@@ -2574,11 +2576,13 @@ class DropLootType(typing.SupportsInt):
 
 class DynamicTachieWidget(Widget):
     @typing.overload
-    def __init__(self, skelPath: str) -> None: ...
+    def __init__(self, skelPath: str, displayTransform: DynamicTachieWidget.DisplayTransform, theApp: LawnApp) -> None: ...
     @typing.overload
-    def __init__(self, skelPath: str, displayTransform: DynamicTachieWidget.DisplayTransform) -> None: ...
+    def __init__(self, skelPath: str, theApp: LawnApp) -> None: ...
     FullRect : TRect
+    mApp : LawnApp
     mClip : bool
+    mCoins : DataArray_1[Coin]
     mColors : List_1[Color]
     mDisabled : bool
     mDoFinger : bool
@@ -2618,10 +2622,11 @@ class DynamicTachieWidget(Widget):
     def Dispose(self) -> None: ...
     def Draw(self, g: Graphics) -> None: ...
     def DrawOverlay(self, g: Graphics) -> None: ...
+    def FumeshroomReward(self) -> None: ...
     def MouseDown(self, x: int, y: int, theBtnNum: int, theClickCount: int) -> None: ...
     def MouseDrag(self, x: int, y: int) -> None: ...
     def MouseUp(self, x: int, y: int, theBtnNum: int, theClickCount: int) -> None: ...
-    def PlayInteractionAnimation(self, animationName: str, transitionFrames: int) -> bool: ...
+    def PlayInteractionAnimation(self, animationName: str, transitionFrames: int, animationCompleteAction: AnimationState.TrackEntryDelegate = ...) -> bool: ...
     def Resize(self, theX: int, theY: int, theWidth: int, theHeight: int) -> None: ...
     def RetractCloseButton(self) -> None: ...
     def ToggleCloseButton(self) -> None: ...
@@ -2681,6 +2686,21 @@ class DynamicTachieWidget(Widget):
         Touch : DynamicTachieWidget.TouchArea # 0
         Touch2 : DynamicTachieWidget.TouchArea # 1
         Touch3 : DynamicTachieWidget.TouchArea # 2
+
+
+    class TouchRewards(typing.SupportsInt):
+        @typing.overload
+        def __init__(self, value : int) -> None: ...
+        @typing.overload
+        def __init__(self, value : int, force_if_true: bool) -> None: ...
+        def __int__(self) -> int: ...
+        
+        # Values:
+        FumeshroomTouch1 : DynamicTachieWidget.TouchRewards # 0
+        FumeshroomTouch2 : DynamicTachieWidget.TouchRewards # 1
+        FumeshroomTouch3 : DynamicTachieWidget.TouchRewards # 2
+        NumTouchRewards : DynamicTachieWidget.TouchRewards # 3
+        Invalid : DynamicTachieWidget.TouchRewards # -1
 
 
 
@@ -3276,6 +3296,7 @@ class GameSelector(Widget, QuickPlayWidgetListener, MiniGamesWidgetListener, Alm
     mFadeInCounter : int
     mFlowerReanimID : Array_1[Reanimation]
     mFullScreenButton : DialogButton
+    mFumeshroomGnomeButton : DialogButton
     mHalfDeltaHeight : int
     mHalfDeltaWidth : int
     mHasAlpha : bool
@@ -3481,6 +3502,7 @@ class GameSelectorButtons(typing.SupportsInt):
     Community : GameSelectorButtons # 126
     FullScreen : GameSelectorButtons # 127
     Trophy : GameSelectorButtons # 128
+    FumeshroomGnome : GameSelectorButtons # 129
 
 
 class GameType(typing.SupportsInt):
@@ -4229,6 +4251,7 @@ class LawnApp(SexyAppBase):
     def CanDoRegisterDialog(self) -> bool: ...
     def CanPauseNow(self) -> bool: ...
     def CanShowAlmanac(self) -> bool: ...
+    def CanShowFumeshroomGnome(self) -> bool: ...
     def CanShowStore(self) -> bool: ...
     def CanShowZenGarden(self) -> bool: ...
     def CanSpawnYetis(self) -> bool: ...
@@ -5269,7 +5292,8 @@ class MusicTune(typing.SupportsInt):
     FinalBossBrainiacManiac : MusicTune # 11
     ZenGarden : MusicTune # 12
     FinalBoss2 : MusicTune # 13
-    MusicTuneCount : MusicTune # 14
+    ZenGardenSH : MusicTune # 14
+    MusicTuneCount : MusicTune # 15
     None_ : MusicTune # -1
 
 
@@ -5619,6 +5643,7 @@ class Plant(GameObject):
     def UpdateTanglekelp(self) -> None: ...
     def UpdateTorchwood(self) -> None: ...
     def UpdateUmbrella(self) -> None: ...
+    def UseHeadReanim(self) -> bool: ...
     # Skipped FindTargetAndFire due to it being static, abstract and generic.
 
     FindTargetAndFire : FindTargetAndFire_MethodGroup
@@ -5933,7 +5958,14 @@ class PlantVoice(abc.ABC):
         Special_Zorrose_Disable : PlantVoice.VoiceType # 28
         Special_Gatlingpea_Attack1 : PlantVoice.VoiceType # 29
         Special_Gatlingpea_Attack2 : PlantVoice.VoiceType # 30
-        NumSpecialTypes : PlantVoice.VoiceType # 31
+        Special_Fumeshroom_Touch_Enter_1 : PlantVoice.VoiceType # 31
+        Special_Fumeshroom_Touch_Enter_2 : PlantVoice.VoiceType # 32
+        Special_Fumeshroom_Touch1 : PlantVoice.VoiceType # 33
+        Special_Fumeshroom_Touch2_1 : PlantVoice.VoiceType # 34
+        Special_Fumeshroom_Touch2_2 : PlantVoice.VoiceType # 35
+        Special_Fumeshroom_Touch3_1 : PlantVoice.VoiceType # 36
+        Special_Fumeshroom_Touch3_2 : PlantVoice.VoiceType # 37
+        NumSpecialTypes : PlantVoice.VoiceType # 38
 
 
 
@@ -5980,6 +6012,7 @@ class PlayerInfo:
     mIsInZenTutorial : bool
     mIZombieScore : int
     mIZombieUnlocked : int
+    mLastCollectedDynamicCoins : List_1[DateTime]
     mLastSeenMoreGames : DateTime
     mLastStinkyChocolateTime : DateTime
     mLevel : int
@@ -6537,6 +6570,7 @@ class SaveFileVersion(typing.SupportsInt):
     NewLayout600 : SaveFileVersion # 11
     Layout500pMode : SaveFileVersion # 12
     OptionShowName : SaveFileVersion # 13
+    FumeshroomDynamic : SaveFileVersion # 14
 
 
 class ScaryPotType(typing.SupportsInt):
@@ -7113,6 +7147,7 @@ class StoreItem(typing.SupportsInt):
     STORE_ITEM_GREENHOUSE_NIGHT : StoreItem # 37
     STORE_ITEM_CATTAIL_DRIVER_HYPNO : StoreItem # 38
     STORE_ITEM_CATTAIL_DRIVER : StoreItem # 39
+    STORE_ITEM_FUMESHROOM_GNOME : StoreItem # 40
     STORE_ITEM_INVALID : StoreItem # -1
 
 
@@ -7858,6 +7893,7 @@ class ZenGarden(ButtonListener, StoreListener):
     gAquariumGridPlacement : Array_1[SpecialGridPlacement]
     gGreenhouseGridPlacement : Array_1[SpecialGridPlacement]
     mApp : LawnApp
+    mBackFromInteractionButton : NewLawnButton
     mBoard : Board
     mFeedButton : NewLawnButton
     mGardenType : GardenType

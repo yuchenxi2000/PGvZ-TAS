@@ -7,6 +7,7 @@ import LawnMod
 import Sexy
 import Sexy.TodLib
 from pgvz import *
+from pgvz.rng import rng_manip
 from .cheat import cheat_option
 from .placer import placer
 from .tas import tas_manager
@@ -54,6 +55,24 @@ def Board__CanPlantAt(orig, board: Lawn.Board, gridX: int, gridY: int, seedtype:
         return Lawn.PlantingReason.Ok
     else:
         return orig(board, gridX, gridY, seedtype, ismove)
+
+# 路灯花变身概率锁定为100%
+@LawnMod.MonoModUtils.HookTo(Lawn.Plant.PlantInitialize)
+def Plant__PlantInitialize(orig, plant: Lawn.Plant, gridX: int, gridY: int, seedType: Lawn.SeedType, imitaterType: Lawn.SeedType):
+    if seedType != Lawn.SeedType.Plantern or not cheat_option.planternAlwaysTransform:
+        return orig(plant, gridX, gridY, seedType, imitaterType)
+
+    had_override = 100 in rng_manip.forced_int_by_ceiling
+    old_value = rng_manip.forced_int_by_ceiling.get(100)
+    rng_manip.forced_int_by_ceiling[100] = 0
+    try:
+        return orig(plant, gridX, gridY, seedType, imitaterType)
+    finally:
+        if had_override:
+            rng_manip.forced_int_by_ceiling[100] = old_value
+        else:
+            del rng_manip.forced_int_by_ceiling[100]
+
 @LawnMod.MonoModUtils.HookTo(Lawn.Challenge.CanPlantAt)
 def Challenge__CanPlantAt(orig, challenge: Lawn.Challenge, gridX: int, gridY: int, seedtype: Lawn.SeedType):
     if cheat_option.plantAnyWhere:

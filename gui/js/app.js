@@ -149,6 +149,7 @@ const app = createApp({
                 'butterPult',
                 'doubleGatlingpea',
                 'fullAreaGloomshroom',
+                'planternAlwaysTransform',
             ],
             scene: [
                 'noFog',

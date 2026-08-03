@@ -10,6 +10,8 @@ class RNGManip:
     def __init__(self) -> None:
         self.enabled = False
         self.next_rand: 'list[int | float]' = []
+        # 按随机上限临时覆盖整数随机结果，供局部Hook使用
+        self.forced_int_by_ceiling = {}
 
 rng_manip = RNGManip()
 
@@ -28,6 +30,10 @@ def RandomNumbers__NextNumber(orig):
 
 @LawnMod.MonoModUtils.As(Sexy.RandomNumbers.NextNumber.Overloads[System.Int32])  # type: ignore
 def RandomNumbers__NextNumber2(orig, n):
+    if n in rng_manip.forced_int_by_ceiling:
+        rng = rng_manip.forced_int_by_ceiling[n]
+        Sexy.Debug.Log(f'forced rng: {rng}')
+        return rng
     if rng_manip.enabled:
         try:
             rng = rng_manip.next_rand.pop(0)
