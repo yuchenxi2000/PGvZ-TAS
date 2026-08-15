@@ -86,6 +86,12 @@ class Placer(Serializable):
     def toggle(self):
         self.active = not self.active
 
+    def can_toggle(self, board: Lawn.Board):
+        return self.easyPlaceEnabled and board.mApp.mGameScene == Lawn.GameScenes.Playing \
+            and board.CanInteractWithBoardButtons() \
+            and board.mCursorObject.mCursorType in (Lawn.CursorType.Normal, Lawn.CursorType.Hammer) \
+            and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro)
+
     def try_place(self, board: Lawn.Board, x: int, y: int):
         """轻松放置：根据当前模式放置"""
         col, row = PixelToGrid(board, (x, y))

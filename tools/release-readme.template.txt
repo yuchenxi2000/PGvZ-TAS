@@ -72,7 +72,7 @@ Adv：逐帧，运行一帧后暂停
 
 ===== 自定义快捷键 =====
 
-可以重新绑定选择种子包、使用铲子、暂停、加速和玉米炮等快捷键。
+可以重新绑定选择种子包、铲子、手套、轻松放置、TAS 按钮、暂停、加速和玉米炮等快捷键。
 在 user_config.json 同级目录新建 keybinds.txt，每行填写一个“功能名 = 按键”，例如：
 
 seed_1 = Q
@@ -194,7 +194,7 @@ A Frame counter is also shown for frame-precise play.
 
 ===== Custom Keybinds =====
 
-You can rebind seed packet selection, shovel, pause, acceleration, cob cannons, and other shortcuts.
+You can rebind seed packet selection, shovel, glove, quick place, TAS actions, pause, acceleration, cob cannons, and other shortcuts.
 Create keybinds.txt next to user_config.json and add one "action = key" entry per line, for example:
 
 seed_1 = Q

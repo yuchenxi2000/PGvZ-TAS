@@ -27,7 +27,7 @@ See [docs/install.md](docs/install.md) (Chinese) for detailed installation steps
 - **Item placement**: Select plant/zombie/item types and properties in the web UI, then click to place them on the field
 - **Quick place**: Check "轻松放置", choose a placement mode, click the Taco icon (to the right of the shovel) in-game to activate, left-click to place, right-click to exit
 - **TAS tool**: Check "启用 TAS" in "常用修改". Four buttons appear in the bottom-right corner — Save, Undo (go back to previous save; auto-saves current state first when live), Redo (go forward to next save), Adv (advance one frame then pause). A frame counter is also displayed. Use these for frame-precise control, similar to emulator TAS tools
-- **Custom keybinds**: Rebind seed packet selection, shovel, pause and other keys. Common non-English input methods are supported. See [docs/keybinds.md](docs/keybinds.md)
+- **Custom keybinds**: Rebind seed packet selection, shovel, glove, quick place, TAS actions, pause and other keys. Common non-English input methods are supported. See [docs/keybinds.md](docs/keybinds.md)
 
 Below is a visual guide for the quick-place and TAS features:
 

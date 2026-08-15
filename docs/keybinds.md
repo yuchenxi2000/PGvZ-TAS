@@ -17,8 +17,16 @@
 |---|---|---|
 | `pause` | Space | 暂停/继续 |
 | `shovel` | `` ` `` | 拿起铲子 |
+| `glove` | `-` | 拿起手套 |
+| `easy_place` | `=` | 切换轻松放置 |
 | `accelerate` | Tab | 切换加速 |
 | `seed_1` ~ `seed_10` | 1~0 | 选种子包 |
+| `tas_save` | `u` | TAS Save：存档当前状态 |
+| `tas_undo` | `i` | TAS Undo：读档回退 |
+| `tas_redo` | `o` | TAS Redo：读档前进 |
+| `tas_advance` | `p` | TAS Adv：运行一帧后暂停 |
+
+> 拿起手套：需要当前关卡可用且冷却完成，不包括禅境花园手套
 
 ### 玉米炮快捷键 (cob)
 

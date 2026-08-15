@@ -13,9 +13,24 @@ _NAME_TO_CHAR = {
     'Enter': '\n',
 }
 
+CUSTOM_ACTION_CHARS = {
+    'glove':      '-',
+    'easy_place': '=',
+    'tas_save':    'u',
+    'tas_undo':    'i',
+    'tas_redo':    'o',
+    'tas_advance': 'p',
+}
+
 _DEFAULT = {
     'pause':      ' ',
     'shovel':     '`',
+    'glove':      CUSTOM_ACTION_CHARS['glove'],
+    'easy_place': CUSTOM_ACTION_CHARS['easy_place'],
+    'tas_save':    CUSTOM_ACTION_CHARS['tas_save'],
+    'tas_undo':    CUSTOM_ACTION_CHARS['tas_undo'],
+    'tas_redo':    CUSTOM_ACTION_CHARS['tas_redo'],
+    'tas_advance': CUSTOM_ACTION_CHARS['tas_advance'],
     'accelerate': '\t',
     'seed_1':     '1',  'seed_2': '2',  'seed_3': '3',  'seed_4': '4',  'seed_5': '5',
     'seed_6':     '6',  'seed_7': '7',  'seed_8': '8',  'seed_9': '9',  'seed_10': '0',

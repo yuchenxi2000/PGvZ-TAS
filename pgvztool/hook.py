@@ -11,7 +11,7 @@ from pgvz.rng import rng_manip
 from .cheat import cheat_option
 from .placer import placer
 from .tas import tas_manager
-from .keybinds import build_physical_key_map, build_reverse_map
+from .keybinds import CUSTOM_ACTION_CHARS, build_physical_key_map, build_reverse_map
 import System
 # 关闭assertion，不然启动带命令行的游戏（Lawn.Console.exe）在输出过多时会卡死
 @LawnMod.MonoModUtils.HookTo(Sexy.Debug.ASSERT)
@@ -584,8 +584,7 @@ def Board__MouseDownInternal(orig, board: Lawn.Board, x: int, y: int, theClickCo
     if placer.active and theClickCount < 0:
         placer.active = False
         return
-    if placer.easyPlaceEnabled and placer._ep_rect.Contains(x, y) and board.CanInteractWithBoardButtons() and board.mCursorObject.mCursorType in (Lawn.CursorType.Normal, Lawn.CursorType.Hammer) \
-        and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
+    if placer._ep_rect.Contains(x, y) and placer.can_toggle(board):
         placer.toggle()
         return
     if placer.active and theClickCount >= 0:
@@ -594,24 +593,22 @@ def Board__MouseDownInternal(orig, board: Lawn.Board, x: int, y: int, theClickCo
         if placer.try_place(board, x, y):
             return
     # TAS 按钮点击
-    if cheat_option.tasEnabled and board.mApp.mGameScene == Lawn.GameScenes.Playing \
-        and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro) \
-        and theClickCount >= 0:
+    if tas_manager.can_use(board, cheat_option.tasEnabled) and theClickCount >= 0:
         if tas_manager.buttons is not None:
             for i, btn in enumerate(tas_manager.buttons):
                 if btn.mX <= x < btn.mX + btn.mWidth and btn.mY <= y < btn.mY + btn.mHeight:  # 必须要这样，不能用IsButtonDown()以及IsMouseOver()，不然手机上按按钮无效
-                    if i == 0:
-                        tas_manager.save()
-                    elif i == 1:
-                        tas_manager.undo()
-                    elif i == 2:
-                        tas_manager.redo()
-                    elif i == 3:
-                        tas_manager.frame_advance()
+                    tas_manager.run_action(i)
                     return
     orig(board, x, y, theClickCount, isTouch)
     if placer.active and board.mCursorObject.mCursorType not in (Lawn.CursorType.Normal, Lawn.CursorType.Hammer):
         placer.active = False
+
+# 为了让轻松放置UI有卡槽类似的行为，能够被RefreshSeedPacketFromCursor重置
+# 能修复一个bug，轻松放置选定状态下，用快捷键选卡槽时轻松放置状态不会重置，导致点击场地后进行轻松放置而不是放置选定卡槽的植物
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.RefreshSeedPacketFromCursor)
+def Board__RefreshSeedPacketFromCursor(orig, board: Lawn.Board):
+    placer.active = False
+    orig(board)
 
 def DrawEasyPlaceUI(board: Lawn.Board, g: Sexy.Graphics):
     if board.mApp.mGameScene == Lawn.GameScenes.Playing and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
@@ -730,18 +727,16 @@ def Board__Draw(orig, board: Lawn.Board, g: Sexy.Graphics):
     if _HasTrashcan(board) and not board.mApp.IsRogueConveyorbeltLevel():
         DrawTrashcan(board, g)
     # TAS 按钮
-    if cheat_option.tasEnabled and board.mApp.mGameScene == Lawn.GameScenes.Playing \
-        and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
+    if tas_manager.can_use(board, cheat_option.tasEnabled):
         _DrawTasButtons(board, g)
         _DrawTasFrameCounter(board, g)
 
 # TAS 按钮 — 右下角，懒初始化
 def _DrawTasButtons(board: Lawn.Board, g: Sexy.Graphics):
     if tas_manager.buttons is None:
-        labels = ['Save', 'Undo', 'Redo', 'Adv']
         btnH = Sexy.AtlasResources.IMAGE_BUTTON_LEFT.mHeight
         tas_manager.buttons = []  # type: ignore
-        for i, label in enumerate(labels):
+        for i, label in enumerate(tas_manager.ACTION_LABELS):
             btn = Lawn.GameButton(9000 + i, board)
             btn.mDrawStoneButton = True
             btn.SetLabel(label)
@@ -750,7 +745,8 @@ def _DrawTasButtons(board: Lawn.Board, g: Sexy.Graphics):
     # 右下角竖排，等距
     gap = 2
     btnH = tas_manager.buttons[0].mHeight   # type: ignore
-    totalH = btnH * 4 + gap * 3
+    button_count = len(tas_manager.buttons)
+    totalH = btnH * button_count + gap * (button_count - 1)
     baseX = board.mWidth - 200
     baseY = board.mHeight - totalH - 30
     for i, btn in enumerate(tas_manager.buttons):    # type: ignore
@@ -777,6 +773,38 @@ def TrailHolder__AllocTrailFromDef(orig, trailHolder: Sexy.TodLib.TrailHolder, t
 _key_reverse_map = build_reverse_map()
 _physical_key_map = build_physical_key_map()
 _dispatching_physical_key = False
+_tas_key_action_indices = {
+    CUSTOM_ACTION_CHARS['tas_save']: tas_manager.ACTION_SAVE,
+    CUSTOM_ACTION_CHARS['tas_undo']: tas_manager.ACTION_UNDO,
+    CUSTOM_ACTION_CHARS['tas_redo']: tas_manager.ACTION_REDO,
+    CUSTOM_ACTION_CHARS['tas_advance']: tas_manager.ACTION_ADVANCE,
+}
+
+
+def _handle_custom_keybind(board: Lawn.Board, ch: str):
+    """处理游戏没有原生 KeyChar 入口的快捷键。"""
+    if ch == CUSTOM_ACTION_CHARS['glove']:
+        is_level_glove = board.mApp.mGameScene == Lawn.GameScenes.Playing \
+            and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom) \
+            and board.HasGlove()
+        if is_level_glove and board.CanInteractWithBoardButtons() and board.CanUseGameObject(Lawn.GameObjectType.Glove):
+            if board.mChallenge.mGloveCounter > 0:
+                board.mApp.PlaySample(Sexy.Resources.SOUND_BUZZER)
+            else:
+                if board.mCursorObject.mCursorType != Lawn.CursorType.Shovel:
+                    board.RefreshSeedPacketFromCursor()
+                board.PickUpTool(Lawn.GameObjectType.Glove)
+        return True
+    if ch == CUSTOM_ACTION_CHARS['easy_place']:
+        if placer.can_toggle(board):
+            placer.toggle()
+        return True
+    tas_action_index = _tas_key_action_indices.get(ch)
+    if tas_action_index is not None:
+        if tas_manager.can_use(board, cheat_option.tasEnabled):
+            tas_manager.run_action(tas_action_index)
+        return True
+    return False
 
 
 def _reset_desktop_ime_composition(board: Lawn.Board):
@@ -818,6 +846,8 @@ def Board__KeyChar(orig, board: Lawn.Board, theChar: Sexy.SexyChar):
     ch = str(theChar.value_type)
     if _dispatching_physical_key:
         # KeyDown 传入的已经是默认功能字符，不能再次经过自定义映射。
+        if _handle_custom_keybind(board, ch):
+            return
         orig(board, theChar)
         return
     # 英文输入法还会在 KeyDown 后产生 KeyChar。字母/数字快捷键已由上面的
@@ -830,5 +860,8 @@ def Board__KeyChar(orig, board: Lawn.Board, theChar: Sexy.SexyChar):
             return
     mapped = _key_reverse_map.get(ch)
     if mapped is not None:
+        ch = mapped
         theChar = Sexy.SexyChar(System.Char(ord(mapped)))  # type: ignore
+    if _handle_custom_keybind(board, ch):
+        return
     orig(board, theChar)

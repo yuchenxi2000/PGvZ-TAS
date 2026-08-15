@@ -17,6 +17,8 @@
 | Redo | 读档前进 |
 | Adv | 逐帧（取消暂停，跑 1 帧后自动暂停） |
 
+四个按钮的默认快捷键依次为 `u` / `i` / `o` / `p`，可通过 `keybinds.txt` 中的 `tas_save` / `tas_undo` / `tas_redo` / `tas_advance` 重新绑定，详见 [keybinds.md](keybinds.md)。
+
 下方显示 `Frame: {mMainCounter}`，方便定位时间点。
 
 和通常的存档/读档不同，这里的 Save 和 Undo 操作一条**存档队列**而不是单个文件。每次 Save 在当前时间点新增一个存档；Undo 沿队列向过去回档，一直点一直往前回；Redo 是"撤销回档"——比如 Undo 两次后又想回到最初，点两次 Redo 即可。

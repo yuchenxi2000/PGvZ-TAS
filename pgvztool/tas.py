@@ -9,6 +9,12 @@ from pgvz import GetLawnApp, GetBoard, script_manager, ScriptRunMode
 
 
 class TasManager:
+    ACTION_SAVE = 0
+    ACTION_UNDO = 1
+    ACTION_REDO = 2
+    ACTION_ADVANCE = 3
+    ACTION_LABELS = ('Save', 'Undo', 'Redo', 'Adv')
+
     def __init__(self):
         self._saves: 'list[int]' = []   # 每次存档时的 board.mMainCounter
         self._pointer = -1               # -1=live, >=0=存档索引
@@ -16,6 +22,20 @@ class TasManager:
         self._pendingFrameAdvance = False
         self._saveDir: 'Path' = None   # type: ignore
         self.buttons: 'list[Lawn.GameButton]' = None              # type: ignore  # 懒初始化，hook.py 使用
+
+    def can_use(self, board: Lawn.Board, enabled: bool):
+        return enabled and board.mApp.mGameScene == Lawn.GameScenes.Playing \
+            and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro)
+
+    def run_action(self, index: int):
+        if index == self.ACTION_SAVE:
+            self.save()
+        elif index == self.ACTION_UNDO:
+            self.undo()
+        elif index == self.ACTION_REDO:
+            self.redo()
+        elif index == self.ACTION_ADVANCE:
+            self.frame_advance()
 
     def _init_save_dir(self):
         if self._saveDir is not None:
