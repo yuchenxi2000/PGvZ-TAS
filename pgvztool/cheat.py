@@ -123,8 +123,7 @@ class CheatOption(Serializable):
         pottedPlant.mLastNeedFulfilledTime = System.DateTime.UtcNow
         player.mNumPottedPlants += 1
 
-    @main_thread
-    def GiveAllPottedPlants(self):
+    def _GiveAllPottedPlants(self):
         lawnapp = GetLawnApp()
         player = lawnapp.mPlayerInfo
         # 检查是否所有花园已购买
@@ -186,6 +185,10 @@ class CheatOption(Serializable):
             lawnapp.KillBoard()
             lawnapp.PreNewGame(Lawn.GameMode.ChallengeZenGarden, False)
 
+    @main_thread
+    def GiveAllPottedPlants(self):
+        self._GiveAllPottedPlants()
+
     def _GetTrophy(self, lawnapp: Lawn.LawnApp, playerinfo: Lawn.PlayerInfo, gamemode: Lawn.GameMode, idx: int):
         if lawnapp.IsSurvivalNormal(gamemode):
             if playerinfo.mChallengeRecords[idx] < 5:
@@ -218,8 +221,7 @@ class CheatOption(Serializable):
             lawnapp.KillChallengeScreen()
             lawnapp.ShowChallengeScreen(page)
 
-    @main_thread
-    def GetFinishedAccount(self):
+    def _CompleteAccount(self):
         lawnapp = GetLawnApp()
         playerinfo = lawnapp.mPlayerInfo
         # 解锁所有关卡
@@ -288,6 +290,9 @@ class CheatOption(Serializable):
         ]
         for store_item, purchase_count in store_purchases:
             playerinfo.mPurchases[int(store_item)] = purchase_count
+
+    def _RefreshAccountDisplay(self):
+        lawnapp = GetLawnApp()
         # 刷新显示
         if lawnapp.mGameScene == Lawn.GameScenes.Menu:
             almanac_dialog = lawnapp.GetDialog(3)
@@ -301,6 +306,33 @@ class CheatOption(Serializable):
             page = lawnapp.mChallengeScreen.mPageIndex
             lawnapp.KillChallengeScreen()
             lawnapp.ShowChallengeScreen(page)
+
+    def _SetTreeHeight(self, height: int):
+        lawnapp = GetLawnApp()
+        tree_is_open = lawnapp.mGameMode == Lawn.GameMode.TreeOfWisdom and lawnapp.mGameScene == Lawn.GameScenes.Playing
+        if tree_is_open:
+            # 先移除旧动画；TreeOfWisdomLeave 可能结算正在使用的树肥，必须在写入目标高度前调用。
+            lawnapp.mBoard.mChallenge.TreeOfWisdomLeave()
+        lawnapp.mPlayerInfo.mChallengeRecords[48] = height
+        if tree_is_open:
+            lawnapp.mBoard.mChallenge.TreeOfWisdomInit()
+
+    @main_thread
+    def SetTreeHeight(self, height: int):
+        self._SetTreeHeight(height)
+
+    @main_thread
+    def CompleteAccount(self):
+        self._CompleteAccount()
+        self._RefreshAccountDisplay()
+
+    @main_thread
+    def PerfectAccount(self):
+        self._CompleteAccount()
+        GetLawnApp().mPlayerInfo.mCoins = 999999
+        self._SetTreeHeight(2147483647)
+        self._GiveAllPottedPlants()
+        self._RefreshAccountDisplay()
 
     def SetSpeed(self, speed: float):
         fast = speed >= 1.0
@@ -465,6 +497,12 @@ def ScriptAutoRestock():
         while playerInfo.mPurchases[15] <= 1015 and playerInfo.mCoins >= 100:
             playerInfo.mPurchases[15] += 5
             playerInfo.mCoins -= 100
-conf_auto_restock = ScriptConf(runmode=ScriptRunMode.FOREVER, canRunFunc=lambda: GetLawnApp().mGameMode in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom))
+conf_auto_restock = ScriptConf(
+    runmode=ScriptRunMode.FOREVER,
+    runcond=lambda: GetLawnApp().mGameMode in (
+        Lawn.GameMode.ChallengeZenGarden,
+        Lawn.GameMode.TreeOfWisdom,
+    ),
+)
 script_auto_restock = script_manager.Register(ScriptAutoRestock, conf=conf_auto_restock)
 script_auto_restock.Off()

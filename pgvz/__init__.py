@@ -8,7 +8,7 @@ from .cob_manager import CobManager, GetCobRecoverTime
 from .global_var import gvar
 from .script import ScriptManager, ScriptRunMode, ScriptType, ScriptObj, ScriptConf
 from .smart import AutoCollect
-from .time_operation import Delay, Prejudge, Until, DelayA
+from .time_operation import Delay, Prejudge, Until, DelayA, wave_clock
 from .util import *
 from .set_zb import SetZombies
 import LawnMod
@@ -34,7 +34,9 @@ def LawnApp__UpdateFrames(orig, lawnapp: Lawn.LawnApp):
 def Board__UpdateGame(orig, board: Lawn.Board):
     # 管理脚本
     script_manager.Manage()
+    spawning_snapshot = wave_clock.Snapshot(board)
     orig(board)
+    wave_clock.ObserveUpdate(board, spawning_snapshot)
 
 __all__ = [
     "Card", "Shovel", "SelectCards", "LetsRock",

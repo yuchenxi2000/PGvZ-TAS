@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>植物娘修改器</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.14.0/dist/index.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.14.3/dist/index.min.css">
     <link rel="stylesheet" href="./styles.css">
 </head>
 
@@ -57,7 +57,7 @@
                                             <el-input-number v-model="treeHeight" :min="0" :max="2147483647" size="small" />
                                         </div>
                                         <div class="resource-action">
-                                            <el-button type="warning" @click="send(`Sexy.GlobalStaticVars.gLawnApp.mPlayerInfo.mChallengeRecords[48] = ${treeHeight}`)">
+                                            <el-button type="warning" @click="send(`cheat_option.SetTreeHeight(${treeHeight})`)">
                                                 {{ t('actions.setTreeHeight') }}
                                             </el-button>
                                         </div>
@@ -80,7 +80,8 @@
                                 <div class="button-grid two">
                                     <el-button type="primary" @click="send('Sexy.GlobalStaticVars.gLawnApp.KillDialog(19)\nSexy.GlobalStaticVars.gLawnApp.mBoard.FadeOutLevel()')">{{ t('actions.winNow') }}</el-button>
                                     <el-button type="danger" @click="send('cheat_option.FailImmediately(Lawn.ZombieType.Normal)')">{{ t('actions.loseNow') }}</el-button>
-                                    <el-button type="success" @click="send('cheat_option.GetFinishedAccount()')">{{ t('actions.finishedAccount') }}</el-button>
+                                    <el-button type="success" @click="send('cheat_option.CompleteAccount()')">{{ t('actions.completeAccount') }}</el-button>
+                                    <el-button type="success" @click="send('cheat_option.PerfectAccount()')">{{ t('actions.perfectAccount') }}</el-button>
                                     <el-button @click="send('GetBoard().mShowShovel = True')">{{ t('actions.showShovel') }}</el-button>
                                     <el-button @click="send('GetBoard().mChallenge.mChallengeStateCounter = 2147483647')">{{ t('actions.freezePortal') }}</el-button>
                                 </div>
@@ -314,8 +315,8 @@
         </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/vue@3.5.34/dist/vue.global.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/element-plus@2.14.0/dist/index.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.5.40/dist/vue.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/element-plus@2.14.3/dist/index.full.min.js"></script>
     <script src="./js/i18n.js"></script>
     <script src="./js/data.js"></script>
     <script src="./js/protocol.js"></script>
