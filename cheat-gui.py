@@ -34,7 +34,10 @@ class _GUIHandler(http.server.SimpleHTTPRequestHandler):
         return result
 
     def end_headers(self):
-        self.send_header('Cache-Control', 'no-cache')
+        # 防止之后的页面加载复用缓存；已在运行的旧页面仍需由会话校验拦截。
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
         super().end_headers()
 
     def log_message(self, format, *args):

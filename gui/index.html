@@ -25,6 +25,14 @@
         </header>
 
         <main class="app-shell">
+            <el-alert
+                v-if="sessionRejected"
+                :title="t('messages.sessionOccupied')"
+                :description="t('messages.sessionOccupiedDetail')"
+                type="error"
+                show-icon
+                :closable="false"
+            ></el-alert>
             <el-tabs v-model="activeTab" class="main-tabs">
                 <el-tab-pane :label="t('tabs.player')" name="player">
                     <section class="panel-grid three">

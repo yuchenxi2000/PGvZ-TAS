@@ -467,6 +467,12 @@ def Plant__UpdateShooting(orig, plant: Lawn.Plant):
 
 # 显示植物/僵尸血量
 
+# 潜水僵尸入水时的血条 Y 轴补偿；正数向下。
+# 入水动画的可视位置不会写回 GetZombieRect，需要在游戏内调整此值。
+SNORKEL_IN_POOL_HP_OFFSET_Y = 90
+# 潜水僵尸在水中啃食时会播放上浮动画，但碰撞箱不会跟随动画。
+SNORKEL_EATING_IN_POOL_HP_OFFSET_Y = 70
+
 def DrawPlantHp(plant: Lawn.Plant, g: Sexy.Graphics, marginX: int, offsetY: int, color1, color2):
     if plant.mPlantHealth < plant.mPlantMaxHealth:
         # 一格80x80，画60x5
@@ -503,6 +509,11 @@ def DrawZombieHp(zombie: Lawn.Zombie, g: Sexy.Graphics, marginX: int, offsetY: i
     totalWidth = rect.mWidth
     x = rect.mX + marginX
     y = rect.mY + offsetY + 20
+    if zombie.mZombieType == Lawn.ZombieType.Snorkel:
+        if zombie.mInPool and zombie.mIsEating:
+            y += SNORKEL_EATING_IN_POOL_HP_OFFSET_Y
+        elif zombie.mZombiePhase == Lawn.ZombiePhase.SnorkelIntoPool or zombie.mInPool:
+            y += SNORKEL_IN_POOL_HP_OFFSET_Y
     # 两类血量
     hpWidth = 0
     hpWidth2 = 0

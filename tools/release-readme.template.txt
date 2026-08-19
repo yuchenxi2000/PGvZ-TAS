@@ -106,6 +106,16 @@ pause = Enter
    修改 keybinds.txt 后请重启游戏，并打开网页连接修改器。
    本修改器已适配常见非英文输入法；如果当前输入法仍然拦截快捷键，请切换到英文输入法后再试。
 
+7. 提示“另一个修改器页面已连接”
+   同时只使用一个修改器网页。后打开的页面会被拒绝，请关闭当前页面，继续使用先前页面。
+   如果只看见一个页面，请关闭浏览器中所有修改器标签页和窗口，等待最多 15 秒，再只打开一个 http://localhost:58080 页面。
+   不要通过 file:// 直接打开 gui/index.html；它不会获得本地服务器提供的缓存控制响应头。
+
+8. 修改器显示的状态与游戏内不一致
+   先检查是否还开启了其他修改器、调试工具或游戏内置修改器。
+   不同修改器可能各自修改同一个游戏变量，后执行的修改会改变游戏内的实际状态。各修改器界面通常只记录自己最后设置或同步到的值，不会实时感知其他入口所做的修改，因此界面显示可能仍是旧值。
+   本修改器的单客户端保护只防止多个官方网页同时控制游戏，不会限制其他修改器或游戏内置修改器。
+
 ===== 源码和许可证 =====
 
 源码：https://github.com/yuchenxi2000/PGvZ-TAS
@@ -227,6 +237,16 @@ Full configuration guide: https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/doc
 6. Custom keybinds do not work
    Restart the game after editing keybinds.txt, then open and connect the web console.
    Common non-English input methods are supported. If the current input method still intercepts shortcuts, switch to an English input method and try again.
+
+7. The page says another mod page is connected
+   Use only one mod web page at a time. A later page is rejected; close it and continue using the page that was opened first.
+   If only one page is visible, close every tab or window showing the mod page, wait up to 15 seconds, then open only one http://localhost:58080 page.
+   Do not open gui/index.html through file:// because it does not receive the local server's cache-control headers.
+
+8. A mod's displayed state does not match the game
+   First check whether another mod, debugging tool, or the game's built-in cheat controls are enabled.
+   Different modifiers may independently change the same game variable, and the last change determines the actual in-game state. Each interface usually remembers only the value it last set or synchronized and does not observe changes made through another control path in real time, so it may continue to display an older value.
+   This tool's single-client protection only prevents multiple official web pages from controlling the game at once; it does not restrict other mods or the game's built-in cheat controls.
 
 ===== Source and License =====
 

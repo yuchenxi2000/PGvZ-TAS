@@ -18,7 +18,7 @@ pgvztool 模块 (cheat_option, placer, ...)
 
 位于 `cheat-gui.py`，使用 Python 标准库 `http.server`。启动时自动挂在 `localhost:58080`，将所有请求路由到 `gui/` 目录下的文件。根路径 `/` 返回 `gui/cheat-gui.html`。
 
-`Cache-Control: no-cache` 头确保浏览器每次刷新都拉取最新文件（防止手机端缓存不更新）。
+`Cache-Control: no-store, no-cache, must-revalidate` 等响应头用于防止之后的页面加载复用缓存。它不能停止已经在页面内存中运行的旧 JavaScript、重连定时器或 WebSocket；通过 `file://` 直接打开文件时也不存在这些 HTTP 响应头。仍在运行的旧页面由下述 GUI 会话协议拦截。
 
 ## WebSocket 服务 (localhost:8080/Py)
 
@@ -39,6 +39,8 @@ pgvztool 模块 (cheat_option, placer, ...)
 // 异常
 {"statuscode": 1, "error": "error message", "errortype": "ExceptionType"}
 ```
+
+`PyHub` 允许多个 WebSocket 同时连接，所有连接共用同一个 IronPython `ScriptScope`。它本身没有客户端身份、认证或独占机制，因此直接连接 `/Py` 的其他程序可以执行任意 Python，也可以绕过下述 GUI 会话协议。若要拒绝所有来源的第二个 WebSocket 连接，需要修改游戏的 C# `PyHub` 服务端。
 
 ### JSON 引号问题
 
@@ -63,6 +65,14 @@ const msg = JSON.parse(r);
 ```
 
 ## 应用层协议
+
+### GUI 单客户端会话
+
+官方 GUI 的每个页面实例会生成唯一 `_clientId`，连接后通过 `sync_reg.connect(...)` 申请会话。`SyncRegistry` 只允许一个活动页面，页面每 3 秒调用 `sync_reg.heartbeat(...)` 续租；正常关闭时调用 `sync_reg.release(...)`，异常消失的租约会在 15 秒后过期。
+
+后打开的页面收到 `sessionRejected` 后显示“另一个修改器页面已连接”，不再自动重连抢占。其后用户点击控件时仍会得到相同提示。官方 GUI 发出的每条正常指令前还会调用 `sync_reg.require_client(...)`，在 IronPython 端再次校验会话所有权。
+
+这是 `pgvztool` 的应用层保护，不是 `/Py` WebSocket 服务的安全边界；直接发送未包装 Python 的第三方客户端不受此限制。
 
 ### sync（状态同步）
 
@@ -119,12 +129,15 @@ send(`sync_reg.apply('${JSON.stringify({cheat: {[key]: value}})}')`);
 
 ```javascript
 send(`sync_reg.apply('${JSON.stringify({
+  _clientId: clientId,          // 每个页面实例生成的唯一 ID
   cheat: cheatOption,           // Vue reactive 对象
   placer: { seedType: ..., ... }
 })}')`);
 ```
 
 Python 端 `SyncRegistry.apply()` 解析 JSON 后，遍历各对象调用 `Serializable.from_dict()`。`from_dict` 通过 `setattr` 写入——普通属性直接赋值，有 setter 的 `@property` 自动走 setter（如 `cheat_option.autoCollect = True` 会调用 `auto_collector.On()`）。
+
+完整状态回写必须携带 `_clientId`。后端会忽略不带该字段、且同时包含 `cheat` 和 `placer` 的旧版完整同步，防止浏览器中残留的旧页面在游戏重连后用默认值覆盖当前页面；单字段修改不受影响。
 
 ### lineup（布阵码）
 
@@ -149,7 +162,7 @@ Python 端 `SyncRegistry.apply()` 解析 JSON 后，遍历各对象调用 `Seria
 
 ### PC 端：推送模式
 
-GUI 初始状态全为 `false`（除 `autoCollect` 和 `runBackground` 默认为 `true`）。连接建立后，`syncCheatOptions()` 将当前 `cheatOption`（Vue reactive 对象）和 `placer` 状态合并为一次 `sync_reg.apply(...)` 发送。
+GUI 初始状态全为 `false`（除 `autoCollect` 和 `runBackground` 默认为 `true`）。连接建立后，`syncCheatOptions()` 将页面实例的 `_clientId`、当前 `cheatOption`（Vue reactive 对象）和 `placer` 状态合并为一次 `sync_reg.apply(...)` 发送。
 
 用户勾选复选框时，`watch(cheatOption)` 检测变化，通过 `setCheatOption(key, value)` 发送：
 

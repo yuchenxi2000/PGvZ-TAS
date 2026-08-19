@@ -55,6 +55,9 @@ const app = createApp({
         const wsParams = new URLSearchParams(location.search);
         const SERVER_URL = wsParams.get('ws') || 'ws://localhost:8080/Py';
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const clientId = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
+            ? globalThis.crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
         const {
             seedTypes,
             zombieTypes,
@@ -78,6 +81,7 @@ const app = createApp({
         ]);
 
         const connected = ref(false);
+        const sessionRejected = ref(false);
         const connectionState = ref('disconnected');
         const statusText = computed(() => t(`status.${connectionState.value}`));
         const activeTab = ref('player');
@@ -187,6 +191,8 @@ const app = createApp({
 
         let ws = null;
         let applyingRemoteState = false;
+        let pendingCodes = [];
+        let heartbeatTimer = null;
 
         function dataLabel(item) {
             if (language.value === 'zh') return item.label;
@@ -199,20 +205,51 @@ const app = createApp({
             lastResult.text = text;
         }
 
-        function send(code) {
+        function showSessionRejected(showToast = true) {
+            sessionRejected.value = true;
+            connected.value = false;
+            connectionState.value = 'occupied';
+            pendingCodes = [];
+            setResult(false, 'messages.sessionOccupied');
+            if (showToast) {
+                ElementPlus.ElMessage.error(t('messages.sessionOccupied'));
+            }
+        }
+
+        function send(code, allowBeforeReady = false) {
+            if (sessionRejected.value && !allowBeforeReady) {
+                showSessionRejected();
+                return;
+            }
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 ElementPlus.ElMessage.error(t('messages.notConnected'));
                 return;
             }
-            ws.send(code);
+            if (!connected.value && !allowBeforeReady) {
+                pendingCodes.push(code);
+                return;
+            }
+            ws.send(allowBeforeReady
+                ? code
+                : `sync_reg.require_client('${clientId}')\n${code}`
+            );
             setResult(true, 'messages.sent');
         }
 
-        function setCheatOption(key, value) {
-            send(`sync_reg.apply('${JSON.stringify({ cheat: { [key]: value } })}')`);
+        function markConnected() {
+            sessionRejected.value = false;
+            connected.value = true;
+            connectionState.value = 'connected';
+            const queuedCodes = pendingCodes;
+            pendingCodes = [];
+            queuedCodes.forEach(code => send(code));
         }
 
-        function syncCheatOptions() {
+        function setCheatOption(key, value) {
+            send(`sync_reg.apply('${JSON.stringify({ _clientId: clientId, cheat: { [key]: value } })}')`);
+        }
+
+        function syncCheatOptions(withBootstrap = false) {
             const placerUpdates = {
                 seedType: selectedSeedType.value,
                 zombieType: selectedZombieType.value,
@@ -224,7 +261,37 @@ const app = createApp({
                 easyPlaceMode: easyPlaceMode.value,
                 easyPlaceEnabled: easyPlaceEnabled.value,
             };
-            send(`sync_reg.apply('${JSON.stringify({ cheat: cheatOption, placer: placerUpdates })}')`);
+            const state = JSON.stringify({ _clientId: clientId, cheat: cheatOption, placer: placerUpdates });
+            const syncCode = withBootstrap
+                ? `sync_reg.connect('${clientId}', '${state}')`
+                : `sync_reg.apply('${state}')`;
+            send(withBootstrap ? `${PGvZProtocol.BOOTSTRAP_CODE}\n${syncCode}` : syncCode, withBootstrap);
+        }
+
+        function stopHeartbeat() {
+            if (heartbeatTimer !== null) {
+                clearInterval(heartbeatTimer);
+                heartbeatTimer = null;
+            }
+        }
+
+        function startHeartbeat() {
+            stopHeartbeat();
+            heartbeatTimer = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN && connected.value) {
+                    ws.send(`sync_reg.heartbeat('${clientId}')`);
+                }
+            }, 3000);
+        }
+
+        function releaseSession() {
+            if (ws && ws.readyState === WebSocket.OPEN && connected.value) {
+                try {
+                    ws.send(`sync_reg.release('${clientId}')`);
+                } catch {
+                    // 页面关闭期间 WebSocket 可能已经被浏览器释放。
+                }
+            }
         }
 
         watch(
@@ -267,29 +334,39 @@ const app = createApp({
         function connect() {
             ws = new WebSocket(SERVER_URL);
             ws.onopen = () => {
-                connected.value = true;
-                connectionState.value = 'connected';
+                connected.value = false;
+                connectionState.value = 'connecting';
                 if (isMobile) {
-                    send(`${PGvZProtocol.BOOTSTRAP_CODE}\nsync_reg.serialize()`);
+                    send(`${PGvZProtocol.BOOTSTRAP_CODE}\nsync_reg.connect('${clientId}')`, true);
                 } else {
-                    send(PGvZProtocol.BOOTSTRAP_CODE);
-                    syncCheatOptions();
+                    // 保证新游戏进程中先完成导入，再恢复网页保留的状态。
+                    syncCheatOptions(true);
                 }
             };
             ws.onmessage = event => {
                 try {
                     const data = JSON.parse(event.data);
                     if (data.statuscode === 0) {
+                        const msg = PGvZProtocol.parseResultMessage(data.result);
+                        if (msg && msg.action === 'heartbeat') {
+                            return;
+                        }
+                        if (msg && msg.action === 'sessionRejected') {
+                            stopHeartbeat();
+                            showSessionRejected();
+                            return;
+                        }
                         if (data.result) {
                             setResult(true, '', data.result);
                         } else {
                             setResult(true, 'messages.success');
                         }
 
-                        const msg = PGvZProtocol.parseResultMessage(data.result);
                         if (msg && msg.action === 'sync' && msg.state) {
                             setResult(true, 'messages.syncOk');
                             applySyncState(msg.state);
+                            markConnected();
+                            startHeartbeat();
                             return;
                         }
                         if (msg && msg.action === 'lineup' && msg.code) {
@@ -309,7 +386,12 @@ const app = createApp({
                 }
             };
             ws.onclose = () => {
+                stopHeartbeat();
                 connected.value = false;
+                if (sessionRejected.value) {
+                    connectionState.value = 'occupied';
+                    return;
+                }
                 connectionState.value = 'reconnecting';
                 setTimeout(connect, 3000);
             };
@@ -379,6 +461,7 @@ const app = createApp({
         }
 
         onMounted(() => {
+            window.addEventListener('beforeunload', releaseSession);
             connect();
         });
 
@@ -389,6 +472,7 @@ const app = createApp({
             t,
             optionLabel,
             connected,
+            sessionRejected,
             statusText,
             activeTab,
             speed,

@@ -108,9 +108,11 @@ window.PGvZI18n = (() => {
             },
             status: {
                 disconnected: '未连接',
+                connecting: '正在初始化修改器...',
                 connected: '已连接到游戏服务器',
                 reconnecting: '连接已断开，3秒后重连...',
                 error: '连接错误',
+                occupied: '已有修改器页面正在使用',
                 ok: '成功',
                 failed: '失败',
             },
@@ -131,6 +133,8 @@ window.PGvZI18n = (() => {
                 lineupOk: '已获得布阵码',
                 emptyCode: '代码不能为空',
                 unknownError: '未知错误',
+                sessionOccupied: '另一个修改器页面已连接，当前页面不能发送指令',
+                sessionOccupiedDetail: '请关闭当前页面，继续使用先前打开的修改器页面。',
             },
             options: {
                 autoCollect: '自动收集',
@@ -284,9 +288,11 @@ window.PGvZI18n = (() => {
             },
             status: {
                 disconnected: 'Disconnected',
+                connecting: 'Initializing the mod...',
                 connected: 'Connected to game server',
                 reconnecting: 'Disconnected, reconnecting in 3s...',
                 error: 'Connection error',
+                occupied: 'Another mod page is already active',
                 ok: 'OK',
                 failed: 'Failed',
             },
@@ -307,6 +313,8 @@ window.PGvZI18n = (() => {
                 lineupOk: 'Lineup code received',
                 emptyCode: 'Code cannot be empty',
                 unknownError: 'Unknown error',
+                sessionOccupied: 'Another mod page is connected; this page cannot send commands',
+                sessionOccupiedDetail: 'Close this page and continue using the mod page you opened earlier.',
             },
             options: {
                 autoCollect: 'Auto Collect',
