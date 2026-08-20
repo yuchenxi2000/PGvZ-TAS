@@ -201,7 +201,8 @@ helper_script = script_manager.RunInThread(HelperScript)
 - 没有“继续游戏”对话框。
 
 离开战斗界面后，生成器会按运行模式卸载或重置。倍速时脚本仍按每个游戏逻辑帧运行，
-而不是只按画面刷新频率运行。
+而不是只按画面刷新频率运行。全局快慢速和 Board 分数速度的执行层级、分帧算法及叠加
+关系见[游戏速度控制机制](speed-control.md)。
 
 ### 4. 同时加载多个脚本
 
@@ -241,7 +242,42 @@ helper_script = script_manager.RunInThread(HelperScript)
 | `__version__` | `PROJECT_VERSION` 的标准模块别名。 |
 | `__supported_game_versions__` | `SUPPORTED_GAME_VERSIONS` 的标准模块别名。 |
 
-### 2. 卡片、铲子与选卡
+### 2. 速度控制
+
+速度 API 位于 `pgvz/speed.py`，所有设置都限制在闭区间 `0.01` 至 `100`：
+
+| API | 说明 |
+|---|---|
+| `GetGlobalSpeedExact()` | 返回游戏实际采用的全局 `(is_fast, factor)`。 |
+| `GetGlobalSpeed()` | 以浮点数返回实际全局速度。 |
+| `SetGlobalSpeedExact(is_fast, factor)` | 全局精确速度；`is_fast=True` 表示 `factor` 倍，否则表示 `1/factor` 倍。 |
+| `SetGlobalSpeed(speed)` | 按整数倍/整数倒数倍规则转换浮点数并设置全局速度。 |
+| `GetBoardSpeedExact(board=None)` | 原样返回 Board 的 `(numerator, denominator)`。 |
+| `GetBoardSpeed(board=None)` | 以浮点数返回 Board 当前配置的速度。 |
+| `SetBoardSpeedExact(numerator, denominator, board=None)` | 直接设置 Board 分子和分母，不约分，并重置分帧相位。 |
+| `SetBoardSpeed(speed, max_error=1e-6, board=None)` | 用连分数把浮点速度转换为误差小于 `max_error` 的 Board 分数。 |
+
+四个设置函数都返回实际写入的精确表示。全局设置返回 `(is_fast, factor)`，Board 设置返回
+`(numerator, denominator)`：
+
+```python
+SetGlobalSpeedExact(False, 5)       # 全局 1/5 倍。
+actual_global = SetGlobalSpeed(1.6) # 返回 (True, 2)。
+current_global = GetGlobalSpeed()   # 返回 2.0。
+
+SetBoardSpeedExact(3, 2)            # 当前关卡精确 3/2 倍。
+actual_board = SetBoardSpeed(1.414, max_error=1e-5)
+current_ratio = GetBoardSpeedExact() # 返回实际分子和分母。
+```
+
+不在关卡内调用 Board 速度 API 会抛出 `RuntimeError`。非法类型、超出速度范围、无效误差
+或可能使游戏的 C# `int` 计算溢出的分数也会抛出异常。Board 精确 getter 会原样返回字段；
+如果分母为零，浮点 getter 会抛出 `ValueError`。完整算法、两套速度的作用层级和叠加关系
+见[游戏速度控制机制](speed-control.md)。
+
+相关常量为 `MIN_GAME_SPEED`、`MAX_GAME_SPEED` 和 `DEFAULT_BOARD_SPEED_ERROR`。
+
+### 3. 卡片、铲子与选卡
 
 #### `Card(seedtype, row, col, isImitater=False) -> bool`
 
@@ -284,7 +320,7 @@ yield from SelectCards(
 等待当前选卡动画完成并关闭选卡界面。通常由 `SelectCards` 自动调用；单独使用时也必须
 写成 `yield from LetsRock()`。
 
-### 3. 时间操作
+### 4. 时间操作
 
 #### `Delay(t)`
 
@@ -340,7 +376,7 @@ Shovel(1, 1)
 | `gvar.doPassedOp` | 为 `False` 时，部分框架操作会取消已经错过的动作；设为 `True` 可保留传统框架“立即补做”的行为。默认 `False`。 |
 | `gvar.opCanceled` | 只读属性，等于 `timePassed and not doPassedOp`。 |
 
-### 4. 玉米炮
+### 5. 玉米炮
 
 #### `CobManager()`
 
@@ -362,7 +398,7 @@ cob_manager.Fire([(2, 8.8), (5, 8.8)])
 返回指定玉米炮距离可发射还需要的逻辑帧数。参数应是场上的玉米炮植物对象；不是玉米炮
 或处于未知状态时可能抛出异常。
 
-### 5. 僵尸列表
+### 6. 僵尸列表
 
 #### `SetZombies(zb_list, internal_spawn=True)`
 
@@ -376,7 +412,7 @@ cob_manager.Fire([(2, 8.8), (5, 8.8)])
 该函数会重建波次列表，应在关卡正式刷新僵尸以前调用。设置 PGvZ 新增僵尸时，应使用
 当前游戏提供的对应枚举值。
 
-### 6. 坐标与鼠标辅助
+### 7. 坐标与鼠标辅助
 
 | API | 说明 |
 |---|---|
@@ -388,7 +424,7 @@ cob_manager.Fire([(2, 8.8), (5, 8.8)])
 屏幕坐标、场地坐标和格子坐标不是同一套坐标，涉及摄像机或绘制时请先阅读
 [坐标与绘制](rendering.md)。
 
-### 7. 场上对象与阵型辅助
+### 8. 场上对象与阵型辅助
 
 #### `IterAliveZombies()`
 
@@ -423,7 +459,7 @@ cob_manager.Fire([(2, 8.8), (5, 8.8)])
 保存当前生存模式阶段，并删除超过 `max_backup` 个阶段的旧备份。它依赖当前 Board、
 玩家和生存阶段信息，只应在生存模式关卡内调用。
 
-### 8. 枚举辅助
+### 9. 枚举辅助
 
 #### `none_of(enumType)`
 
@@ -438,7 +474,7 @@ empty_value = none_of(Lawn.SomeEnum)
 
 等价于 `none_of(Lawn.SeedType)`，用于需要“无植物”枚举值的场景。
 
-### 9. 脚本管理 API
+### 10. 脚本管理 API
 
 #### `ScriptManager`
 
@@ -471,7 +507,7 @@ empty_value = none_of(Lawn.SomeEnum)
 
 保存运行模式和运行条件的高级配置对象，示例见[自定义运行条件](#1-自定义运行条件)。
 
-### 10. 默认自动收集
+### 11. 默认自动收集
 
 #### `auto_collector`
 
@@ -793,6 +829,7 @@ def MainScript():
 - [安装与加载机制](install.md)
 - [示例脚本说明](../scripts/README.md)
 - [PGvZ 与 PvZ 的异同](pgvz-vs-pvz.md)
+- [游戏速度控制机制](speed-control.md)
 - [僵尸波次刷新机制与时间操作实现](zombie-spawning.md)
 - [坐标系统与绘制](rendering.md)
 - [TAS 功能](tas.md)

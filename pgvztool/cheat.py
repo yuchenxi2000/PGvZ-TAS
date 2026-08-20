@@ -1,6 +1,6 @@
 """
 更好的作弊
-请配合cheat-gui.html使用
+请配合网页修改器使用
 """
 import System
 import Lawn
@@ -11,7 +11,7 @@ from .util import main_thread
 from .sync import Serializable
 
 # 作弊选项，其中成员设置为True就是开启。还包括一些包装好的函数
-# 推荐配合cheat-gui.html使用
+# 推荐配合网页修改器使用
 class CheatOption(Serializable):
     def __init__(self) -> None:
         self.wontLose = False
@@ -333,13 +333,6 @@ class CheatOption(Serializable):
         self._SetTreeHeight(2147483647)
         self._GiveAllPottedPlants()
         self._RefreshAccountDisplay()
-
-    def SetSpeed(self, speed: float):
-        fast = speed >= 1.0
-        factor = round(speed) if fast else round(1.0 / speed)
-        Sexy.GlobalStaticVars.gFastMo = fast
-        Sexy.GlobalStaticVars.gSlowMo = not fast
-        Sexy.GlobalStaticVars.gFastSlowMoNum = factor
 
     def _EnterNewGame(self, gamemode: Lawn.GameMode):
         lawnapp = GetLawnApp()

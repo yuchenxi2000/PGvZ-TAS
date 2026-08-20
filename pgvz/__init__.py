@@ -8,6 +8,11 @@ from .cob_manager import CobManager, GetCobRecoverTime
 from .global_var import gvar
 from .script import ScriptManager, ScriptRunMode, ScriptType, ScriptObj, ScriptConf
 from .smart import AutoCollect
+from .speed import (
+    MIN_GAME_SPEED, MAX_GAME_SPEED, DEFAULT_BOARD_SPEED_ERROR,
+    GetGlobalSpeedExact, GetGlobalSpeed, GetBoardSpeedExact, GetBoardSpeed,
+    SetGlobalSpeedExact, SetGlobalSpeed, SetBoardSpeedExact, SetBoardSpeed,
+)
 from .time_operation import Delay, Prejudge, Until, DelayA, wave_clock
 from .util import *
 from .set_zb import SetZombies
@@ -44,6 +49,9 @@ __all__ = [
     "gvar",
     "ScriptManager", "ScriptRunMode", "ScriptType", "ScriptObj", "ScriptConf",
     "Delay", "Prejudge", "Until", "DelayA",
+    "MIN_GAME_SPEED", "MAX_GAME_SPEED", "DEFAULT_BOARD_SPEED_ERROR",
+    "GetGlobalSpeedExact", "GetGlobalSpeed", "GetBoardSpeedExact", "GetBoardSpeed",
+    "SetGlobalSpeedExact", "SetGlobalSpeed", "SetBoardSpeedExact", "SetBoardSpeed",
     "GetLawnApp", "GetBoard",
     "PixelToGrid", "GridToPixel", "MouseDragGrid", "PixelToGridRaw",
     "SeedTypeNone", "none_of", "SetPlantOnBoard", "SurvivalBackupGame",

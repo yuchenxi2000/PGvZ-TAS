@@ -472,6 +472,10 @@ def Plant__UpdateShooting(orig, plant: Lawn.Plant):
 SNORKEL_IN_POOL_HP_OFFSET_Y = 90
 # 潜水僵尸在水中啃食时会播放上浮动画，但碰撞箱不会跟随动画。
 SNORKEL_EATING_IN_POOL_HP_OFFSET_Y = 70
+# 海豚僵尸在水中骑行
+DOLPHIN_RIDING_HP_OFFSET_Y = 40
+# 海豚僵尸在水中行走
+DOLPHIN_WALKING_IN_POOL_HP_OFFSET_Y = 60
 
 def DrawPlantHp(plant: Lawn.Plant, g: Sexy.Graphics, marginX: int, offsetY: int, color1, color2):
     if plant.mPlantHealth < plant.mPlantMaxHealth:
@@ -509,11 +513,17 @@ def DrawZombieHp(zombie: Lawn.Zombie, g: Sexy.Graphics, marginX: int, offsetY: i
     totalWidth = rect.mWidth
     x = rect.mX + marginX
     y = rect.mY + offsetY + 20
+    # 对一些僵尸的特殊状态修正y轴偏移，使血条位置和视觉一致
     if zombie.mZombieType == Lawn.ZombieType.Snorkel:
         if zombie.mInPool and zombie.mIsEating:
             y += SNORKEL_EATING_IN_POOL_HP_OFFSET_Y
         elif zombie.mZombiePhase == Lawn.ZombiePhase.SnorkelIntoPool or zombie.mInPool:
             y += SNORKEL_IN_POOL_HP_OFFSET_Y
+    elif zombie.mZombieType == Lawn.ZombieType.DolphinRider:
+        if zombie.mZombiePhase == Lawn.ZombiePhase.DolphinWalkingInPool:
+            y += DOLPHIN_WALKING_IN_POOL_HP_OFFSET_Y
+        elif zombie.mZombiePhase == Lawn.ZombiePhase.DolphinRiding:
+            y += DOLPHIN_RIDING_HP_OFFSET_Y
     # 两类血量
     hpWidth = 0
     hpWidth2 = 0

@@ -4,6 +4,31 @@ const savedLanguage = localStorage.getItem('pgvz-gui-language');
 const initialLanguage = savedLanguage || ((navigator.language || '').toLowerCase().startsWith('en') ? 'en' : 'zh');
 const i18n = PGvZI18n.createI18n(initialLanguage);
 
+const CHECKBOX_STATE_STORAGE_KEY = 'pgvz-gui-checkbox-state';
+
+function readCheckboxState() {
+    try {
+        const item = localStorage.getItem(CHECKBOX_STATE_STORAGE_KEY);
+        if (!item) return null;
+        const state = JSON.parse(item);
+        return state && typeof state === 'object' ? state : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeCheckboxState(state) {
+    try {
+        localStorage.setItem(CHECKBOX_STATE_STORAGE_KEY, JSON.stringify(state));
+    } catch {
+        // 隐私模式或存储空间不可用时仍允许修改器正常工作。
+    }
+}
+
+function savedBoolean(state, key, fallback) {
+    return state && typeof state[key] === 'boolean' ? state[key] : fallback;
+}
+
 const SwitchRow = {
     props: {
         label: { type: String, required: true },
@@ -55,6 +80,10 @@ const app = createApp({
         const wsParams = new URLSearchParams(location.search);
         const SERVER_URL = wsParams.get('ws') || 'ws://localhost:8080/Py';
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        // 手机端始终以游戏内状态为准；PC 端才从 localStorage 恢复并推送状态。
+        const savedCheckboxState = isMobile ? null : readCheckboxState();
+        const savedCheatState = savedCheckboxState && savedCheckboxState.cheat;
+        const savedPlacerState = savedCheckboxState && savedCheckboxState.placer;
         const clientId = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
             ? globalThis.crypto.randomUUID()
             : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -105,9 +134,9 @@ const app = createApp({
         const selectedCol = ref(-1);
         const selectedScaryPotType = ref(scaryPotType[1].value);
         const selectedScaryPotAppearance = ref(scaryPotAppearance[0].value);
-        const isImitater = ref(false);
-        const mindCtrl = ref(false);
-        const potLeft = ref(false);
+        const isImitater = ref(savedBoolean(savedPlacerState, 'imitater', false));
+        const mindCtrl = ref(savedBoolean(savedPlacerState, 'mindCtrl', false));
+        const potLeft = ref(savedBoolean(savedPlacerState, 'potReverse', false));
         const lastResult = reactive({ ok: true, key: 'messages.waiting', text: '' });
         const resultText = computed(() => lastResult.key ? t(lastResult.key) : lastResult.text);
         const customCode = ref('');
@@ -117,7 +146,7 @@ const app = createApp({
         const selectedScene = ref('pool');
         const selectedLineUp = ref('');
         const easyPlaceMode = ref('plant');
-        const easyPlaceEnabled = ref(true);
+        const easyPlaceEnabled = ref(savedBoolean(savedPlacerState, 'easyPlaceEnabled', true));
 
         const switchGroups = {
             common: [
@@ -172,11 +201,11 @@ const app = createApp({
         const optionConfig = [...new Set(Object.values(switchGroups).flat())];
         const cheatOption = reactive({});
         optionConfig.forEach(item => {
-            cheatOption[item] = false;
+            cheatOption[item] = savedBoolean(savedCheatState, item, false);
         });
-        cheatOption.autoCollect = true;
-        cheatOption.runBackground = true;
-        cheatOption.tasEnabled = true;
+        cheatOption.autoCollect = savedBoolean(savedCheatState, 'autoCollect', true);
+        cheatOption.runBackground = savedBoolean(savedCheatState, 'runBackground', true);
+        cheatOption.tasEnabled = savedBoolean(savedCheatState, 'tasEnabled', true);
 
         const scenes = computed(() => [
             { label: t('scene.day'), value: 'day' },
@@ -249,6 +278,19 @@ const app = createApp({
             send(`sync_reg.apply('${JSON.stringify({ _clientId: clientId, cheat: { [key]: value } })}')`);
         }
 
+        function saveCheckboxState() {
+            if (isMobile) return;
+            writeCheckboxState({
+                cheat: { ...cheatOption },
+                placer: {
+                    imitater: isImitater.value,
+                    mindCtrl: mindCtrl.value,
+                    potReverse: potLeft.value,
+                    easyPlaceEnabled: easyPlaceEnabled.value,
+                },
+            });
+        }
+
         function syncCheatOptions(withBootstrap = false) {
             const placerUpdates = {
                 seedType: selectedSeedType.value,
@@ -297,6 +339,7 @@ const app = createApp({
         watch(
             () => ({ ...cheatOption }),
             (newVal, oldVal) => {
+                saveCheckboxState();
                 if (applyingRemoteState) return;
                 for (const key in newVal) {
                     if (newVal[key] !== oldVal[key]) {
@@ -305,6 +348,11 @@ const app = createApp({
                 }
             },
             { deep: true }
+        );
+
+        watch(
+            [isImitater, mindCtrl, potLeft, easyPlaceEnabled],
+            saveCheckboxState
         );
 
         function applySyncState(state) {

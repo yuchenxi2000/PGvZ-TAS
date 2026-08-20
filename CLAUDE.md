@@ -2,72 +2,44 @@
 
 Tool-Assisted Superplay framework and cheat mod for "PlantGirls vs. Zombies" (PGvZ).
 
-## Versioning
+## Required workflow
 
-The mod has its own version number independent of the game. It always targets the **latest** game version only — older game versions are not supported.
+### Versioning and changelog
 
-## Architecture
+The mod has its own version number and supports only the latest game versions declared in `pgvz/version.py`; do not add backward-compatibility paths for older game versions.
 
-```
-pgvz/            TAS framework: time operations, card/plant management, cob manager, script scheduler
-    ↑
-pgvztool/        Cheat mod: all @HookTo functions in hook.py; logic in cheat.py, placer.py
-    ↑
-gui/             Single-page Vue3 + ElementPlus app controlling toggles over WebSocket
-cheat-gui.py     Embedded HTTP server on localhost:58080; serves gui/ to browser
-```
+- At the start of a change, inspect the working tree, `pgvz/version.py`, and the top of `CHANGELOG.md` to determine whether an unreleased version is already in progress.
+- Every completed project change must be recorded in `CHANGELOG.md` under the current in-progress version.
+- If there were no pre-existing project changes and no in-progress version, increment `MOD_VERSION` in `pgvz/version.py` first, then create a new top-level `CHANGELOG.md` section for that version and the current date.
+- If pre-existing changes have already incremented the version and created its changelog section, add new entries to that same version instead of incrementing it again.
+- Never add new changes beneath a previously released or otherwise old version heading.
 
-**Mod loading**: Game auto-scans `mods/` for `*.py` files on startup. Python packages (directories) are NOT auto-loaded — `pgvz` and `pgvztool` are imported by `cheat-gui.py` on startup, outside the main-thread timeout window.
+### Documentation and reverse engineering
 
-**Communication**: Browser ↔ `cheat-gui.py` HTTP ↔ WebSocket `ws://localhost:8080/Py` ↔ in-game IronPython engine.
+- Before decompiling the game, search `docs/` and `typings/`; the relevant behavior may already be documented.
+- Record durable discoveries about game internals in a focused Chinese document under `docs/`, one topic per file. Keep this file limited to agent workflow, constraints, and navigation.
+- Use the locally configured decompiled game source when implementation depends on current game internals. If its location is unavailable, ask the user.
 
-## Tech stack
+## Source map and loading
 
-- **Game engine**: C# / MonoGame
-- **Mod language**: IronPython
-- **Hooking**: `LawnMod.MonoModUtils.HookTo` decorator (wraps MonoMod.RuntimeDetour). Hooks register at module import time.
-- **GUI**: Single HTML file, Vue3 + ElementPlus from CDN, no build step.
-- **Top-level objects**: `Sexy.GlobalStaticVars.gLawnApp` → `GetLawnApp()`, `GetBoard()`
-
-## Hooks
-
-All `@HookTo` functions are in **`pgvztool/hook.py`**. `pgvztool/__init__.py` imports `cheat` → `placer` → `sync` → `hook`, so all dependencies are available when hooks register.
-
-| File | Purpose |
+| Path | Purpose |
 |---|---|
-| `pgvztool/cheat.py` | `CheatOption` class (all toggle state), script singletons |
-| `pgvztool/placer.py` | `Placer` class (easy-place state and placement methods) |
-| `pgvztool/hook.py` | All `@HookTo` functions |
-| `pgvztool/sync.py` | `Serializable`, `SyncRegistry` — state sync |
+| `pgvz/` | TAS framework: scripts, time operations, cards, cobs, utilities, and the two framework update hooks in `pgvz/__init__.py` |
+| `pgvztool/` | Cheat mod; state and actions in `cheat.py`, placement in `placer.py`, synchronization in `sync.py`, TAS in `tas.py`, and cheat hooks in `hook.py` |
+| `gui/` | Static Vue 3 + Element Plus GUI with no build step: layout in `index.html`, styles in `styles.css`, and behavior/protocol/data/i18n in `js/` |
+| `cheat-gui.py` | Auto-loaded mod entry point that only configures paths and serves `gui/` on `localhost:58080` |
+| `scripts/` | Example TAS scripts |
+| `typings/` | Editor-only game and .NET type stubs |
+| `tests/` | CPython unit tests for framework logic that can run outside the game |
 
-`pgvz/__init__.py` also has two hooks (`LawnApp.UpdateFrames`, `Board.UpdateGame`) to drive `script_manager`.
+The game scans only top-level `mods/*.py` files. Package directories are not auto-loaded. `cheat-gui.py` starts the HTTP server during game startup; `pgvz` and `pgvztool` are imported later by the WebSocket bootstrap in `gui/js/protocol.js` when a GUI connects. See [installation and loading](docs/install.md) and the [GUI protocol](docs/cheat-gui-protocol.md).
 
-If a hook on a small method seems to have no effect, the method may have been inlined by the runtime. Hooking a larger caller method instead typically resolves this.
+## Implementation constraints
 
-## Coordinate systems & drawing hooks
-
-The game has three coordinate systems (screen, board/world, grid) connected by camera transforms. The rendering pipeline has distinct hook levels; `Board.Draw` is the recommended level for overlay UI.
-
-See [docs/rendering.md](docs/rendering.md) for full details.
-
-## IronPython gotchas
-
-- **C# enum `None` members**: Conflicts with Python keyword. Use `none_of(enum_type)` from `pgvz/util.py` (reflects via `getattr`).
-- **Type annotations**: IronPython cannot handle annotations like `list[int]` or `tuple[int, int]` (tries to resolve them as .NET generics). Wrap them in quotes: `'list[int]'`, `'tuple[int, int]'`.
-- **WebSocket JSON**: JSON booleans (`true`/`false`) are not valid Python. When sending JSON over WebSocket to be parsed by `json.loads()`, always wrap it as a Python string literal (single quotes). The receiver side must strip outer quotes before `JSON.parse()` — the `repr()` response from the WebSocket wraps the result in quotes.
-
-## Script framework (pgvz)
-
-- Scripts register via `script_manager.Register(func, runmode=ScriptRunMode.FOREVER)`. Blocking scripts use generator functions (containing `yield`).
-- `Board.UpdateGame` hook calls `script_manager.Manage()` **before** each game tick.
-- Acceleration: `GlobalStaticVars.gFastMo` (global, persists across levels) vs `Board.mAccelerationNumerator` (Board-local, dies with Board). In-game speed button uses the latter; cheat `SetSpeed` uses the former.
-
-## Adding a new cheat toggle
-
-See [docs/cheat-gui-protocol.md](docs/cheat-gui-protocol.md) for the full communication protocol and step-by-step guide.
-
-## Decompiled code & docs
-
-The decompiled game code reference path should be configured locally (check agent config, or ask the user).
-
-When you discover a game internals detail worth recording (rendering, coordinate transforms, game mechanics, data structures), write a doc in `docs/` (in Chinese, one topic per file). Before decompiling to answer a question, check `docs/` first — it may have already been covered.
+- Runtime code must remain compatible with IronPython. Use `none_of(EnumType)` for C# enum members named `None`, quote modern annotations such as `'list[int]'`, and access game objects on the main game thread. See [IronPython and hooking notes](docs/scripting.md#5-ironpython-与-net-注意事项).
+- Put cheat-mod `@HookTo` functions in `pgvztool/hook.py`. The framework driver hooks in `pgvz/__init__.py` are the intentional exception. Before changing a hook, inspect the current decompiled caller and the [hooking guide](docs/scripting.md#6-挂钩游戏方法); small methods may be inlined.
+- Before changing overlays or coordinate conversions, read [the rendering and coordinate-system document](docs/rendering.md).
+- Before changing WebSocket messages, client sessions, synchronization, persistence, or cheat toggles, read [the GUI protocol](docs/cheat-gui-protocol.md). Keep all user-facing option labels in both Chinese and English.
+- Before changing script scheduling or time operations, read [the scripting guide](docs/scripting.md) and, where relevant, [the zombie-spawning timing document](docs/zombie-spawning.md).
+- Before changing global or Board-local speed control, read [the speed-control document](docs/speed-control.md).
+- Before changing TAS save/undo/redo behavior, read [the TAS document](docs/tas.md).

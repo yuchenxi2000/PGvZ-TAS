@@ -3,20 +3,20 @@
 ## 整体架构
 
 ```
-浏览器 (gui/cheat-gui.html)
-    ↕ HTTP (localhost:58080)
-cheat-gui.py (内嵌服务器)
-    ↕ WebSocket (localhost:8080/Py)
-游戏 IronPython 引擎
-    ↕ Python 对象
-pgvztool/sync.py (SyncRegistry)
-    ↕ Serializable
-pgvztool 模块 (cheat_option, placer, ...)
+浏览器 (gui/index.html + gui/js/)
+    ├─ HTTP (localhost:58080) ─────→ cheat-gui.py ─→ gui/ 静态文件
+    └─ WebSocket (localhost:8080/Py) → 游戏 IronPython 引擎
+                                              ↕ Python 对象
+                                    pgvztool/sync.py (SyncRegistry)
+                                              ↕ Serializable
+                                    cheat_option、placer 等对象
 ```
 
 ## HTTP 服务器 (cheat-gui.py)
 
-位于 `cheat-gui.py`，使用 Python 标准库 `http.server`。启动时自动挂在 `localhost:58080`，将所有请求路由到 `gui/` 目录下的文件。根路径 `/` 返回 `gui/cheat-gui.html`。
+位于 `cheat-gui.py`，使用 Python 标准库 `http.server`。启动时自动挂在 `localhost:58080`，将所有请求路由到 `gui/` 目录下的文件。根路径 `/` 返回 `gui/index.html`。
+
+游戏启动时只自动扫描 `mods/` 顶层的 `.py` 文件，因此此时执行的是 `cheat-gui.py`，它只配置模块搜索路径并启动 HTTP 服务。`pgvz/` 和 `pgvztool/` 是 Python 包，不会被游戏自动扫描；网页建立 WebSocket 连接后，`gui/js/protocol.js` 中的 `BOOTSTRAP_CODE` 才会导入它们并注册相关钩子。
 
 `Cache-Control: no-store, no-cache, must-revalidate` 等响应头用于防止之后的页面加载复用缓存。它不能停止已经在页面内存中运行的旧 JavaScript、重连定时器或 WebSocket；通过 `file://` 直接打开文件时也不存在这些 HTTP 响应头。仍在运行的旧页面由下述 GUI 会话协议拦截。
 
@@ -78,10 +78,10 @@ const msg = JSON.parse(r);
 
 由 `sync_reg.serialize()` 生成。`sync_reg` 是 `SyncRegistry` 实例，注册了 `cheat`（`CheatOption`）和 `placer`（`Placer`）两个对象。序列化通过 `Serializable.to_dict()` 自动完成——包括简单属性和脚本单例的 `@property`。
 
-**发送**（手机端连接后拉取）：
+**发送**（手机端连接并申请 GUI 会话，同时拉取状态）：
 
 ```
-sync_reg.serialize()
+sync_reg.connect('<clientId>')
 ```
 
 **返回**：
@@ -117,27 +117,28 @@ GUI 收到后分别遍历 `cheat` 和 `placer` 对象更新状态。
 
 ### apply（Web → Python 控制）
 
-所有状态的修改统一走 `sync_reg.apply(json_str)`：
+正常连接后的状态修改统一走 `sync_reg.apply(json_str)`；PC 端的初始完整状态作为 `sync_reg.connect(...)` 的第二个参数传入，由 `connect()` 在取得会话后调用 `apply()`：
 
 **单个复选框切换**：
 
 ```javascript
-send(`sync_reg.apply('${JSON.stringify({cheat: {[key]: value}})}')`);
+send(`sync_reg.apply('${JSON.stringify({_clientId: clientId, cheat: {[key]: value}})}')`);
 ```
 
-**初始化同步全部状态**：
+**PC 端连接时同步全部状态**：
 
 ```javascript
-send(`sync_reg.apply('${JSON.stringify({
+const state = JSON.stringify({
   _clientId: clientId,          // 每个页面实例生成的唯一 ID
   cheat: cheatOption,           // Vue reactive 对象
   placer: { seedType: ..., ... }
-})}')`);
+});
+send(`sync_reg.connect('${clientId}', '${state}')`, true);
 ```
 
 Python 端 `SyncRegistry.apply()` 解析 JSON 后，遍历各对象调用 `Serializable.from_dict()`。`from_dict` 通过 `setattr` 写入——普通属性直接赋值，有 setter 的 `@property` 自动走 setter（如 `cheat_option.autoCollect = True` 会调用 `auto_collector.On()`）。
 
-完整状态回写必须携带 `_clientId`。后端会忽略不带该字段、且同时包含 `cheat` 和 `placer` 的旧版完整同步，防止浏览器中残留的旧页面在游戏重连后用默认值覆盖当前页面；单字段修改不受影响。
+官方 GUI 的每次 `apply()` 都携带 `_clientId`。存在活动会话时，后端会拒绝客户端 ID 不匹配或缺失的任何修改；即使当前没有活动会话，也会额外拒绝不带 `_clientId`、且同时包含 `cheat` 和 `placer` 的旧版完整同步，防止残留旧页面在游戏重连后用默认值覆盖状态。
 
 ### lineup（布阵码）
 
@@ -162,17 +163,17 @@ Python 端 `SyncRegistry.apply()` 解析 JSON 后，遍历各对象调用 `Seria
 
 ### PC 端：推送模式
 
-GUI 初始状态全为 `false`（除 `autoCollect` 和 `runBackground` 默认为 `true`）。连接建立后，`syncCheatOptions()` 将页面实例的 `_clientId`、当前 `cheatOption`（Vue reactive 对象）和 `placer` 状态合并为一次 `sync_reg.apply(...)` 发送。
+GUI 会将修改选项和放置器中的布尔开关保存到 `localStorage` 的 `pgvz-gui-checkbox-state` 项。下次打开时，PC 端先从 `localStorage` 恢复；没有已保存值的选项使用代码中的默认值。连接建立后，`syncCheatOptions()` 将页面实例的 `_clientId`、当前 `cheatOption`（Vue reactive 对象）和 `placer` 状态传给 `sync_reg.connect(...)`，在申请 GUI 会话的同时写入游戏。因此即使游戏是刚启动的新进程，也会恢复上次网页中勾选的状态。
 
 用户勾选复选框时，`watch(cheatOption)` 检测变化，通过 `setCheatOption(key, value)` 发送：
 
 ```javascript
-send(`sync_reg.apply('${JSON.stringify({cheat: {[key]: value}})}')`);
+send(`sync_reg.apply('${JSON.stringify({_clientId: clientId, cheat: {[key]: value}})}')`);
 ```
 
 ### 手机端：拉取模式
 
-手机浏览器可能被系统杀死后台页面，导致 GUI 状态丢失。连接建立后，先发 `sync_reg.serialize()` 拉取当前游戏内的完整状态，通过返回的 `sync` 消息同步回来。
+手机浏览器可能被系统杀死后台页面，导致 GUI 内存状态丢失。手机端不读取或写入上述 `localStorage` 项，并始终将游戏内状态视为权威状态。网页不需要预先判断游戏进程是否运行：WebSocket 连接成功本身就表示游戏的 `/Py` 服务正在运行；连接建立后，GUI 通过 `sync_reg.connect(clientId)` 拉取当前游戏内的完整状态。若游戏尚未运行，网页保持重连，直到连接成功后再同步。
 
 ## 如何新增一个修改选项
 
@@ -197,9 +198,9 @@ def xxx(self, value):
 
 `Serializable.to_dict()` 会自动发现 `@property` 并包含在序列化中。
 
-### 2. GUI 端：注册选项 (gui/cheat-gui.html)
+### 2. GUI 端：注册选项
 
-在 `optionConfig` 数组末尾添加 `'xxx'`，在对应 `<el-card>` 中添加 `<el-checkbox>`。
+在 `gui/js/app.js` 的对应 `switchGroups` 分组中添加 `'xxx'`。`optionConfig` 会自动从所有分组生成，`CheckGroupCard` 也会自动创建复选框，因此不需要再手写一份控件。随后在 `gui/js/i18n.js` 的中英文 `options` 中分别添加显示名称。
 
 ### 3. 通信流程
 
@@ -207,9 +208,9 @@ def xxx(self, value):
 用户勾选复选框
   → Vue watch 检测 cheatOption.xxx 变化
   → setCheatOption('xxx', true)
-  → send("sync_reg.apply('" + JSON.stringify({cheat: {xxx: true}}) + "')")
+  → send("sync_reg.apply('" + JSON.stringify({_clientId: clientId, cheat: {xxx: true}}) + "')")
   → WebSocket → IronPython 执行
-  → sync_reg.apply('{"cheat":{"xxx":true}}')
+  → sync_reg.apply('{"_clientId":"...","cheat":{"xxx":true}}')
   → json.loads → obj.from_dict → setattr(cheat_option, 'xxx', True)
   → 下一帧 hook 函数读取 cheat_option.xxx，执行对应逻辑
 ```
