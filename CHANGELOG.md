@@ -1,5 +1,19 @@
 # 更新日志
 
+## [1.13.1] - 2026-08-21
+
+### 改进
+
+- 更新 PGvZ 1.2.5 类型存根。
+- 更新 PGvZ 和 PvZ 差异文档，记录海蘑菇的新特性。
+- 新增游戏启动阶段 `Board` 静态初始化专题文档，完整记录墓碑关卡数组越界的根因、版本差异、就绪标志选择、修复边界与验证方法。
+- PC 自动安装脚本会先删除旧版修改器目录和文件再全新复制，避免覆盖安装遗留废文件；旧版顶层入口 `cheat.py` 则原地改名为 `.disabled` 文件，保留内容并阻止游戏继续加载。
+
+### 修复
+
+- 包导入失败不再阻止网页内自定义代码发送，使得包导入失败后能通过写自定义代码进行调试。
+- 网页连接游戏后会先等待 `LawnApp` 启动加载线程，再导入框架和修改器，避免游戏初始化期间过早触发 `Board` 静态构造而导致墓碑关卡数组越界。
+
 ## [1.13.0] - 2026-08-20
 
 ### 新增
@@ -210,7 +224,12 @@
 - 修复安卓部分区域无法自动收集、移除天尸诅咒不完整，以及过长命令结果挤出网页界面的问题。
 - 进入月夜无尽前检查屋顶无尽存档，避免未经提示直接覆盖。
 
-[1.10.0]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.9.1...v1.10.0
+[1.13.1]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.13.0...HEAD
+[1.13.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.0
+[1.12.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.12.0
+[1.11.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.11.0
+[1.10.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.10.1
+[1.10.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.10.0
 [1.9.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.9.1
 [1.9.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.9.0
 [1.8.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.8.1

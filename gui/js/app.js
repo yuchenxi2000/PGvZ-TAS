@@ -222,6 +222,8 @@ const app = createApp({
         let applyingRemoteState = false;
         let pendingCodes = [];
         let heartbeatTimer = null;
+        let bootstrapProbeTimer = null;
+        let bootstrapStarted = false;
 
         function dataLabel(item) {
             if (language.value === 'zh') return item.label;
@@ -336,6 +338,36 @@ const app = createApp({
             }
         }
 
+        function stopBootstrapProbe() {
+            if (bootstrapProbeTimer !== null) {
+                clearTimeout(bootstrapProbeTimer);
+                bootstrapProbeTimer = null;
+            }
+        }
+
+        function requestBootstrapReady() {
+            stopBootstrapProbe();
+            if (!ws || ws.readyState !== WebSocket.OPEN || bootstrapStarted) return;
+            ws.send(PGvZProtocol.BOOTSTRAP_READY_PROBE_CODE);
+        }
+
+        function retryBootstrapReady() {
+            stopBootstrapProbe();
+            bootstrapProbeTimer = setTimeout(requestBootstrapReady, 100);
+        }
+
+        function startBootstrap() {
+            if (bootstrapStarted || !ws || ws.readyState !== WebSocket.OPEN) return;
+            stopBootstrapProbe();
+            bootstrapStarted = true;
+            if (isMobile) {
+                send(`${PGvZProtocol.BOOTSTRAP_CODE}\nsync_reg.connect('${clientId}')`, true);
+            } else {
+                // 保证新游戏进程中先完成导入，再恢复网页保留的状态。
+                syncCheatOptions(true);
+            }
+        }
+
         watch(
             () => ({ ...cheatOption }),
             (newVal, oldVal) => {
@@ -382,20 +414,25 @@ const app = createApp({
         function connect() {
             ws = new WebSocket(SERVER_URL);
             ws.onopen = () => {
+                stopBootstrapProbe();
+                bootstrapStarted = false;
                 connected.value = false;
                 connectionState.value = 'connecting';
-                if (isMobile) {
-                    send(`${PGvZProtocol.BOOTSTRAP_CODE}\nsync_reg.connect('${clientId}')`, true);
-                } else {
-                    // 保证新游戏进程中先完成导入，再恢复网页保留的状态。
-                    syncCheatOptions(true);
-                }
+                requestBootstrapReady();
             };
             ws.onmessage = event => {
                 try {
                     const data = JSON.parse(event.data);
                     if (data.statuscode === 0) {
                         const msg = PGvZProtocol.parseResultMessage(data.result);
+                        if (msg && msg.action === 'bootstrapReady') {
+                            if (msg.ready) {
+                                startBootstrap();
+                            } else {
+                                retryBootstrapReady();
+                            }
+                            return;
+                        }
                         if (msg && msg.action === 'heartbeat') {
                             return;
                         }
@@ -434,6 +471,8 @@ const app = createApp({
                 }
             };
             ws.onclose = () => {
+                stopBootstrapProbe();
+                bootstrapStarted = false;
                 stopHeartbeat();
                 connected.value = false;
                 if (sessionRejected.value) {
@@ -455,7 +494,7 @@ const app = createApp({
                 return;
             }
             customCodeError.value = '';
-            send(customCode.value.trim());
+            send(customCode.value.trim(), true);  // 不然没法调试了...
         }
 
         function sendLineupCode() {

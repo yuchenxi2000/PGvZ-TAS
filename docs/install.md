@@ -4,13 +4,24 @@
 
 ### PC
 
-1. 将 `pgvz/`、`pgvztool/`、`gui/`、`cheat-gui.py` 复制到 mods 目录（位置见下方），或者直接运行 `cp-cheat-mods.bat` 自动完成安装
-2. 启动游戏，浏览器打开 `http://localhost:58080`
+1. 退出游戏。如果修改过旧版修改器中的文件，请先自行备份修改内容。
+2. 删除 mods 目录中的旧版 `pgvz/`、`pgvztool/`、`gui/`、`cheat-gui.py` 和 `cheat.py`，
+   不要直接覆盖安装，以免新版已经移除的文件残留，或旧版顶层入口继续被游戏自动加载。
+3. 将新版 `pgvz/`、`pgvztool/`、`gui/` 和 `cheat-gui.py` 复制到 mods 目录。
+4. 启动游戏，浏览器打开 `http://localhost:58080`。
+
+也可以直接运行 `cp-cheat-mods.bat` 自动完成第 2 至第 3 步。自动工具为避免擅自删除可能被
+用户修改过的内容，只会删除旧版 `pgvz/`、`pgvztool/`、`gui/` 和 `cheat-gui.py`；旧版
+`cheat.py` 会原地改名为 `cheat.py.disabled`。如果目标名称已存在，脚本会使用另一个以
+`.disabled` 结尾的名称，避免覆盖先前保留的文件。脚本不会处理其他模组，并会先检查安装
+包文件齐全，再开始清理旧版文件。
 
 ### 安卓
 
-1. 将所有文件（`pgvz/`、`pgvztool/`、`gui/`、`cheat-gui.py`）复制到 mods 目录（位置见下方）
-2. 启动游戏，浏览器打开 `http://localhost:58080`
+1. 退出游戏。如果修改过旧版修改器中的文件，请先自行备份修改内容。
+2. 删除 mods 目录中的旧版 `pgvz/`、`pgvztool/`、`gui/`、`cheat-gui.py` 和 `cheat.py`。
+3. 将新版 `pgvz/`、`pgvztool/`、`gui/` 和 `cheat-gui.py` 复制到 mods 目录。
+4. 启动游戏，浏览器打开 `http://localhost:58080`。
 
 ### mods 目录位置
 

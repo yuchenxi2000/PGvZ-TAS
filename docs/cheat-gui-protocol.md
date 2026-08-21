@@ -16,7 +16,7 @@
 
 位于 `cheat-gui.py`，使用 Python 标准库 `http.server`。启动时自动挂在 `localhost:58080`，将所有请求路由到 `gui/` 目录下的文件。根路径 `/` 返回 `gui/index.html`。
 
-游戏启动时只自动扫描 `mods/` 顶层的 `.py` 文件，因此此时执行的是 `cheat-gui.py`，它只配置模块搜索路径并启动 HTTP 服务。`pgvz/` 和 `pgvztool/` 是 Python 包，不会被游戏自动扫描；网页建立 WebSocket 连接后，`gui/js/protocol.js` 中的 `BOOTSTRAP_CODE` 才会导入它们并注册相关钩子。
+游戏启动时只自动扫描 `mods/` 顶层的 `.py` 文件，因此此时执行的是 `cheat-gui.py`，它只配置模块搜索路径并启动 HTTP 服务。`pgvz/` 和 `pgvztool/` 是 Python 包，不会被游戏自动扫描；网页建立 WebSocket 连接并确认游戏同步初始化完成后，`gui/js/protocol.js` 中的 `BOOTSTRAP_CODE` 才会导入它们并注册相关钩子。
 
 `Cache-Control: no-store, no-cache, must-revalidate` 等响应头用于防止之后的页面加载复用缓存。它不能停止已经在页面内存中运行的旧 JavaScript、重连定时器或 WebSocket；通过 `file://` 直接打开文件时也不存在这些 HTTP 响应头。仍在运行的旧页面由下述 GUI 会话协议拦截。
 
@@ -41,6 +41,33 @@
 ```
 
 `PyHub` 允许多个 WebSocket 同时连接，所有连接共用同一个 IronPython `ScriptScope`。它本身没有客户端身份、认证或独占机制，因此直接连接 `/Py` 的其他程序可以执行任意 Python，也可以绕过下述 GUI 会话协议。若要拒绝所有来源的第二个 WebSocket 连接，需要修改游戏的 C# `PyHub` 服务端。
+
+### 启动就绪探测
+
+游戏在 `Main.Initialize()` 中先启动 IronPython WebSocket 并执行顶层模组，随后才通过
+`base.Initialize()` 进入 `Main.LoadContent()`。场地尺寸等运行时常量由
+`SetupForResolution()` 中的 `Constants.Load*()` 设置，因此 WebSocket 可以在这些常量尚未
+完成初始化时就接受连接。
+
+GUI 建立 WebSocket 后不会立即发送 `BOOTSTRAP_CODE`，而是先发送只导入 `Sexy` 的
+`BOOTSTRAP_READY_PROBE_CODE`，检查：
+
+```python
+app = Sexy.GlobalStaticVars.gSexyAppBase
+ready = app is not None and app.mLoadingThreadStarted
+```
+
+`mLoadingThreadStarted` 由 `Main.LoadContent()` 最后的 `StartLoadingThread()` 设置，晚于
+`Constants.Load*()`、`GlobalStaticVars.initialize()` 和 `LawnApp.Init()/Start()`。探测未就绪
+时网页每 100 毫秒重试；就绪后才导入 `pgvz` 和 `pgvztool` 并申请 GUI 会话。不能使用
+`Constants.Loaded` 作为标志，因为各 `Constants.Load*()` 会在函数前段设置它，后续仍有
+大量字段尚未赋值。
+
+完整的异常表现、静态初始化根因、历史版本差异和修复边界见
+[启动阶段 `Board` 静态初始化与墓碑关卡数组越界](startup-board-static-initialization.md)。
+
+就绪响应使用 `{"action":"bootstrapReady","ready":...}` 与普通执行结果、状态同步和心跳
+区分。自定义代码仍允许在引导失败时直接发送，以便调试。
 
 ### JSON 引号问题
 

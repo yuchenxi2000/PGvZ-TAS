@@ -3293,6 +3293,7 @@ class GameSelector(Widget, QuickPlayWidgetListener, MiniGamesWidgetListener, Alm
     mDisabled : bool
     mDoFinger : bool
     mDoNewGameAfterStore : bool
+    mExitButton : DialogButton
     mFadeInCounter : int
     mFlowerReanimID : Array_1[Reanimation]
     mFullScreenButton : DialogButton
@@ -3325,6 +3326,7 @@ class GameSelector(Widget, QuickPlayWidgetListener, MiniGamesWidgetListener, Alm
     mMouseInsets : Insets
     mMouseVisible : bool
     mNeedToPlayRollIn : bool
+    mOnlineLevelsButton : DialogButton
     mOptionsButton : NewLawnButton
     mParent : WidgetContainer
     mPekingCounter : float
@@ -3408,6 +3410,7 @@ class GameSelector(Widget, QuickPlayWidgetListener, MiniGamesWidgetListener, Alm
     def RetractQuickPlayWidget(self) -> None: ...
     def SetButtonAvailable(self, button: DialogButton, available: bool, preserveVisibility: bool = ...) -> None: ...
     def ShouldDoZenTuturialBeforeAdventure(self) -> bool: ...
+    def ShowOnlineLevels(self) -> None: ...
     def SlideOutQuickPlayWidget(self) -> None: ...
     def SlideTo(self, theX: int, theY: int) -> None: ...
     def SwitchToCreativeLevel(self) -> None: ...
@@ -3503,6 +3506,7 @@ class GameSelectorButtons(typing.SupportsInt):
     FullScreen : GameSelectorButtons # 127
     Trophy : GameSelectorButtons # 128
     FumeshroomGnome : GameSelectorButtons # 129
+    OnlineLevels : GameSelectorButtons # 130
 
 
 class GameType(typing.SupportsInt):
@@ -4147,6 +4151,7 @@ class LawnApp(SexyAppBase):
     mDialogMap : Dictionary_2[int, Dialog]
     mDoubleProperties : Dictionary_2[str, float]
     mEasyPlantingCheat : bool
+    mEdition : LawnApp.Edition
     mEffectSystem : EffectSystem
     mFirstTimeGameSelector : bool
     mFullCompanyName : str
@@ -4527,6 +4532,32 @@ class LawnApp(SexyAppBase):
         def __call__(self) -> None:...
         @typing.overload
         def __call__(self, doExit: bool) -> None:...
+
+
+    class Edition(IEquatable_1[LawnApp.Edition]):
+        def __init__(self, HasComic: bool, HasOnlineLevels: bool) -> None: ...
+        @property
+        def HasComic(self) -> bool: ...
+        @HasComic.setter
+        def HasComic(self, value: bool) -> bool: ...
+        @property
+        def HasOnlineLevels(self) -> bool: ...
+        @HasOnlineLevels.setter
+        def HasOnlineLevels(self, value: bool) -> bool: ...
+        def Deconstruct(self, HasComic: clr.Reference[bool], HasOnlineLevels: clr.Reference[bool]) -> None: ...
+        def GetHashCode(self) -> int: ...
+        def __eq__(self, left: LawnApp.Edition, right: LawnApp.Edition) -> bool: ...
+        def __ne__(self, left: LawnApp.Edition, right: LawnApp.Edition) -> bool: ...
+        def ToString(self) -> str: ...
+        # Skipped Equals due to it being static, abstract and generic.
+
+        Equals : Equals_MethodGroup
+        class Equals_MethodGroup:
+            @typing.overload
+            def __call__(self, other: LawnApp.Edition) -> bool:...
+            @typing.overload
+            def __call__(self, obj: typing.Any) -> bool:...
+
 
 
 
@@ -6296,7 +6327,8 @@ class ProjectileType(typing.SupportsInt):
     TalismanMove : ProjectileType # 19
     TalismanSeal : ProjectileType # 20
     HypnoCattailSpike : ProjectileType # 21
-    ProjectilesCount : ProjectileType # 22
+    PuffGreen : ProjectileType # 22
+    ProjectilesCount : ProjectileType # 23
 
 
 class QuickPlayWidget(Widget):

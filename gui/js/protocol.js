@@ -1,4 +1,9 @@
 window.PGvZProtocol = (() => {
+    const BOOTSTRAP_READY_PROBE_CODE = [
+        'import Sexy',
+        "'{\"action\":\"bootstrapReady\",\"ready\":' + ('true' if Sexy.GlobalStaticVars.gSexyAppBase is not None and Sexy.GlobalStaticVars.gSexyAppBase.mLoadingThreadStarted else 'false') + '}'",
+    ].join('\n');
+
     const BOOTSTRAP_CODE = [
         'from pgvz import *',
         'from pgvztool import *',
@@ -31,6 +36,7 @@ window.PGvZProtocol = (() => {
     }
 
     return {
+        BOOTSTRAP_READY_PROBE_CODE,
         BOOTSTRAP_CODE,
         parseResultMessage,
         pyBool,
