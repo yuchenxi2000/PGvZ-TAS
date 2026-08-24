@@ -86,6 +86,9 @@ pause = Enter
 
 1. 打不开 http://localhost:58080
    请确认游戏已经启动，并且 cheat-gui.py 已经放在 mods 目录下。
+   如果无法判断是模组未加载、端口绑定失败还是本机网络拦截，请完全退出游戏，备份 mods 目录中的正式 cheat-gui.py，再用发布包 debug 目录中的 cheat-gui.py 覆盖它。
+   重启游戏后，调试入口会在游戏内显示 HTTP 服务启动结果、WebSocket 实际端口，以及 pgvz、pgvztool、gui 的关键文件检查结果。没有提示表示入口未运行；HTTP 绑定成功但网页仍打不开时，请排查防火墙、浏览器或本机网络环境。
+   排查完成后必须完全退出游戏并恢复正式 cheat-gui.py；调试入口不能用于正式游玩。
 
 2. 网页打开了，但显示连接失败
    可能是 WebSocket 端口不是 8080。可以依次尝试：
@@ -93,25 +96,30 @@ pause = Enter
    http://localhost:58080/?ws=ws://localhost:8082/Py
    http://localhost:58080/?ws=ws://localhost:8083/Py
 
-3. 按钮没有效果
-   请先看网页连接状态是否为“已连接到游戏服务器”。如果不是，请重启游戏和浏览器页面。
+3. 网页空白或内容缺失
+   HTTP 和 WebSocket 能连接不代表 gui 文件完整。完全退出游戏，删除 mods 中的旧 gui 目录，再从同一发布包重新复制；不要只覆盖旧目录。随后重新打开网页。
 
-4. 安卓上启动黑屏或闪退
+4. 按钮没有效果
+   先确认网页显示“已连接到游戏服务器”；否则按第 2 项排查 WebSocket 端口和连接状态。
+   安装或替换入口和 Python 包后必须完全重启游戏，只刷新网页不会重新加载 Python 文件。
+   确认 pgvz 和 pgvztool 来自同一发布包。完全退出游戏，删除这两个旧目录后重新复制；如果网页执行结果显示包导入异常，也应先重新复制它们。调试入口可以检查相关关键文件是否存在。
+
+5. 安卓上启动黑屏或闪退
    如果同时安装了很多模组，游戏初始化时可能加载太慢。可以先移除其他模组，只保留本修改器再试。
 
-5. 文件复制后仍然异常
+6. 文件复制后仍然异常
    请重新解压并复制。某些安卓文件管理器在解压或覆盖复制时可能漏文件。
 
-6. 自定义快捷键无效
+7. 自定义快捷键无效
    修改 keybinds.txt 后请重启游戏，并打开网页连接修改器。
    本修改器已适配常见非英文输入法；如果当前输入法仍然拦截快捷键，请切换到英文输入法后再试。
 
-7. 提示“另一个修改器页面已连接”
+8. 提示“另一个修改器页面已连接”
    同时只使用一个修改器网页。后打开的页面会被拒绝，请关闭当前页面，继续使用先前页面。
    如果只看见一个页面，请关闭浏览器中所有修改器标签页和窗口，等待最多 15 秒，再只打开一个 http://localhost:58080 页面。
    不要通过 file:// 直接打开 gui/index.html；它不会获得本地服务器提供的缓存控制响应头。
 
-8. 修改器显示的状态与游戏内不一致
+9. 修改器显示的状态与游戏内不一致
    先检查是否还开启了其他修改器、调试工具或游戏内置修改器。
    不同修改器可能各自修改同一个游戏变量，后执行的修改会改变游戏内的实际状态。各修改器界面通常只记录自己最后设置或同步到的值，不会实时感知其他入口所做的修改，因此界面显示可能仍是旧值。
    本修改器的单客户端保护只防止多个官方网页同时控制游戏，不会限制其他修改器或游戏内置修改器。
@@ -218,6 +226,9 @@ Full configuration guide: https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/doc
 
 1. Cannot open http://localhost:58080
    Make sure the game is running and cheat-gui.py is in the mods folder.
+   If you cannot tell whether the mod failed to load, the port failed to bind, or local networking blocked it, fully exit the game and back up the regular cheat-gui.py in the mods folder. Replace it with debug/cheat-gui.py from the release package.
+   After restarting, the debug entry displays the HTTP startup result, actual WebSocket port, and key-file checks for pgvz, pgvztool, and gui. No message means the entry did not run. If HTTP binding succeeds but the page still cannot open, check the firewall, browser, and local network environment.
+   Fully exit the game and restore the regular cheat-gui.py after diagnosis. The debug entry is not for normal play.
 
 2. Page opens but connection fails
    The WebSocket port may not be 8080. Try:
@@ -225,25 +236,30 @@ Full configuration guide: https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/doc
    http://localhost:58080/?ws=ws://localhost:8082/Py
    http://localhost:58080/?ws=ws://localhost:8083/Py
 
-3. Buttons do nothing
-   Check that the page says it is connected to the game server. If not, restart the game and refresh the page.
+3. The page is blank or missing content
+   Successful HTTP and WebSocket connections do not prove that the gui files are complete. Fully exit the game, delete the old gui directory from mods, and copy it again from the same release package instead of overwriting it. Then reopen the page.
 
-4. Android black screen or crash on startup
+4. Buttons do nothing
+   First confirm that the page says it is connected to the game server. Otherwise, troubleshoot the WebSocket port and connection state in item 2.
+   Fully restart the game after installing or replacing the entry and Python packages. Refreshing the page does not reload Python files in the game.
+   Make sure pgvz and pgvztool came from the same release package. Fully exit the game, delete both old directories, and copy them again. If the page reports a package-import error, recopy these directories first. The debug entry can check whether their key files exist.
+
+5. Android black screen or crash on startup
    Too many mods can slow down initialization. Try removing other mods and keeping only this tool.
 
-5. Still broken after copying files
+6. Still broken after copying files
    Extract and copy again. Some Android file managers may skip or damage files during extraction or overwrite.
 
-6. Custom keybinds do not work
+7. Custom keybinds do not work
    Restart the game after editing keybinds.txt, then open and connect the web console.
    Common non-English input methods are supported. If the current input method still intercepts shortcuts, switch to an English input method and try again.
 
-7. The page says another mod page is connected
+8. The page says another mod page is connected
    Use only one mod web page at a time. A later page is rejected; close it and continue using the page that was opened first.
    If only one page is visible, close every tab or window showing the mod page, wait up to 15 seconds, then open only one http://localhost:58080 page.
    Do not open gui/index.html through file:// because it does not receive the local server's cache-control headers.
 
-8. A mod's displayed state does not match the game
+9. A mod's displayed state does not match the game
    First check whether another mod, debugging tool, or the game's built-in cheat controls are enabled.
    Different modifiers may independently change the same game variable, and the last change determines the actual in-game state. Each interface usually remembers only the value it last set or synchronized and does not observe changes made through another control path in real time, so it may continue to display an older value.
    This tool's single-client protection only prevents multiple official web pages from controlling the game at once; it does not restrict other mods or the game's built-in cheat controls.

@@ -37,6 +37,7 @@ The game scans only top-level `mods/*.py` files. Package directories are not aut
 ## Implementation constraints
 
 - Runtime code must remain compatible with IronPython. Use `none_of(EnumType)` for C# enum members named `None`, quote modern annotations such as `'list[int]'`, and access game objects on the main game thread. See [IronPython and hooking notes](docs/scripting.md#5-ironpython-与-net-注意事项).
+- `debug/cheat-gui.py` hard-codes the expected installation files in `_pgvz_files`, `_pgvztool_files`, and `_gui_files`. Whenever files are added, removed, renamed, or moved under those directories, update the corresponding list; verify all three lists against the actual directory structure before committing.
 - Put cheat-mod `@HookTo` functions in `pgvztool/hook.py`. The framework driver hooks in `pgvz/__init__.py` are the intentional exception. Before changing a hook, inspect the current decompiled caller and the [hooking guide](docs/scripting.md#6-挂钩游戏方法); small methods may be inlined.
 - Before changing overlays or coordinate conversions, read [the rendering and coordinate-system document](docs/rendering.md).
 - Before changing WebSocket messages, client sessions, synchronization, persistence, or cheat toggles, read [the GUI protocol](docs/cheat-gui-protocol.md). Keep all user-facing option labels in both Chinese and English.

@@ -231,7 +231,7 @@
                         <div class="card-stack">
                             <el-card shadow="never" class="tool-card">
                                 <template #header>{{ t('sections.speed') }}</template>
-                                <el-radio-group v-model="speed" @change="value => send(`SetGlobalSpeed(${value})`)">
+                                <el-radio-group v-model="speed" @change="value => send(`_ = SetGlobalSpeed(${value})`)">
                                     <el-radio-button v-for="item in speedOptions" :key="item" :label="item">{{ item }}</el-radio-button>
                                 </el-radio-group>
                             </el-card>

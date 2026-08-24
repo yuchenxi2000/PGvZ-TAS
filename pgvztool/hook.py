@@ -631,6 +631,8 @@ def Board__RefreshSeedPacketFromCursor(orig, board: Lawn.Board):
     placer.active = False
     orig(board)
 
+EASY_PLACE_UI_SCALE = 0.7
+
 def DrawEasyPlaceUI(board: Lawn.Board, g: Sexy.Graphics):
     if board.mApp.mGameScene == Lawn.GameScenes.Playing and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
         shovel_rect = board.GetShovelButtonRect()
@@ -644,7 +646,17 @@ def DrawEasyPlaceUI(board: Lawn.Board, g: Sexy.Graphics):
         if placer.active:
             g.SetColorizeImages(True)
             g.SetColor(Sexy.SexyColor(200, 200, 200).Color)
-        g.DrawImage(Sexy.AtlasResources.IMAGE_TACO, btn_x - 7, btn_y - 3)
+        taco_image = Sexy.AtlasResources.IMAGE_TACO
+        taco_x = btn_x - 7
+        taco_y = btn_y - 3
+        Sexy.TodLib.TodCommon.TodDrawImageCenterScaledF(
+            g,
+            taco_image,
+            float(taco_x),
+            float(taco_y),
+            EASY_PLACE_UI_SCALE,
+            EASY_PLACE_UI_SCALE,
+        )
         g.SetColorizeImages(False)
 
         placer._ep_rect = Sexy.TRect(btn_x, btn_y, btn_w, btn_h)

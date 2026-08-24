@@ -22,6 +22,7 @@ REQUIRED_FILES = (
     "LICENSE",
 )
 REQUIRED_DIRS = (
+    "debug",
     "pgvz",
     "pgvztool",
 )
