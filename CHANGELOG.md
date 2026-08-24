@@ -1,5 +1,15 @@
 # 更新日志
 
+## [1.13.3] - 2026-08-24
+
+### 改进
+
+- 适配游戏 v1.2.6 版本，经测试版本更新没有影响到修改器、自动操作框架和存根。
+
+### 修复
+
+- 通过修改器模组 Hook 方式修复游戏自身的 bug：禅境花园中金盏花的所有变种都显示为白色。
+
 ## [1.13.2] - 2026-08-24
 
 ### 新增
@@ -240,7 +250,9 @@
 - 修复安卓部分区域无法自动收集、移除天尸诅咒不完整，以及过长命令结果挤出网页界面的问题。
 - 进入月夜无尽前检查屋顶无尽存档，避免未经提示直接覆盖。
 
-[1.13.1]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.13.0...HEAD
+[1.13.3]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.13.2...HEAD
+[1.13.2]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.2
+[1.13.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.1
 [1.13.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.0
 [1.12.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.12.0
 [1.11.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.11.0

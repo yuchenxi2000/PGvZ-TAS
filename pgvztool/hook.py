@@ -323,6 +323,22 @@ def NewGridItemZenTool(plant: Lawn.Plant):
     gridItem.mPosY = plant.mY + 40
     return gridItem
 
+# BUG FIX: 修复禅境花园里的金盏花没有应用盆栽存档中花色的问题
+@LawnMod.MonoModUtils.HookTo(Lawn.ZenGarden.PlacePottedPlant)
+def ZenGarden__PlacePottedPlant(orig, zenGarden: Lawn.ZenGarden, pottedPlantIndex: int):
+    plant = orig(zenGarden, pottedPlantIndex)
+    if plant is None or plant.mSeedType != Lawn.SeedType.Marigold:
+        return plant
+
+    pottedPlant = zenGarden.PottedPlantFromIndex(pottedPlantIndex)
+    variation = pottedPlant.mDrawVariation
+    variationValue = int(variation)
+    if int(Lawn.DrawVariation.MarigoldWhite) <= variationValue <= int(Lawn.DrawVariation.MarigoldLightGreen):
+        reanimation = zenGarden.mApp.ReanimationTryToGet(plant.mBodyReanimID)
+        if reanimation is not None:
+            zenGarden.mApp.mReanimatorCache.UpdateReanimationforVariation(reanimation, variation)
+    return plant
+
 # 全屏留声机、花肥、杀虫剂
 @LawnMod.MonoModUtils.HookTo(Lawn.ZenGarden.MouseDownWithFeedingTool)
 def ZenGarden__MouseDownWithFeedingTool(orig, zenGarden: Lawn.ZenGarden, x: int, y: int, theCursorType: Lawn.CursorType, isTouch: bool):
