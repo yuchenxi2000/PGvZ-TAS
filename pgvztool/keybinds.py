@@ -95,34 +95,73 @@ def build_reverse_map() -> 'dict[str, str]':
     return result
 
 
-def _physical_keycodes(ch: str) -> 'tuple[int, ...]':
-    """返回 ASCII 字母或数字对应的 MonoGame KeyCode。"""
+_KEYCODE_CHARS = {
+    9:   ('\t', '\t'),
+    13:  ('\n', '\n'),
+    32:  (' ', ' '),
+    48:  ('0', ')'), 49: ('1', '!'), 50: ('2', '@'), 51: ('3', '#'), 52: ('4', '$'),
+    53:  ('5', '%'), 54: ('6', '^'), 55: ('7', '&'), 56: ('8', '*'), 57: ('9', '('),
+    106: ('*', '*'), 107: ('+', '+'), 109: ('-', '-'), 110: ('.', '.'), 111: ('/', '/'),
+    186: (';', ':'), 187: ('=', '+'), 188: (',', '<'), 189: ('-', '_'),
+    190: ('.', '>'), 191: ('/', '?'), 192: ('`', '~'), 219: ('[', '{'),
+    220: ('\\', '|'), 221: (']', '}'), 222: ("'", '"'), 226: ('\\', '|'),
+}
+
+
+def _physical_keys(ch: str) -> 'tuple[tuple[int, bool], ...]':
+    """返回字符对应的 ``(MonoGame KeyCode, Shift)`` 组合。"""
     lower = ch.lower()
     if len(ch) == 1 and 'a' <= lower <= 'z':
-        return (ord(lower.upper()),)
+        keycode = ord(lower.upper())
+        return ((keycode, False), (keycode, True))
+
+    result = []
+    for keycode, chars in _KEYCODE_CHARS.items():
+        for shifted, key_ch in enumerate(chars):
+            if ch == key_ch:
+                result.append((keycode, bool(shifted)))
     if len(ch) == 1 and '0' <= ch <= '9':
-        # 顶排数字和 NumPad0~9。
-        return (ord(ch), 96 + int(ch))
-    return ()
+        # 小键盘数字不受主键盘 Shift 字符层影响。
+        numpad_keycode = 96 + int(ch)
+        result.append((numpad_keycode, False))
+        result.append((numpad_keycode, True))
+    return tuple(result)
 
 
-def build_physical_key_map() -> 'dict[int, str]':
-    """返回 {字母/数字 KeyCode -> 默认按键字符} 映射。
+def build_physical_key_map() -> 'dict[tuple[int, bool], str]':
+    """返回 ``{(KeyCode, Shift) -> 默认按键字符}`` 映射。
 
-    字母和数字的 KeyChar 都可能被输入法截获，但 MonoGame 的 KeyDown
-    仍会产生。标点依赖键盘布局和 Shift 状态，因此不在这里猜测。
+    Board 获得焦点时桌面文本组合会被关闭，因此所有受支持的 ASCII
+    快捷键都从 MonoGame KeyDown 分发，不经过输入法。
     """
     result = {}
-    # 未被重绑定的游戏原生字母和数字快捷键也要走 KeyDown。
+    # 未被重绑定的游戏原生快捷键也要走 KeyDown。
     for def_ch in _DEFAULT.values():
-        for keycode in _physical_keycodes(def_ch):
-            result[keycode] = def_ch
+        for physical_key in _physical_keys(def_ch):
+            result[physical_key] = def_ch
 
     binds = _load_config()
     for name, def_ch in _DEFAULT.items():
         cfg_ch = binds.get(name, def_ch)
         if cfg_ch == def_ch:
             continue
-        for keycode in _physical_keycodes(cfg_ch):
-            result[keycode] = def_ch
+        for physical_key in _physical_keys(cfg_ch):
+            result[physical_key] = def_ch
     return result
+
+
+def build_physical_input_chars() -> 'set[str]':
+    """返回已由 KeyDown 处理、应忽略后续 KeyChar 的输入字符。"""
+    chars = set()
+    binds = _load_config()
+    for name, def_ch in _DEFAULT.items():
+        for ch in (def_ch, binds.get(name, def_ch)):
+            if _physical_keys(ch):
+                chars.add(ch.lower() if ch.isalpha() else ch)
+    return chars
+
+
+def can_disable_text_composition() -> bool:
+    """所有实际绑定均可物理映射时，Board 可以完全关闭文本组合。"""
+    binds = _load_config()
+    return all(_physical_keys(binds.get(name, def_ch)) for name, def_ch in _DEFAULT.items())

@@ -11,7 +11,13 @@ from pgvz.rng import rng_manip
 from .cheat import cheat_option
 from .placer import placer
 from .tas import tas_manager
-from .keybinds import CUSTOM_ACTION_CHARS, build_physical_key_map, build_reverse_map
+from .keybinds import (
+    CUSTOM_ACTION_CHARS,
+    build_physical_input_chars,
+    build_physical_key_map,
+    build_reverse_map,
+    can_disable_text_composition,
+)
 import System
 # 关闭assertion，不然启动带命令行的游戏（Lawn.Console.exe）在输出过多时会卡死
 @LawnMod.MonoModUtils.HookTo(Sexy.Debug.ASSERT)
@@ -758,6 +764,7 @@ def DrawTrashcan(board: Lawn.Board, g: Sexy.Graphics):
 # 场地绘制统一钩子
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.Draw)
 def Board__Draw(orig, board: Lawn.Board, g: Sexy.Graphics):
+    _sync_desktop_ime_for_board(board)
     orig(board, g)
     # 进入Board坐标空间
     board.mCamera.ApplyTransform(g)
@@ -821,7 +828,10 @@ def TrailHolder__AllocTrailFromDef(orig, trailHolder: Sexy.TodLib.TrailHolder, t
 
 _key_reverse_map = build_reverse_map()
 _physical_key_map = build_physical_key_map()
+_physical_input_chars = build_physical_input_chars()
+_can_disable_text_composition = can_disable_text_composition()
 _dispatching_physical_key = False
+_desktop_board_ime_disabled = False
 _tas_key_action_indices = {
     CUSTOM_ACTION_CHARS['tas_save']: tas_manager.ACTION_SAVE,
     CUSTOM_ACTION_CHARS['tas_undo']: tas_manager.ACTION_UNDO,
@@ -856,38 +866,91 @@ def _handle_custom_keybind(board: Lawn.Board, ch: str):
     return False
 
 
-def _reset_desktop_ime_composition(board: Lawn.Board):
-    """取消桌面 SDL 输入法的当前组合串，关闭候选框。"""
-    ime_handler = board.mWidgetManager.mIMEHandler
+def _get_desktop_ime_handler(widget_manager: Sexy.WidgetManager):
+    ime_handler = widget_manager.mIMEHandler
     if ime_handler is None or str(ime_handler.GetType().Name) != 'SdlIMEHandler':  # type: ignore
+        return None
+    return ime_handler
+
+
+def _disable_desktop_board_ime(widget_manager: Sexy.WidgetManager):
+    """在 Board 接收物理快捷键期间关闭 SDL 文本组合。"""
+    global _desktop_board_ime_disabled
+    if _desktop_board_ime_disabled or not _can_disable_text_composition:
+        return
+    ime_handler = _get_desktop_ime_handler(widget_manager)
+    if ime_handler is None:
         return
     # MonoGame 启动时 SDL 文本输入可能已开启，但 IMEHandler.Enabled 仍为
-    # False。先 Start 同步状态，再 Stop 取消组合，最后 Start 恢复标点输入。
+    # False。先 Start 同步状态，再 Stop，确保实际关闭 SDL 文本组合。
+    ime_handler.StartTextComposition()
+    ime_handler.StopTextComposition()
+    _desktop_board_ime_disabled = True
+
+
+def _enable_desktop_ime(widget_manager: Sexy.WidgetManager):
+    """离开 Board 后恢复菜单和文本框原有的文本输入。"""
+    global _desktop_board_ime_disabled
+    if not _desktop_board_ime_disabled:
+        return
+    ime_handler = _get_desktop_ime_handler(widget_manager)
+    if ime_handler is not None:
+        ime_handler.StartTextComposition()
+    _desktop_board_ime_disabled = False
+
+
+def _reset_desktop_ime_composition(board: Lawn.Board):
+    """无法关闭文本组合时，保留旧的按键后清除组合串回退。"""
+    ime_handler = _get_desktop_ime_handler(board.mWidgetManager)
+    if ime_handler is None:
+        return
     ime_handler.StartTextComposition()
     ime_handler.StopTextComposition()
     ime_handler.StartTextComposition()
 
 
+def _sync_desktop_ime_focus(widget_manager: Sexy.WidgetManager):
+    if isinstance(widget_manager.mFocusWidget, Lawn.Board):
+        _disable_desktop_board_ime(widget_manager)
+    else:
+        _enable_desktop_ime(widget_manager)
+
+
+def _sync_desktop_ime_for_board(board: Lawn.Board):
+    # pgvztool 可能在 Board 已经获得焦点后才加载，Draw 用于首次同步。
+    if board.mWidgetManager.mFocusWidget == board:
+        _disable_desktop_board_ime(board.mWidgetManager)
+
+
+@LawnMod.MonoModUtils.HookTo(Sexy.WidgetManager.SetFocus)
+def WidgetManager__SetFocus(orig, widget_manager: Sexy.WidgetManager, widget: Sexy.Widget):
+    orig(widget_manager, widget)
+    _sync_desktop_ime_focus(widget_manager)
+
+
+@LawnMod.MonoModUtils.HookTo(Sexy.WidgetManager.GotFocus)
+def WidgetManager__GotFocus(orig, widget_manager: Sexy.WidgetManager):
+    orig(widget_manager)
+    _sync_desktop_ime_focus(widget_manager)
+
+
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.KeyDown)
 def Board__KeyDown(orig, board: Lawn.Board, theKey: Sexy.KeyCode):
-    """用物理字母/数字键触发快捷键，绕过输入法对 KeyChar 的截获。"""
+    """用物理键触发快捷键，绕过输入法对 KeyChar 的截获。"""
     global _dispatching_physical_key
     orig(board, theKey)
     keycode = int(theKey)
-    mapped = _physical_key_map.get(keycode)
+    key_down = board.mWidgetManager.mKeyDown
+    shift_down = bool(key_down[160] or key_down[161])  # LeftShift / RightShift
+    mapped = _physical_key_map.get((keycode, shift_down))
     if mapped is None:
         return
-    # Shift+顶排数字输入的是标点，仍交给 KeyChar 按键盘布局处理。
-    if ord('0') <= keycode <= ord('9'):
-        key_down = board.mWidgetManager.mKeyDown
-        if key_down[160] or key_down[161]:  # LeftShift / RightShift
-            return
     _dispatching_physical_key = True
     try:
         board.KeyChar(Sexy.SexyChar(System.Char(ord(mapped))))  # type: ignore
     finally:
         _dispatching_physical_key = False
-    if ord('A') <= keycode <= ord('Z'):
+    if not _can_disable_text_composition and ord('A') <= keycode <= ord('Z'):
         _reset_desktop_ime_composition(board)
 
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.KeyChar)
@@ -899,14 +962,10 @@ def Board__KeyChar(orig, board: Lawn.Board, theChar: Sexy.SexyChar):
             return
         orig(board, theChar)
         return
-    # 英文输入法还会在 KeyDown 后产生 KeyChar。字母/数字快捷键已由上面的
-    # KeyDown 钩子处理，这里丢弃文本事件，避免一次按键触发两次。
-    if len(ch) == 1:
-        lower = ch.lower()
-        if 'a' <= lower <= 'z' and ord(lower.upper()) in _physical_key_map:
-            return
-        if '0' <= ch <= '9' and ord(ch) in _physical_key_map:
-            return
+    # 未关闭文本组合的平台仍可能在 KeyDown 后产生 KeyChar，需避免重复触发。
+    normalized_ch = ch.lower() if ch.isalpha() else ch
+    if normalized_ch in _physical_input_chars:
+        return
     mapped = _key_reverse_map.get(ch)
     if mapped is not None:
         ch = mapped
