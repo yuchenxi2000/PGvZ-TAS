@@ -26,7 +26,7 @@ SDL 文本输入/输入法
 
 ## 修改器适配
 
-`pgvztool/keybinds.py` 将常用 ASCII 字母、数字、控制键和美式键位标点转换为 `(KeyCode, Shift)`；`pgvztool/hook.py` 在 `Board.KeyDown()` 中直接分发对应功能。
+`pgvztool/keybinds.py` 中的 `KeybindHandler` 统一管理配置、物理映射、输入法状态和功能分发，并将常用 ASCII 字母、数字、控制键和美式键位标点转换为 `(KeyCode, Shift)`。`pgvztool/hook.py` 仅保留项目要求集中声明的 Hook，并将 `Board.KeyDown()` 等事件委托给处理类。
 
 桌面 SDL 后端在 `Board` 获得焦点时关闭文本组合，因此按下字母快捷键前输入法不会建立组合串，也不会显示或闪烁选词框。焦点离开 `Board` 后立即恢复文本组合，用户名等文本框仍可正常输入。由于修改器可能在关卡已经开始后才由网页连接加载，`Board.Draw()` 还负责首次状态同步。
 
