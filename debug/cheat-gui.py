@@ -7,34 +7,10 @@ mods 目录并覆盖正式 cheat-gui.py；排查完成后必须恢复正式入�
 import sys
 import System
 import System.IO
-import System.Reflection
-import Sexy
 
 
 _GUI_PORT = 58080
-_game = Sexy.Main.GamerServicesComp.Game
-
-
-def _get_websocket_port():
-    """读取 IronPyInteractive 已选定、将在模组加载完成后监听的端口。"""
-    binding_flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static  # type: ignore
-    ironpy_type = _game.GetType().Assembly.GetType('LawnMod.IronPyInteractive')  # type: ignore
-    if ironpy_type is None:
-        raise RuntimeError('LawnMod.IronPyInteractive type was not found')
-    server_field = ironpy_type.GetField('mWS', binding_flags)
-    if server_field is None:
-        raise RuntimeError('IronPyInteractive.mWS field was not found')
-    websocket_server = server_field.GetValue(None)
-    if websocket_server is None:
-        raise RuntimeError('IronPyInteractive.mWS has not been created')
-    return int(websocket_server.Port)
-
-
-try:
-    _websocket_port = _get_websocket_port()
-    _websocket_status = 'WebSocket 端口: {}'.format(_websocket_port)
-except Exception as error:
-    _websocket_status = 'WebSocket: 读取失败（{}）'.format(error)
+_DIALOG_ID = 900
 
 
 # Android: IronPython 库位于 CurrentDirectory/IronPython/Libs。
@@ -55,6 +31,43 @@ modsDirPath = System.IO.Path.Combine(
 )
 sys.path.append(pyLibPath)
 sys.path.append(modsDirPath)
+
+
+# 先启动 HTTP 服务，再访问任何游戏类型。Android 上游戏类型或弹窗不可用时，
+# 诊断页面仍应当可访问。
+try:
+    import http.server
+    import os
+    import socketserver
+    import threading
+    import urllib.parse
+
+    class _GUIHandler(http.server.SimpleHTTPRequestHandler):
+        def translate_path(self, path):
+            path = urllib.parse.unquote(path.split('?', 1)[0]).lstrip('/')
+            gui_dir = os.path.join(modsDirPath, 'gui')
+            return os.path.join(gui_dir, path) if path else gui_dir
+
+        def end_headers(self):
+            self.send_header(
+                'Cache-Control',
+                'no-store, no-cache, must-revalidate, max-age=0',
+            )
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Expires', '0')
+            super().end_headers()
+
+        def log_message(self, format, *args):
+            pass
+
+    class _ThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+        daemon_threads = True
+
+    _server = _ThreadingServer(('127.0.0.1', _GUI_PORT), _GUIHandler)
+    threading.Thread(target=_server.serve_forever, daemon=True).start()
+    _http_status = 'HTTP {}: OK'.format(_server.server_port)
+except Exception as error:
+    _http_status = 'HTTP {}: 失败（{}）'.format(_GUI_PORT, error)
 
 
 def _join_mod_path(relative_path):
@@ -142,39 +155,32 @@ _file_status = (
 )
 
 
+def _get_websocket_port():
+    """读取 IronPyInteractive 已选定、将在模组加载完成后监听的端口。"""
+    import System.Reflection
+
+    binding_flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static  # type: ignore
+    ironpy_type = None
+    for assembly in System.AppDomain.CurrentDomain.GetAssemblies():
+        ironpy_type = assembly.GetType('LawnMod.IronPyInteractive')
+        if ironpy_type is not None:
+            break
+    if ironpy_type is None:
+        raise RuntimeError('LawnMod.IronPyInteractive type was not found')
+    server_field = ironpy_type.GetField('mWS', binding_flags)
+    if server_field is None:
+        raise RuntimeError('IronPyInteractive.mWS field was not found')
+    websocket_server = server_field.GetValue(None)
+    if websocket_server is None:
+        raise RuntimeError('IronPyInteractive.mWS has not been created')
+    return int(websocket_server.Port)
+
+
 try:
-    import http.server
-    import os
-    import socketserver
-    import threading
-    import urllib.parse
-
-    class _GUIHandler(http.server.SimpleHTTPRequestHandler):
-        def translate_path(self, path):
-            path = urllib.parse.unquote(path.split('?', 1)[0]).lstrip('/')
-            gui_dir = os.path.join(modsDirPath, 'gui')
-            return os.path.join(gui_dir, path) if path else gui_dir
-
-        def end_headers(self):
-            self.send_header(
-                'Cache-Control',
-                'no-store, no-cache, must-revalidate, max-age=0',
-            )
-            self.send_header('Pragma', 'no-cache')
-            self.send_header('Expires', '0')
-            super().end_headers()
-
-        def log_message(self, format, *args):
-            pass
-
-    class _ThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
-        daemon_threads = True
-
-    _server = _ThreadingServer(('127.0.0.1', _GUI_PORT), _GUIHandler)
-    threading.Thread(target=_server.serve_forever, daemon=True).start()
-    _http_status = 'HTTP {}: OK'.format(_server.server_port)
+    _websocket_port = _get_websocket_port()
+    _websocket_status = 'WebSocket 端口: {}'.format(_websocket_port)
 except Exception as error:
-    _http_status = 'HTTP {}: 失败（{}）'.format(_GUI_PORT, error)
+    _websocket_status = 'WebSocket: 读取失败（{}）'.format(error)
 
 
 _message = (
@@ -184,5 +190,63 @@ _message = (
     '仅供故障排查；游玩前请恢复正式 cheat-gui.py。'
 ).format(_http_status, _websocket_status, _file_status)
 
-Sexy.Debug.Log('[PGvZTool debug loader]\n' + _message)
-_game.ShowMessageBox(0, 'PGvZTool 调试入口 / Debug', _message)  # type: ignore
+
+_report_path = System.IO.Path.Combine(
+    modsDirPath,
+    'pgvztool-debug-report.txt',
+)
+
+
+def _write_report(message):
+    try:
+        System.IO.File.WriteAllText(_report_path, message)
+    except Exception:
+        pass
+
+
+# 顶层模组在 Main.Initialize() 内加载，此时 LawnApp 还没有创建。通过
+# LoadingCompleted 延后到游戏资源和对话框系统就绪后，再在主线程显示诊断结果。
+try:
+    import Lawn
+    import LawnMod
+
+    @LawnMod.MonoModUtils.HookTo(Lawn.LawnApp.LoadingCompleted)
+    def LawnApp__LoadingCompleted(orig, lawnapp):
+        orig(lawnapp)
+        try:
+            lawnapp.KillDialog(_DIALOG_ID)
+            lawnapp.DoDialog(
+                _DIALOG_ID,
+                True,
+                'PGvZTool 调试入口 / Debug',
+                _message,
+                '关闭 / Close',
+                3,
+            )
+        except Exception as error:
+            _write_report(
+                _report_message + '\n游戏内弹窗：显示失败（{}）'.format(error),
+            )
+            try:
+                import Sexy
+                Sexy.Debug.Log(
+                    '[PGvZTool debug loader] dialog failed: ' + str(error),
+                )
+            except Exception:
+                pass
+except Exception as error:
+    _dialog_status = '游戏内弹窗：注册失败（{}）'.format(error)
+else:
+    _dialog_status = '游戏内弹窗：已注册，将在进入主界面时显示'
+
+_report_message = _message + '\n' + _dialog_status
+
+
+# Android 上若游戏内弹窗仍无法显示，可直接在 mods 目录读取这份报告。
+_write_report(_report_message)
+
+try:
+    import Sexy
+    Sexy.Debug.Log('[PGvZTool debug loader]\n' + _report_message)
+except Exception:
+    pass
