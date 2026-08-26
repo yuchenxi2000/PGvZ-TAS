@@ -248,10 +248,13 @@
                                         <el-button type="primary" @click="send(`cheat_option.EnterNewGame(Lawn.GameMode.${selectedLevel})`)">{{ t('actions.enterLevel') }}</el-button>
                                         <el-button @click="send(`Sexy.GlobalStaticVars.gLawnApp.mGameMode = Lawn.GameMode.${selectedLevel}`)">{{ t('actions.chaosLevel') }}</el-button>
                                     </div>
-                                    <div class="control-line">
-                                        <span>{{ t('fields.survivalStage') }}</span>
-                                        <el-input-number v-model="numSurvivalStage" :min="0" :max="2147483647" size="small" />
-                                        <el-button @click="send(`Sexy.GlobalStaticVars.gLawnApp.mBoard.mChallenge.mSurvivalStage = ${numSurvivalStage}`)">{{ t('actions.apply') }}</el-button>
+                                    <div class="resource-row">
+                                        <div class="resource-value">
+                                            <el-input-number v-model="numSurvivalStage" :min="0" :max="2147483647" size="small"></el-input-number>
+                                        </div>
+                                        <div class="resource-action">
+                                            <el-button type="success" @click="send(`Sexy.GlobalStaticVars.gLawnApp.mBoard.mChallenge.mSurvivalStage = ${numSurvivalStage}`)">{{ t('fields.survivalStage') }}</el-button>
+                                        </div>
                                     </div>
                                     <el-button type="primary" @click="send(`cheat_option.EnterMoonEndless()`)">{{ t('actions.enterMoonEndless') }}</el-button>
                                 </div>
@@ -286,7 +289,7 @@
                                 <el-select v-model="selectedLineUp" clearable :disabled="!selectedScene" :placeholder="t('placeholders.lineup')" @change="onSelectLineUp">
                                     <el-option v-for="opt in currentLineupList" :key="opt.value" :label="opt.label" :value="opt.value" />
                                 </el-select>
-                                <el-input v-model="lineupCode" type="textarea" :rows="7" resize="vertical" />
+                                <el-input v-model="lineupCode" type="textarea" :rows="7" resize="vertical"></el-input>
                                 <div class="button-grid two">
                                     <el-button type="primary" @click="sendLineupCode">{{ t('actions.applyLineup') }}</el-button>
                                     <el-button @click="getLineupCode">{{ t('actions.getLineup') }}</el-button>

@@ -1,5 +1,11 @@
 # 更新日志
 
+## [1.13.5] - 2026-08-26
+
+### 修复
+
+- 修复网页修改器中布阵码操作按钮与生存模式轮数设置按钮不显示的问题。
+
 ## [1.13.4] - 2026-08-26
 
 ### 改进
@@ -260,7 +266,9 @@
 - 修复安卓部分区域无法自动收集、移除天尸诅咒不完整，以及过长命令结果挤出网页界面的问题。
 - 进入月夜无尽前检查屋顶无尽存档，避免未经提示直接覆盖。
 
-[1.13.3]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.13.2...HEAD
+[1.13.5]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.13.4...HEAD
+[1.13.4]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.4
+[1.13.3]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.3
 [1.13.2]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.2
 [1.13.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.1
 [1.13.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.0
