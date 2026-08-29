@@ -716,7 +716,7 @@ def DrawSeedPacketNumbers(seedbank: Lawn.SeedBank, g: Sexy.Graphics):
             continue
         text = str(packet.mIndex + 1)
         x = 3
-        y = packet.mOffsetY + packet.mHeight // 2
+        y = packet.mOffsetY
         Sexy.TodLib.TodCommon.TodDrawString(g, text, x + 1, y + 1, font, shadow_color, justification)
         Sexy.TodLib.TodCommon.TodDrawString(g, text, x, y, font, text_color, justification)
         packet.EndDraw(g)
