@@ -23,6 +23,8 @@ class CheatOption(Serializable):
         self.potatoNoCooling = False
         self.disableTalisman = False
         self.disableNinja = False
+        self.jackInTheBoxNoExplode = False
+        self.jalapenoHeadNoExplode = False
         self.visibleGhoul = False
         self.noThunder = False
         self.diamondZenTools = False
@@ -47,6 +49,7 @@ class CheatOption(Serializable):
         self.gloveNoCooling = False
         self.enableTrashcan = False
         self.showWaveInfo = False
+        self.showSeedPacketNumbers = False
         self.drawSquirrel = False
         self.tasEnabled = True
 

@@ -74,3 +74,18 @@ case RenderObjectType.TopUi:
 当前 `pgvztool/hook.py` 中的 `Board.Draw` 钩子分两个阶段绘制：
 1. Camera Apply（场地坐标）→ 画植物/僵尸血量
 2. Camera Reset（屏幕坐标）→ 画轻松放置 UI、波数信息
+
+### 种子栏叠加绘制
+
+`SeedBank.Draw()` 在正常关卡中按以下顺序定位每张卡片：
+
+1. `SeedBank.BeginDraw()` 叠加种子栏的 `mX/mY`；
+2. 正式游戏场景中再减去 `Board_Offset_AspectRatio_Correction`；
+3. `SeedPacket.BeginDraw()` 叠加卡片的 `mX/mY`；
+4. 传送带卡片还会在局部绘制坐标中使用 `mOffsetY`。
+
+卡槽叠加层应在 `SeedBank.Draw` 钩子的 `orig` 之后绘制。此时仍位于种子栏局部坐标，
+可直接使用 `SeedPacket.mX/mY/mOffsetY`；传送带模式需重新设置 `ConveyorBeltClipRect`，绘制后清除。
+不要在 `Board.Draw` 末尾复现种子栏变换，否则编号会脱离传送带的裁剪与绘制批次。
+老虎机关卡会在 `SeedPacket.DrawBackground()` 中改用 `Challenge.SlotMachineRect()` 的横向布局，
+不适用普通种子栏坐标。

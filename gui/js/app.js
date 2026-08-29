@@ -171,6 +171,8 @@ const app = createApp({
             features: [
                 'disableTalisman',
                 'disableNinja',
+                'jackInTheBoxNoExplode',
+                'jalapenoHeadNoExplode',
                 'diamondZenTools',
                 'autoRestock',
                 'mushroomAwake',
@@ -190,6 +192,7 @@ const app = createApp({
                 'visibleGhoul',
                 'noThunder',
                 'noCover',
+                'showSeedPacketNumbers',
                 'showWaveInfo',
                 'drawPlantHp',
                 'drawZombieHp',

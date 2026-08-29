@@ -284,6 +284,18 @@ def Zombie_UpdateNinja(orig, zombie: Lawn.Zombie):
     if zombie.mZombiePhase == Lawn.ZombiePhase.ZombieNormal and cheat_option.disableNinja:
         zombie.mZombiePhase = Lawn.ZombiePhase.NinjaShownByPlantern
 
+# 玩偶匣僵尸不爆炸
+@LawnMod.MonoModUtils.HookTo(Lawn.Zombie.UpdateZombieJackInTheBox)
+def Zombie__UpdateZombieJackInTheBox(orig, zombie: Lawn.Zombie):
+    if not cheat_option.jackInTheBoxNoExplode:
+        orig(zombie)
+
+# 辣椒僵尸不爆炸
+@LawnMod.MonoModUtils.HookTo(Lawn.Zombie.UpdateZombieJalapenoHead)
+def Zombie__UpdateZombieJalapenoHead(orig, zombie: Lawn.Zombie):
+    if not cheat_option.jalapenoHeadNoExplode:
+        orig(zombie)
+
 # 隐形僵尸关卡僵尸显形。显形方法是偷偷把关卡ID换成其他的。这样不用写一大堆代码
 @LawnMod.MonoModUtils.HookTo(Lawn.Zombie.Draw)
 def Zombie__Draw(orig, zombie: Lawn.Zombie, graphics: Sexy.Graphics):
@@ -683,6 +695,39 @@ def DrawEasyPlaceUI(board: Lawn.Board, g: Sexy.Graphics):
             g.SetColor(Sexy.SexyColor(255, 0, 0).Color)
             g.DrawRect(placer.portal_placer.select_portal_rect)
             g.SetColorizeImages(False)
+
+def DrawSeedPacketNumbers(seedbank: Lawn.SeedBank, g: Sexy.Graphics):
+    board = seedbank.mBoard
+    if board.mApp.mGameScene != Lawn.GameScenes.Playing or board.mApp.IsSlotMachineLevel():
+        return
+    if board.mCutScene is not None and board.mCutScene.IsBeforePreloading():
+        return
+
+    # SeedBank.Draw 返回时仍保持种子栏的局部坐标，直接沿用其变换与传送带裁剪。
+    if board.HasConveyorBeltSeedBank():
+        g.SetClipRect(Sexy.Constants.ConveyorBeltClipRect)
+    font = Sexy.Resources.FONT_DWARVENTODCRAFT12
+    shadow_color = Sexy.SexyColor(0, 0, 0, 220)
+    text_color = Sexy.SexyColor(255, 255, 255)
+    justification = Sexy.TodLib.DrawStringJustification.LeftVerticalMiddle
+    for i in range(seedbank.mNumPackets):
+        packet = seedbank.mSeedPackets[i]
+        if packet.mPacketType == SeedTypeNone or not packet.BeginDraw(g):
+            continue
+        text = str(packet.mIndex + 1)
+        x = 3
+        y = packet.mOffsetY + packet.mHeight // 2
+        Sexy.TodLib.TodCommon.TodDrawString(g, text, x + 1, y + 1, font, shadow_color, justification)
+        Sexy.TodLib.TodCommon.TodDrawString(g, text, x, y, font, text_color, justification)
+        packet.EndDraw(g)
+    if board.HasConveyorBeltSeedBank():
+        g.ClearClipRect()
+
+@LawnMod.MonoModUtils.HookTo(Lawn.SeedBank.Draw)
+def SeedBank__Draw(orig, seedbank: Lawn.SeedBank, g: Sexy.Graphics):
+    orig(seedbank, g)
+    if cheat_option.showSeedPacketNumbers:
+        DrawSeedPacketNumbers(seedbank, g)
 
 def DrawWaveInfo(board: Lawn.Board, g: Sexy.Graphics):
     # 在进度条下面画波数信息
