@@ -35,4 +35,16 @@ def WhackZombie():
         Card(Lawn.SeedType.Gravebuster, grave_list[0][1] + 1, grave_list[0][0] + 1)
 
 # 锤僵尸
-script_whackazombie = script_manager.Register(WhackZombie, gamemode=Lawn.GameMode.ChallengeWhackAZombie)
+def IsWhackAZombie():
+    gamemode = GetLawnApp().mGameMode
+    if gamemode == Lawn.GameMode.ChallengeWhackAZombie:
+        return True
+    elif gamemode == Lawn.GameMode.Adventure:
+        return GetBoard().mLevel == 15
+    else:
+        return False
+
+script_whackazombie = script_manager.Register(
+    WhackZombie,
+    conf=ScriptConf(ScriptRunMode.FOREVER, IsWhackAZombie)
+)
