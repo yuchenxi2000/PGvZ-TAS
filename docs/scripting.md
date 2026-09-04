@@ -565,7 +565,7 @@ script_manager.Unregister(script_pe12)    # 卸载
 
 ### 1. 查看日志
 
-桌面版可运行带命令行窗口的 `Lawn.Console.exe`。脚本中使用：
+桌面版可以运行带控制台窗口的游戏程序。脚本中使用：
 
 ```python
 import Sexy
@@ -573,8 +573,13 @@ import Sexy
 Sexy.Debug.Log('script reached wave 10')
 ```
 
-某些游戏构建的 `Lawn.Console.exe` 本身无法启动，这是游戏版本问题；遇到这种情况应换用
-可运行控制台的对应游戏构建，或通过修改器“自定义”区域分段执行代码排查。
+游戏历史版本使用过不同的发布方式：有些版本保留外置 `Lawn.dll`，附带的
+`Lawn.Console.exe` 可以直接运行；有些版本只把完整游戏打包进单文件 `Lawn.exe`，但
+`Lawn.Console.exe` 仍依赖未随游戏发布的 `Lawn.dll`，因而无法启动。遇到后一种情况，
+可以使用仓库中的 PowerShell 工具从 `Lawn.exe` 生成控制台版副本。原因、判断方法和
+操作步骤见 [Windows 控制台版游戏](windows-console-game.md)。
+
+如果暂时不需要持续查看日志，也可以通过修改器“自定义”区域分段执行代码排查。
 
 ### 2. 使用类型存根
 
