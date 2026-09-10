@@ -46,10 +46,12 @@ class CheatOption(Serializable):
         self.selectZombieHp = False
         self.shovelNoReset = False
         self.runBackground = False
+        self.skipLevelIntro = False
         self.gloveNoCooling = False
         self.enableTrashcan = False
         self.showWaveInfo = False
         self.showSeedPacketNumbers = False
+        self.showCraterCooldown = False
         self.drawSquirrel = False
         self.tasEnabled = True
 
@@ -458,6 +460,45 @@ class CheatOption(Serializable):
         GetLawnApp().mEasyPlantingCheat = value
 
 cheat_option = CheatOption()
+
+# 跳过关卡入场动画。脚本始终运行并记录场景边沿，以支持修改器晚连接、
+# 开关动态启用和同一 Board 的生存模式换轮。
+_skip_level_intro_state = {
+    'board': None,
+    'scene': None,
+    'enabled': False,
+}
+
+def ScriptSkipLevelIntro():
+    lawnapp = GetLawnApp()
+    board = lawnapp.mBoard
+    scene = lawnapp.mGameScene
+    enabled = cheat_option.skipLevelIntro
+    is_level_intro = board is not None and scene == Lawn.GameScenes.LevelIntro
+    entering_intro = is_level_intro and (
+        _skip_level_intro_state['board'] is not board
+        or _skip_level_intro_state['scene'] != Lawn.GameScenes.LevelIntro
+    )
+    enabled_during_intro = is_level_intro and enabled and not _skip_level_intro_state['enabled']
+
+    # 先记录状态；CancelIntro 可能弹出 Rose 模态对话框并暂停 Board。
+    _skip_level_intro_state['board'] = board
+    _skip_level_intro_state['scene'] = scene
+    _skip_level_intro_state['enabled'] = enabled
+
+    if not enabled or not (entering_intro or enabled_during_intro):
+        return
+    if lawnapp.mGameMode in (Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
+        return
+    cutscene = board.mCutScene
+    if cutscene is None or cutscene.mSeedChoosing:
+        return
+    # 游戏原生会自动取消没有戴夫对话的非滚屏入场，不要重复调用。
+    if cutscene.IsNonScrollingCutscene() and cutscene.mCrazyDaveTime == 0:
+        return
+    cutscene.CancelIntro()
+
+script_manager.Register(ScriptSkipLevelIntro, runmode=ScriptRunMode.GLOBAL)
 
 # 无限阳光
 def ScriptInfSun():

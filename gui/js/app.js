@@ -152,6 +152,7 @@ const app = createApp({
             common: [
                 'autoCollect',
                 'runBackground',
+                'skipLevelIntro',
                 'freePlant',
                 'noCooldown',
                 'plantAnyWhere',
@@ -193,6 +194,7 @@ const app = createApp({
                 'noThunder',
                 'noCover',
                 'showSeedPacketNumbers',
+                'showCraterCooldown',
                 'showWaveInfo',
                 'drawPlantHp',
                 'drawZombieHp',

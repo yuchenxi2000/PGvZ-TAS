@@ -835,6 +835,7 @@ def MainScript():
 - [示例脚本说明](../scripts/README.md)
 - [PGvZ 与 PvZ 的异同](pgvz-vs-pvz.md)
 - [游戏速度控制机制](speed-control.md)
+- [关卡入场动画与自动跳过](level-intro.md)
 - [僵尸波次刷新机制与时间操作实现](zombie-spawning.md)
 - [坐标系统与绘制](rendering.md)
 - [TAS 功能](tas.md)

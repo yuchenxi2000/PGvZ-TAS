@@ -620,6 +620,35 @@ def DrawZombieHpAll(board: Lawn.Board, g: Sexy.Graphics):
         DrawZombieHp(zombie, g, 0, 0, color5, color6, color7, color8)
     g.SetColorizeImages(False)
 
+CRATER_COOLDOWN_BAR_WIDTH = 60
+CRATER_COOLDOWN_BAR_HEIGHT = 5
+
+def DrawCraterCooldowns(board: Lawn.Board, g: Sexy.Graphics):
+    bar_color = Sexy.SexyColor(192, 192, 192, 255).Color
+    bar_background = Sexy.SexyColor(128, 128, 128, 255).Color
+    max_counter = Lawn.GameConstants.CRATER_TIME
+
+    for i in range(board.mGridItems.Count):
+        crater = board.mGridItems[i]
+        if (
+            crater.mDead
+            or crater.mGridItemType != Lawn.GridItemType.Crater
+            or crater.mGridItemCounter <= 0
+        ):
+            continue
+        grid_x, grid_y = GridToPixel(board, (crater.mGridX, crater.mGridY))
+        bar_x = grid_x + 10
+        bar_y = grid_y + 65
+        remaining = min(crater.mGridItemCounter, max_counter)
+        remaining_width = int(CRATER_COOLDOWN_BAR_WIDTH * remaining / max_counter)
+
+        g.SetColorizeImages(True)
+        g.SetColor(bar_background)
+        g.FillRect(bar_x, bar_y, CRATER_COOLDOWN_BAR_WIDTH, CRATER_COOLDOWN_BAR_HEIGHT)
+        g.SetColor(bar_color)
+        g.FillRect(bar_x, bar_y, remaining_width, CRATER_COOLDOWN_BAR_HEIGHT)
+        g.SetColorizeImages(False)
+
 # 连续铲子
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.MouseDownWithTool)
 def Board__MouseDownWithTool(orig, board: Lawn.Board, x: int, y: int, clickCnt: int, cursorType: Lawn.CursorType, posScaled: bool, isTouch: bool):
@@ -813,6 +842,8 @@ def Board__Draw(orig, board: Lawn.Board, g: Sexy.Graphics):
         DrawPlantHpAll(board, g)
     if cheat_option.drawZombieHp:
         DrawZombieHpAll(board, g)
+    if cheat_option.showCraterCooldown:
+        DrawCraterCooldowns(board, g)
     if cheat_option.drawSquirrel:
         DrawSquirrel(board, g)
     board.mCamera.ResetTransform(g)

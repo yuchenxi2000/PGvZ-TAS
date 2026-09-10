@@ -139,6 +139,7 @@ window.PGvZI18n = (() => {
             options: {
                 autoCollect: '自动收集',
                 runBackground: '后台运行',
+                skipLevelIntro: '跳过入场动画',
                 freePlant: '植物免费',
                 noCooldown: '无冷却种植',
                 plantAnyWhere: '随意种植',
@@ -171,6 +172,7 @@ window.PGvZI18n = (() => {
                 noThunder: '暴风雨不瞎眼',
                 noCover: '去除遮挡草丛',
                 showSeedPacketNumbers: '显示卡槽数字',
+                showCraterCooldown: '显示弹坑冷却',
                 drawPlantHp: '显示植物血量',
                 drawZombieHp: '显示僵尸血量',
                 selectZombieHp: '血量只显示精英怪',
@@ -322,6 +324,7 @@ window.PGvZI18n = (() => {
             options: {
                 autoCollect: 'Auto Collect',
                 runBackground: 'Run In Background',
+                skipLevelIntro: 'Skip Level Intro',
                 freePlant: 'Free Plants',
                 noCooldown: 'No Plant Cooldown',
                 plantAnyWhere: 'Plant Anywhere',
@@ -354,6 +357,7 @@ window.PGvZI18n = (() => {
                 noThunder: 'Disable Thunder Flash',
                 noCover: 'Remove Cover Grass',
                 showSeedPacketNumbers: 'Show Seed Slot Numbers',
+                showCraterCooldown: 'Show Crater Cooldown',
                 drawPlantHp: 'Show Plant HP',
                 drawZombieHp: 'Show Zombie HP',
                 selectZombieHp: 'Elite HP Only',
