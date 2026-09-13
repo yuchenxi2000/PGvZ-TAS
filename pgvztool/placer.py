@@ -123,6 +123,10 @@ class Placer(Serializable):
         elif self.easyPlaceMode == 'portal':
             self.portal_placer.try_place(board, x, y)
             return True
+        elif self.easyPlaceMode == 'ice':
+            board.mIceMinX[row] = x
+            board.mIceTimer[row] = 2147483647
+            return True
         return False
 
     # ===== 以下为网页直接调用的放置/移除方法 =====
@@ -213,6 +217,26 @@ class Placer(Serializable):
             zombie = board.mZombies[i]
             if zombie.mHasHead and not zombie.IsDeadOrDying():
                 zombie.DieNoLoot(False)
+
+    @main_thread
+    def PlaceIceOnBoard(self, row: int, col: int):
+        board = GetBoard()
+        if board is None:
+            return
+        row_range, col_range = self.ConvertRange(row, col)
+        for row1 in row_range:
+            xi = board.GridToPixelX(min(col_range), row1)
+            board.mIceMinX[row1] = xi
+            board.mIceTimer[row1] = 2147483647
+
+    @main_thread
+    def RemoveIceOnBoard(self, row: int, col: int):
+        board = GetBoard()
+        if board is None:
+            return
+        row_range, _ = self.ConvertRange(row, col)
+        for row1 in row_range:
+            board.mIceTimer[row1] = 0
 
     def SetSeedPacket(self, idx: int, seedtype: Lawn.SeedType, isImitater: bool):
         board = GetBoard()

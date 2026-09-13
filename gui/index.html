@@ -199,6 +199,7 @@
                                 <el-button type="primary" @click="send(`placer.SetSeedPacket(${selectedPacketIdx}, Lawn.SeedType.${selectedSeedType}, ${pyBool(isImitater)})`)">{{ t('actions.setSeedPacket') }}</el-button>
                                 <el-button type="primary" @click="AddGridItem">{{ t('actions.placeGridItem') }}</el-button>
                                 <el-button type="primary" @click="send(`placer.AddCoinOnBoard(${coinX}, ${coinY}, Lawn.CoinType.${selectedCoin}, Lawn.SeedType.${selectedSeedType}, ${pyBool(potLeft)})`)">{{ t('actions.dropCoin') }}</el-button>
+                                <el-button type="primary" @click="send(`placer.PlaceIceOnBoard(${selectedRow}, ${selectedCol})`)">{{ t('actions.placeIce') }}</el-button>
                                 <el-button @click="send(`placer.AddLadderSmart()`)">{{ t('actions.smartLadder') }}</el-button>
                                 <el-button @click="send(`cheat_option.GivePottedPlant(Lawn.SeedType.${selectedSeedType}, reverse=${pyBool(potLeft)})`)">{{ t('actions.givePottedPlant') }}</el-button>
                                 <el-button @click="send(`cheat_option.GiveAllPottedPlants()`)">{{ t('actions.giveAllPottedPlants') }}</el-button>
@@ -216,6 +217,7 @@
                                 <el-button type="danger" @click="send(`placer.RemoveCoinOnBoard(Lawn.CoinType.${selectedCoin})`)">{{ t('actions.removeCoin') }}</el-button>
                                 <el-button type="danger" @click="send(`placer.RemoveGridItemOnBoard(-1, -1, Lawn.GridItemType.${selectedGridItem})`)">{{ t('actions.removeGridItem') }}</el-button>
                                 <el-button type="danger" @click="send(`placer.RemoveGridItemOnBoard(${selectedRow}, ${selectedCol}, Lawn.GridItemType.${selectedGridItem})`)">{{ t('actions.removeSelectedGridItem') }}</el-button>
+                                <el-button type="danger" @click="send(`placer.RemoveIceOnBoard(${selectedRow}, ${selectedCol})`)">{{ t('actions.removeIce') }}</el-button>
                                 <el-button @click="send(`placer.RemoveTalisman()`)">{{ t('actions.removeTalisman') }}</el-button>
                                 <el-button @click="send(`placer.RemoveLawnMower()`)">{{ t('actions.removeMower') }}</el-button>
                                 <el-button @click="send(`placer.OpenScaryPotterOnBoard()`)">{{ t('actions.openScaryPot') }}</el-button>

@@ -207,6 +207,7 @@ window.PGvZData = (() => {
         { label: '掉落物', value: 'coin', en: 'Drop' },
         { label: '割草机', value: 'mower', en: 'Mower' },
         { label: '传送门', value: 'portal', en: 'Portal' },
+        { label: '冰道', value: 'ice', en: 'Ice' },
     ];
 
     const scaryPotType = [
