@@ -174,6 +174,8 @@ const app = createApp({
                 'disableNinja',
                 'jackInTheBoxNoExplode',
                 'jalapenoHeadNoExplode',
+                'blowAwayPropeller',
+                'blowAwayThrownImp',
                 'diamondZenTools',
                 'autoRestock',
                 'mushroomAwake',

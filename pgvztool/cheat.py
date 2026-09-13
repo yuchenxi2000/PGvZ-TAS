@@ -25,6 +25,8 @@ class CheatOption(Serializable):
         self.disableNinja = False
         self.jackInTheBoxNoExplode = False
         self.jalapenoHeadNoExplode = False
+        self.blowAwayPropeller = False
+        self.blowAwayThrownImp = False
         self.visibleGhoul = False
         self.noThunder = False
         self.diamondZenTools = False

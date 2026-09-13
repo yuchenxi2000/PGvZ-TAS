@@ -142,6 +142,26 @@ def Zombie__DieWithLoot(orig, zombie: Lawn.Zombie):
     else:
         orig(zombie)
 
+# 1. 僵尸无敌：不能被三叶草吹走
+# 2. 特性修改：螺旋桨僵尸和空中小鬼僵尸可以被三叶草吹走
+@LawnMod.MonoModUtils.HookTo(Lawn.Plant.BlowAwayFliers)
+def Plant__BlowAwayFliers(orig, plant: Lawn.Plant, x: int, row: int):
+    if cheat_option.zombieNoDie:
+        plant.mApp.PlaySample(Sexy.Resources.SOUND_BLOVER)
+        plant.mBoard.mFogBlownCountDown = 4000
+        return
+    orig(plant, x, row)
+    if cheat_option.blowAwayPropeller:
+        for i in range(plant.mBoard.mZombies.Count):
+            zombie = plant.mBoard.mZombies[i]
+            if not zombie.mDead and zombie.mZombieType == Lawn.ZombieType.Propeller and zombie.mZombiePhase == Lawn.ZombiePhase.PropellerBlownAway:
+                zombie.mBlowingAway = True
+    if cheat_option.blowAwayThrownImp:
+        for i in range(plant.mBoard.mZombies.Count):
+            zombie = plant.mBoard.mZombies[i]
+            if not zombie.mDead and zombie.mZombieType == Lawn.ZombieType.Imp and zombie.mZombiePhase == Lawn.ZombiePhase.ImpGettingThrown:
+                zombie.mBlowingAway = True
+
 # 植物免疫啃食
 @LawnMod.MonoModUtils.HookTo(Lawn.Zombie.EatPlant)
 def Zombie__EatPlant(orig, zombie: Lawn.Zombie, plant: Lawn.Plant):

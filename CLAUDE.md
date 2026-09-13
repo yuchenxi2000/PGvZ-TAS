@@ -8,11 +8,9 @@ Tool-Assisted Superplay framework and cheat mod for "PlantGirls vs. Zombies" (PG
 
 The mod has its own version number and supports only the latest game versions declared in `pgvz/version.py`; do not add backward-compatibility paths for older game versions.
 
-- At the start of a change, inspect the latest version tag, `pgvz/version.py`, and the top of `CHANGELOG.md`. Release tags use the form `v{MOD_VERSION}`.
-- Use Git tags as the sole release boundary. If tag `v{MOD_VERSION}` exists, increment `MOD_VERSION` before making the project change and create a matching first section in `CHANGELOG.md` with the current date. Update `pgvz/version.py` and `CHANGELOG.md` together.
-- If tag `v{MOD_VERSION}` does not exist, that version is already in progress. Keep the existing `MOD_VERSION` and add the change to its matching top changelog section.
-- Write the changelog entry after completing the project change. Keep changelog content newest-first: the current version section must be immediately below the title, and each new entry must be inserted at the beginning of the appropriate category in that section.
-- Never add new changes beneath a tagged, released, or otherwise older version heading.
+- Record every unreleased change in the top `[unreleased]` section of `CHANGELOG.md`. If that section does not exist, add it before the newest released version section.
+- Keep the reference links at the end of `CHANGELOG.md` synchronized with its sections. The `[unreleased]` link must compare the latest release tag with `HEAD`, and every released version section must have its corresponding release link.
+- Do not update the mod version for ordinary unreleased changes. When publishing a new version, rename the current `[unreleased]` section to `[<version>] - <date>`, update `MOD_VERSION` in `pgvz/version.py` to the same version, update the `[unreleased]` comparison base to the new tag, and add the new version's release link at the end of `CHANGELOG.md`.
 
 ### Documentation and reverse engineering
 
