@@ -837,6 +837,8 @@ def MainScript():
 - [游戏速度控制机制](speed-control.md)
 - [关卡入场动画与自动跳过](level-intro.md)
 - [僵尸波次刷新机制与时间操作实现](zombie-spawning.md)
+- [僵王火球与冰球机制](boss-balls.md)
+- [普通子弹机制](projectiles.md)
 - [坐标系统与绘制](rendering.md)
 - [TAS 功能](tas.md)
 - [类型存根说明](../typings/README.md)

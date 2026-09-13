@@ -891,7 +891,7 @@ def _DrawTasFrameCounter(board: Lawn.Board, g: Sexy.Graphics):
     y = board.mHeight - 30
     Sexy.TodLib.TodCommon.TodDrawString(g, text, x, y, font, color, Sexy.TodLib.DrawStringJustification.Right)
 
-# BUG FIX: 猫尾草数量多时，发射子弹会崩游戏，因为Sexy.TodLib.TrailHolder.AllocTrailFromDef在需要扩容时直接返回null而不是触发扩容
+# BUG FIX: 拖尾容器满时，AllocTrailFromDef直接返回null而不是扩容；大量猫尾草子弹是常见触发方式
 @LawnMod.MonoModUtils.HookTo(Sexy.TodLib.TrailHolder.AllocTrailFromDef)
 def TrailHolder__AllocTrailFromDef(orig, trailHolder: Sexy.TodLib.TrailHolder, theRenderOrder: int, theDefinition: Sexy.TodLib.TrailDefinition):
     if trailHolder.mTrails.Count == trailHolder.mTrails.Capacity:

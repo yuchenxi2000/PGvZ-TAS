@@ -1,10 +1,14 @@
 # 更新日志
 
-## [1.14.0] - 2026-09-13
+## [unreleased] - 2026-09-13
 
 ### 新增
 
 - 修改器“场地”新增“放置冰道”、“移除冰道”功能，轻松放置模式新增冰道模式。
+
+### 改进
+
+- 补充僵王火球、冰球、普通子弹及拖尾容器容量耗尽崩溃修复的内部机制文档。
 
 ## [1.13.8] - 2026-09-05
 
@@ -303,7 +307,7 @@
 - 修复安卓部分区域无法自动收集、移除天尸诅咒不完整，以及过长命令结果挤出网页界面的问题。
 - 进入月夜无尽前检查屋顶无尽存档，避免未经提示直接覆盖。
 
-[1.14.0]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.13.8...HEAD
+[unreleased]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.13.8...HEAD
 [1.13.8]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.8
 [1.13.7]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.7
 [1.13.6]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.6
