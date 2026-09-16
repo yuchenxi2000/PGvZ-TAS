@@ -17,7 +17,7 @@ class CheatOption(Serializable):
         self.wontLose = False
         self.freePlant = False
         self.plantAnyWhere = False
-        self._plantNoDie = False
+        self.plantNoDie = False
         self.zombieNoDie = False
         self.cobNoCooling = False
         self.potatoNoCooling = False
@@ -62,22 +62,6 @@ class CheatOption(Serializable):
         # ID为7的对话框点击ok按钮会直接关闭
         lawnapp.KillDialog(7)
         lawnapp.DoDialog(7, True, title, msg, '好的', 3)
-
-    @property
-    def plantNoDie(self):
-        return self._plantNoDie
-
-    @plantNoDie.setter
-    def plantNoDie(self, value):
-        if self._plantNoDie != value:
-            # 取消篮球、僵尸豌豆的伤害
-            if value:
-                Lawn.GameConstants.gProjectileDefinition[int(Lawn.ProjectileType.ZombiePea)].mDamage = 0
-                Lawn.GameConstants.gProjectileDefinition[int(Lawn.ProjectileType.Basketball)].mDamage = 0
-            else:
-                Lawn.GameConstants.gProjectileDefinition[int(Lawn.ProjectileType.ZombiePea)].mDamage = 20
-                Lawn.GameConstants.gProjectileDefinition[int(Lawn.ProjectileType.Basketball)].mDamage = 75
-            self._plantNoDie = value
 
     @main_thread
     def FailImmediately(self, zombietype: Lawn.ZombieType):
@@ -249,8 +233,8 @@ class CheatOption(Serializable):
         for gamemode in range(1, int(Lawn.GameMode.GameModeCount)):
             if 70 <= gamemode < 122:
                 continue
-            # 当前版本无法完成
-            if 138 <= gamemode < 141 or 146 <= gamemode < 148:
+            # 当前版本无法完成（大泳池的困难和地狱难度）
+            if 146 <= gamemode < 148:
                 continue
             level = Lawn.GameMode(gamemode)
             self._GetTrophy(lawnapp, playerinfo, level, gamemode - 1)

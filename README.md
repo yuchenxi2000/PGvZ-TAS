@@ -39,6 +39,9 @@ mods 目录位置：
 
 脚本编写与使用详见 [docs/scripting.md](docs/scripting.md)。
 
+游戏 v1.3.0 的本地 DIY 关卡、在线关卡缓存、JSON 组件格式及运行机制见
+[自定义关卡与在线关卡](docs/creative-levels.md)。
+
 ## 开源协议
 
 MIT License

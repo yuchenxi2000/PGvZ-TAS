@@ -3,6 +3,7 @@ PGvZTool 钩子集中管理
 所有 @HookTo 装饰的函数统一放在此文件中
 """
 import Lawn
+import Lawn.Creative
 import LawnMod
 import Sexy
 import Sexy.TodLib
@@ -99,8 +100,8 @@ def Challenge__UpdateConveyorBelt(orig, challenge: Lawn.Challenge):
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.HasGlove)
 def Board__HasGlove(orig, board: Lawn.Board):
     if cheat_option.enableGlove:
-        # 我是僵尸模式用手套会崩溃
-        return board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro) and not board.mApp.IsIZombieLevel()
+        # 1.3.0 开始我是僵尸模式用手套不再崩溃
+        return board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro)
     else:
         return orig(board)
 
@@ -168,6 +169,16 @@ def Zombie__EatPlant(orig, zombie: Lawn.Zombie, plant: Lawn.Plant):
     Lawn.GameConstants.TICKS_BETWEEN_EATS = 0 if cheat_option.plantNoDie else 4
     orig(zombie, plant)
     Lawn.GameConstants.TICKS_BETWEEN_EATS = 4
+
+# 植物免疫僵尸豌豆和篮球伤害。直接挂钩伤害查询，使自定义关卡的子弹属性覆盖也能生效。
+@LawnMod.MonoModUtils.HookTo(Lawn.Projectile.GetProjectileDamage)
+def Projectile__GetProjectileDamage(orig, projectile: Lawn.Projectile):
+    if cheat_option.plantNoDie and projectile.mProjectileType in (
+        Lawn.ProjectileType.ZombiePea,
+        Lawn.ProjectileType.Basketball,
+    ):
+        return 0
+    return orig(projectile)
 
 # 植物免疫小丑爆炸
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.KillAllPlantsInRadius)
@@ -320,12 +331,20 @@ def Zombie__UpdateZombieJalapenoHead(orig, zombie: Lawn.Zombie):
 @LawnMod.MonoModUtils.HookTo(Lawn.Zombie.Draw)
 def Zombie__Draw(orig, zombie: Lawn.Zombie, graphics: Sexy.Graphics):
     mApp = zombie.mApp
-    level_is_invisighoul = (mApp.mGameMode == Lawn.GameMode.ChallengeInvisighoul)
+    gameMode = mApp.mGameMode
+    creativeLevel = mApp.mCreativeLevel
+    creative_invisighoul = creativeLevel is not None and \
+        creativeLevel.GetComponent[Lawn.Creative.CSInvisibleZombie]() is not None
+    level_is_invisighoul = mApp.mGameMode == Lawn.GameMode.ChallengeInvisighoul or creative_invisighoul
     if level_is_invisighoul and cheat_option.visibleGhoul:
         mApp.mGameMode = Lawn.GameMode.ChallengeBobsledBonanza
+        if creative_invisighoul:
+            mApp.mCreativeLevel = None  # type: ignore
     orig(zombie, graphics)
-    if level_is_invisighoul:
-        mApp.mGameMode = Lawn.GameMode.ChallengeInvisighoul
+    if level_is_invisighoul and cheat_option.visibleGhoul:
+        mApp.mGameMode = gameMode
+        if creative_invisighoul:
+            mApp.mCreativeLevel = creativeLevel
 
 # 暴风雨夜移除天气特效，不再闪瞎眼
 @LawnMod.MonoModUtils.HookTo(Lawn.Challenge.DrawStormNight)
@@ -713,11 +732,20 @@ EASY_PLACE_UI_SCALE = 0.7
 def DrawEasyPlaceUI(board: Lawn.Board, g: Sexy.Graphics):
     if board.mApp.mGameScene == Lawn.GameScenes.Playing and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
         shovel_rect = board.GetShovelButtonRect()
+        glove_rect = board.GetZenButtonRect(Lawn.GameObjectType.Glove)
         btn_w = shovel_rect.mWidth
         btn_h = shovel_rect.mHeight
         btn_y = shovel_rect.mY
-        num_ui = int(board.mShowShovel) + int(board.HasGlove())
-        btn_x = shovel_rect.mX + 90 * num_ui
+        visible_tool_rects = []
+        if board.IsCombatToolVisible(Lawn.GameObjectType.Shovel):
+            visible_tool_rects.append(shovel_rect)
+        if board.IsCombatToolVisible(Lawn.GameObjectType.Glove):
+            visible_tool_rects.append(glove_rect)
+        if visible_tool_rects:
+            slot_gap = max(0, 90 - btn_w)
+            btn_x = max(rect.mX + rect.mWidth for rect in visible_tool_rects) + slot_gap
+        else:
+            btn_x = shovel_rect.mX
 
         g.DrawImage(Sexy.AtlasResources.IMAGE_SHOVELBANK_ZEN, btn_x, btn_y)
         if placer.active:
@@ -815,39 +843,13 @@ def DrawSquirrel(board: Lawn.Board, g: Sexy.Graphics):
                 g.DrawRect(Sexy.TRect(mX + margin, mY + margin, 80 - 2 * margin, 100 - 2 * margin))
         g.SetColorizeImages(False)
 
-# 垃圾桶
-# 气死了，Board.HasTrashcan竟然被内联优化了，挂不上钩子！逼得写一堆代码
-def _HasTrashcan(board: Lawn.Board):
+# 垃圾桶。1.3.0 中方法未被内联优化，可直接挂钩。
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.HasTrashcan)
+def Board__HasTrashcan(orig, board: Lawn.Board):
     if cheat_option.enableTrashcan:
         gamemode = board.mApp.mGameMode
         return gamemode not in (Lawn.GameMode.Upsell, Lawn.GameMode.Intro, Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom)
-    else:
-        return board.mApp.IsRogueConveyorbeltLevel()
-
-@LawnMod.MonoModUtils.HookTo(Lawn.Board.TrashcanHitTest)
-def Board__TrashcanHitTest(orig, board: Lawn.Board, x: int, y: int):
-    if _HasTrashcan(board):
-        return Sexy.TRect(0, 70, 50, 80).Contains(x, y)
-    return False
-
-def DrawTrashcan(board: Lawn.Board, g: Sexy.Graphics):
-    hasCamera = board.mCameraEnabled and board.mCamera is not None
-    if hasCamera:
-        board.mCamera.ApplyTransform(g)
-    graphics = Sexy.Graphics.GetNew(g)
-    graphics.SetScale(0.75)
-    if board.IsPlantInCursor() and board.TrashcanHitTest(board.mCursorObject.mX, board.mCursorObject.mY):
-        graphics.DrawImage(Sexy.AtlasResources.IMAGE_TRASHCAN, 0.0, 70.0 * Sexy.Constants.S)
-        graphics.SetColorizeImages(True)
-        graphics.SetColor(Sexy.SexyColor(255, 255, 255, 128, False).Color)
-    elif board.IsPlantInCursor():
-        flashingColor2 = Sexy.TodLib.TodCommon.GetFlashingColor(board.mMainCounter, 75)
-        graphics.SetColorizeImages(True)
-        graphics.SetColor(flashingColor2.Color)
-    graphics.DrawImage(Sexy.AtlasResources.IMAGE_TRASHCAN, 0.0, 70.0 * Sexy.Constants.S)
-    graphics.PrepareForReuse()
-    if hasCamera:
-        board.mCamera.ResetTransform(g)
+    return orig(board)
 
 keybind_handler = KeybindHandler(cheat_option, placer, tas_manager)
 
@@ -872,8 +874,6 @@ def Board__Draw(orig, board: Lawn.Board, g: Sexy.Graphics):
         DrawEasyPlaceUI(board, g)
     if cheat_option.showWaveInfo:
         DrawWaveInfo(board, g)
-    if _HasTrashcan(board) and not board.mApp.IsRogueConveyorbeltLevel():
-        DrawTrashcan(board, g)
     # TAS 按钮
     if tas_manager.can_use(board, cheat_option.tasEnabled):
         _DrawTasButtons(board, g)

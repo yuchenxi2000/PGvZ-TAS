@@ -5,6 +5,7 @@ mMainCounter 全局自增（跨 stage 也是一直递增），因此文件名只
 from pathlib import Path
 import Sexy
 import Lawn
+import Lawn.Creative
 from pgvz import GetLawnApp, GetBoard, script_manager, ScriptRunMode
 
 
@@ -47,13 +48,25 @@ class TasManager:
         except OSError:
             pass
 
-    def _file_name(self, playerId, gameMode, frame):
-        return f'{playerId}_{int(gameMode)}_{frame}.dat'
+    def _file_stem(self, lawnApp: Lawn.LawnApp):
+        playerId = int(lawnApp.mPlayerInfo.mId)
+        gameMode = lawnApp.mGameMode
+        if lawnApp.IsDIYMode() or lawnApp.IsOnlineLevelMode():
+            creativeLevel = Lawn.Creative.CreativeLevelManager.GetLevelDefine(gameMode)
+            if creativeLevel is not None:
+                levelKey = f'{int(creativeLevel.mCrc):08X}'
+            else:
+                levelKey = str(int(gameMode))
+            return f'{playerId}_{levelKey}'
+        return f'{playerId}_{int(gameMode)}'
+
+    def _file_name(self, lawnApp: Lawn.LawnApp, frame):
+        return f'{self._file_stem(lawnApp)}_{frame}.dat'
 
     def _file_path(self, index):
         lawnApp = GetLawnApp()
         self._init_save_dir()
-        return self._saveDir / self._file_name(lawnApp.mPlayerInfo.mId, lawnApp.mGameMode, self._saves[index])
+        return self._saveDir / self._file_name(lawnApp, self._saves[index])
 
     def _truncate(self, from_i):
         """删除 from_i 及之后的存档文件和条目"""
@@ -67,9 +80,7 @@ class TasManager:
         """进入关卡时扫描存档目录，加载该 player+mode 下的全部存档"""
         lawnApp = GetLawnApp()
         self._init_save_dir()
-        playerId = lawnApp.mPlayerInfo.mId
-        gameMode = lawnApp.mGameMode
-        prefix = f'{playerId}_{int(gameMode)}_'
+        prefix = f'{self._file_stem(lawnApp)}_'
         suffix = '.dat'
 
         self._saves = []

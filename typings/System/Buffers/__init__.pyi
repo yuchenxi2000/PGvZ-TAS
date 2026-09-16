@@ -1,5 +1,5 @@
 import typing, clr, abc
-from System import Array_1, IDisposable, Memory_1, Span_1, MulticastDelegate, IAsyncResult, ReadOnlySpan_1, AsyncCallback, IEquatable_1
+from System import Array_1, Memory_1, Span_1, IDisposable, ReadOnlyMemory_1, SequencePosition, ReadOnlySpan_1, MulticastDelegate, IAsyncResult, AsyncCallback, IEquatable_1
 from System.Runtime.InteropServices import GCHandle
 from System.Reflection import MethodInfo
 
@@ -29,6 +29,22 @@ class ArrayPool_1(typing.Generic[ArrayPool_1_T], abc.ABC):
         @typing.overload
         def __call__(self, maxArrayLength: int, maxArraysPerBucket: int) -> ArrayPool_1[Create_MethodGroup_ArrayPool_1_T]:...
 
+
+
+class IBufferWriter_GenericClasses(abc.ABCMeta):
+    Generic_IBufferWriter_GenericClasses_IBufferWriter_1_T = typing.TypeVar('Generic_IBufferWriter_GenericClasses_IBufferWriter_1_T')
+    def __getitem__(self, types : typing.Type[Generic_IBufferWriter_GenericClasses_IBufferWriter_1_T]) -> typing.Type[IBufferWriter_1[Generic_IBufferWriter_GenericClasses_IBufferWriter_1_T]]: ...
+
+IBufferWriter : IBufferWriter_GenericClasses
+
+IBufferWriter_1_T = typing.TypeVar('IBufferWriter_1_T')
+class IBufferWriter_1(typing.Generic[IBufferWriter_1_T], typing.Protocol):
+    @abc.abstractmethod
+    def Advance(self, count: int) -> None: ...
+    @abc.abstractmethod
+    def GetMemory(self, sizeHint: int = ...) -> Memory_1[IBufferWriter_1_T]: ...
+    @abc.abstractmethod
+    def GetSpan(self, sizeHint: int = ...) -> Span_1[IBufferWriter_1_T]: ...
 
 
 class IMemoryOwner_GenericClasses(abc.ABCMeta):
@@ -87,6 +103,114 @@ class OperationStatus(typing.SupportsInt):
     DestinationTooSmall : OperationStatus # 1
     NeedMoreData : OperationStatus # 2
     InvalidData : OperationStatus # 3
+
+
+class ReadOnlySequence_GenericClasses(abc.ABCMeta):
+    Generic_ReadOnlySequence_GenericClasses_ReadOnlySequence_1_T = typing.TypeVar('Generic_ReadOnlySequence_GenericClasses_ReadOnlySequence_1_T')
+    def __getitem__(self, types : typing.Type[Generic_ReadOnlySequence_GenericClasses_ReadOnlySequence_1_T]) -> typing.Type[ReadOnlySequence_1[Generic_ReadOnlySequence_GenericClasses_ReadOnlySequence_1_T]]: ...
+
+ReadOnlySequence : ReadOnlySequence_GenericClasses
+
+ReadOnlySequence_1_T = typing.TypeVar('ReadOnlySequence_1_T')
+class ReadOnlySequence_1(typing.Generic[ReadOnlySequence_1_T]):
+    @typing.overload
+    def __init__(self, array: Array_1[ReadOnlySequence_1_T]) -> None: ...
+    @typing.overload
+    def __init__(self, array: Array_1[ReadOnlySequence_1_T], start: int, length: int) -> None: ...
+    @typing.overload
+    def __init__(self, memory: ReadOnlyMemory_1[ReadOnlySequence_1_T]) -> None: ...
+    @typing.overload
+    def __init__(self, startSegment: ReadOnlySequenceSegment_1[ReadOnlySequence_1_T], startIndex: int, endSegment: ReadOnlySequenceSegment_1[ReadOnlySequence_1_T], endIndex: int) -> None: ...
+    Empty : ReadOnlySequence_1[ReadOnlySequence_1_T]
+    @property
+    def End(self) -> SequencePosition: ...
+    @property
+    def First(self) -> ReadOnlyMemory_1[ReadOnlySequence_1_T]: ...
+    @property
+    def FirstSpan(self) -> ReadOnlySpan_1[ReadOnlySequence_1_T]: ...
+    @property
+    def IsEmpty(self) -> bool: ...
+    @property
+    def IsSingleSegment(self) -> bool: ...
+    @property
+    def Length(self) -> int: ...
+    @property
+    def Start(self) -> SequencePosition: ...
+    def GetEnumerator(self) -> ReadOnlySequence_1.Enumerator_1[ReadOnlySequence_1_T]: ...
+    def GetOffset(self, position: SequencePosition) -> int: ...
+    def ToString(self) -> str: ...
+    def TryGet(self, position: clr.Reference[SequencePosition], memory: clr.Reference[ReadOnlyMemory_1[ReadOnlySequence_1_T]], advance: bool = ...) -> bool: ...
+    # Skipped GetPosition due to it being static, abstract and generic.
+
+    GetPosition : GetPosition_MethodGroup[ReadOnlySequence_1_T]
+    GetPosition_MethodGroup_ReadOnlySequence_1_T = typing.TypeVar('GetPosition_MethodGroup_ReadOnlySequence_1_T')
+    class GetPosition_MethodGroup(typing.Generic[GetPosition_MethodGroup_ReadOnlySequence_1_T]):
+        GetPosition_MethodGroup_ReadOnlySequence_1_T = ReadOnlySequence_1.GetPosition_MethodGroup_ReadOnlySequence_1_T
+        @typing.overload
+        def __call__(self, offset: int) -> SequencePosition:...
+        @typing.overload
+        def __call__(self, offset: int, origin: SequencePosition) -> SequencePosition:...
+
+    # Skipped Slice due to it being static, abstract and generic.
+
+    Slice : Slice_MethodGroup[ReadOnlySequence_1_T]
+    Slice_MethodGroup_ReadOnlySequence_1_T = typing.TypeVar('Slice_MethodGroup_ReadOnlySequence_1_T')
+    class Slice_MethodGroup(typing.Generic[Slice_MethodGroup_ReadOnlySequence_1_T]):
+        Slice_MethodGroup_ReadOnlySequence_1_T = ReadOnlySequence_1.Slice_MethodGroup_ReadOnlySequence_1_T
+        @typing.overload
+        def __call__(self, start: int) -> ReadOnlySequence_1[Slice_MethodGroup_ReadOnlySequence_1_T]:...
+        @typing.overload
+        def __call__(self, start: SequencePosition) -> ReadOnlySequence_1[Slice_MethodGroup_ReadOnlySequence_1_T]:...
+        @typing.overload
+        def __call__(self, start: int, length: int) -> ReadOnlySequence_1[Slice_MethodGroup_ReadOnlySequence_1_T]:...
+        # Method Slice(start : Int32, length : Int32) was skipped since it collides with above method
+        @typing.overload
+        def __call__(self, start: int, end: SequencePosition) -> ReadOnlySequence_1[Slice_MethodGroup_ReadOnlySequence_1_T]:...
+        # Method Slice(start : Int32, end : SequencePosition) was skipped since it collides with above method
+        @typing.overload
+        def __call__(self, start: SequencePosition, length: int) -> ReadOnlySequence_1[Slice_MethodGroup_ReadOnlySequence_1_T]:...
+        # Method Slice(start : SequencePosition, length : Int32) was skipped since it collides with above method
+        @typing.overload
+        def __call__(self, start: SequencePosition, end: SequencePosition) -> ReadOnlySequence_1[Slice_MethodGroup_ReadOnlySequence_1_T]:...
+
+
+    Enumerator_GenericClasses_ReadOnlySequence_1_T = typing.TypeVar('Enumerator_GenericClasses_ReadOnlySequence_1_T')
+    class Enumerator_GenericClasses(typing.Generic[Enumerator_GenericClasses_ReadOnlySequence_1_T], abc.ABCMeta):
+        Enumerator_GenericClasses_ReadOnlySequence_1_T = ReadOnlySequence_1.Enumerator_GenericClasses_ReadOnlySequence_1_T
+        def __call__(self) -> ReadOnlySequence_1.Enumerator_1[Enumerator_GenericClasses_ReadOnlySequence_1_T]: ...
+
+    Enumerator : Enumerator_GenericClasses[ReadOnlySequence_1_T]
+
+    Enumerator_1_T = typing.TypeVar('Enumerator_1_T')
+    class Enumerator_1(typing.Generic[Enumerator_1_T]):
+        Enumerator_1_T = ReadOnlySequence_1.Enumerator_1_T
+        def __init__(self, sequence: clr.Reference[ReadOnlySequence_1[Enumerator_1_T]]) -> None: ...
+        @property
+        def Current(self) -> ReadOnlyMemory_1[Enumerator_1_T]: ...
+        def MoveNext(self) -> bool: ...
+
+
+
+class ReadOnlySequenceSegment_GenericClasses(abc.ABCMeta):
+    Generic_ReadOnlySequenceSegment_GenericClasses_ReadOnlySequenceSegment_1_T = typing.TypeVar('Generic_ReadOnlySequenceSegment_GenericClasses_ReadOnlySequenceSegment_1_T')
+    def __getitem__(self, types : typing.Type[Generic_ReadOnlySequenceSegment_GenericClasses_ReadOnlySequenceSegment_1_T]) -> typing.Type[ReadOnlySequenceSegment_1[Generic_ReadOnlySequenceSegment_GenericClasses_ReadOnlySequenceSegment_1_T]]: ...
+
+ReadOnlySequenceSegment : ReadOnlySequenceSegment_GenericClasses
+
+ReadOnlySequenceSegment_1_T = typing.TypeVar('ReadOnlySequenceSegment_1_T')
+class ReadOnlySequenceSegment_1(typing.Generic[ReadOnlySequenceSegment_1_T], abc.ABC):
+    @property
+    def Memory(self) -> ReadOnlyMemory_1[ReadOnlySequenceSegment_1_T]: ...
+    @Memory.setter
+    def Memory(self, value: ReadOnlyMemory_1[ReadOnlySequenceSegment_1_T]) -> ReadOnlyMemory_1[ReadOnlySequenceSegment_1_T]: ...
+    @property
+    def Next(self) -> ReadOnlySequenceSegment_1[ReadOnlySequenceSegment_1_T]: ...
+    @Next.setter
+    def Next(self, value: ReadOnlySequenceSegment_1[ReadOnlySequenceSegment_1_T]) -> ReadOnlySequenceSegment_1[ReadOnlySequenceSegment_1_T]: ...
+    @property
+    def RunningIndex(self) -> int: ...
+    @RunningIndex.setter
+    def RunningIndex(self, value: int) -> int: ...
 
 
 class ReadOnlySpanAction_GenericClasses(abc.ABCMeta):

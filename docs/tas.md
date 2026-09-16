@@ -61,8 +61,16 @@ S0(100) → S1(200) → S2(350) → [live frame 400]
 
 ### 文件格式
 
-```
+正常关卡文件名格式：
+
+```text
 {playerId}_{gameMode}_{frame}.dat
+```
+
+本地和在线自定义关卡参考游戏 `LawnCommon.GetSavedGameName()` 的文件名实现，拼接上帧数 `frame` 组成文件名：
+
+```text
+{playerId}_{crc8}_{frame}.dat
 ```
 
 复用游戏自身的 `board.SaveGame()` / `board.LoadGame()` 序列化，无需自己实现。
@@ -86,3 +94,5 @@ S0(100) → S1(200) → S2(350) → [live frame 400]
 - `LoadGame` 恢复状态时需要 Board 存在，因此 undo/redo 只能在关卡内使用
 - 暂停期间脚本不执行（`mManualPaused` 导致 `Board.UpdateGame` 跳过），cleanup 逻辑只在非暂停时运行
 - 存档文件不会自动清理，需手动删除 `tas_saves/` 目录
+- 游戏存档未序列化 `Challenge.mRandomPortalCounter` 和 `SeedBank.mConveyorBeltBuffer`，因此随机传送门与传送带关卡的 Undo/Redo 可能无法精确恢复这两项状态
+- 自定义关卡的 `CSSpeed` 会在一次更新内额外调用 `Board.UpdateGame()`，因此 Adv 目前可能一次前进多个逻辑帧
