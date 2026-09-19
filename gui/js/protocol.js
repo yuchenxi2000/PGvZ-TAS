@@ -14,6 +14,11 @@ window.PGvZProtocol = (() => {
         'import pgvz.lineup',
     ].join('\n');
 
+    const GAME_VERSION_PROBE_CODE = [
+        'import Lawn',
+        "'{\"action\":\"gameVersion\",\"version\":\"' + Lawn.LawnApp.AppVersionNumber + '\"}'",
+    ].join('\n');
+
     function pyBool(value) {
         return value ? 'True' : 'False';
     }
@@ -35,9 +40,19 @@ window.PGvZProtocol = (() => {
         }
     }
 
+    function isLegacyGameVersion(versionLabel) {
+        const match = String(versionLabel || '').match(/(\d+)\.(\d+)\.(\d+)/);
+        if (!match) return false;
+        const major = Number(match[1]);
+        const minor = Number(match[2]);
+        return major < 1 || (major === 1 && minor < 3);
+    }
+
     return {
         BOOTSTRAP_READY_PROBE_CODE,
         BOOTSTRAP_CODE,
+        GAME_VERSION_PROBE_CODE,
+        isLegacyGameVersion,
         parseResultMessage,
         pyBool,
     };

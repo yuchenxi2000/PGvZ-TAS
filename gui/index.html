@@ -33,6 +33,15 @@
                 show-icon
                 :closable="false"
             ></el-alert>
+            <el-alert
+                v-if="legacyGameVersionWarning"
+                :title="t('messages.legacyGameVersionTitle')"
+                :description="t('messages.legacyGameVersionDetail')"
+                type="warning"
+                show-icon
+                :closable="false"
+                class="compatibility-alert"
+            ></el-alert>
             <el-tabs v-model="activeTab" class="main-tabs">
                 <el-tab-pane :label="t('tabs.player')" name="player">
                     <section class="panel-grid three">
@@ -221,7 +230,6 @@
                                 <el-button @click="send(`placer.RemoveTalisman()`)">{{ t('actions.removeTalisman') }}</el-button>
                                 <el-button @click="send(`placer.RemoveLawnMower()`)">{{ t('actions.removeMower') }}</el-button>
                                 <el-button @click="send(`placer.OpenScaryPotterOnBoard()`)">{{ t('actions.openScaryPot') }}</el-button>
-                                <el-button @click="send(`cheat_option.UnlockCrazyDaveSeed()`)">{{ t('actions.unlockSeeds') }}</el-button>
                             </div>
                         </el-card>
                     </section>
@@ -232,10 +240,21 @@
                         <check-group-card :title="t('sections.sceneCheats')" :items="switchGroups.scene" :model="cheatOption" :label="optionLabel"></check-group-card>
                         <div class="card-stack">
                             <el-card shadow="never" class="tool-card">
-                                <template #header>{{ t('sections.speed') }}</template>
-                                <el-radio-group v-model="speed" @change="value => send(`_ = SetGlobalSpeed(${value})`)">
-                                    <el-radio-button v-for="item in speedOptions" :key="item" :label="item">{{ item }}</el-radio-button>
-                                </el-radio-group>
+                                <template #header>{{ t('sections.stageControl') }}</template>
+                                <div class="form-stack">
+                                    <div class="radio-control">
+                                        <span>{{ t('fields.weather') }}</span>
+                                        <el-radio-group v-model="weather" @change="setWeather">
+                                            <el-radio-button v-for="item in weatherOptions" :key="item.value" :label="item.value">{{ item.label }}</el-radio-button>
+                                        </el-radio-group>
+                                    </div>
+                                    <div class="radio-control">
+                                        <span>{{ t('fields.speed') }}</span>
+                                        <el-radio-group v-model="speed" @change="value => send(`_ = SetGlobalSpeed(${value})`)">
+                                            <el-radio-button v-for="item in speedOptions" :key="item" :label="item">{{ item }}</el-radio-button>
+                                        </el-radio-group>
+                                    </div>
+                                </div>
                             </el-card>
                             <el-card shadow="never" class="tool-card">
                                 <template #header>{{ t('sections.level') }}</template>

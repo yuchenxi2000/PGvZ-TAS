@@ -9,7 +9,7 @@ import Sexy
 import Sexy.TodLib
 from pgvz import *
 from pgvz.rng import rng_manip
-from .cheat import cheat_option
+from .cheat import cheat_option, weather
 from .placer import placer
 from .tas import tas_manager
 from .keybinds import KeybindHandler
@@ -39,6 +39,13 @@ def Board__GetCurrentPlantCost(orig, board: Lawn.Board, plantType: Lawn.SeedType
         return 0
     else:
         return orig(board, plantType, plantImitaterType)
+
+# 解锁被禁止卡片
+@LawnMod.MonoModUtils.HookTo(Lawn.SeedChooserScreen.SeedNotAllowedToPick)
+def SeedChooserScreen__SeedNotAllowedToPick(orig, seedChooser: Lawn.SeedChooserScreen, seedType: Lawn.SeedType):
+    if cheat_option.unlockBannedSeeds:
+        return False
+    return orig(seedChooser, seedType)
 
 # 房主无敌
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.ZombiesWon)
@@ -346,17 +353,17 @@ def Zombie__Draw(orig, zombie: Lawn.Zombie, graphics: Sexy.Graphics):
         if creative_invisighoul:
             mApp.mCreativeLevel = creativeLevel
 
-# 暴风雨夜移除天气特效，不再闪瞎眼
-@LawnMod.MonoModUtils.HookTo(Lawn.Challenge.DrawStormNight)
-def Challenge__DrawStormNight(orig, challenge: Lawn.Challenge, graphics: Sexy.Graphics):
-    if not cheat_option.noThunder:
-        orig(challenge, graphics)
-@LawnMod.MonoModUtils.HookTo(Lawn.Challenge.IsStormyNightPitchBlack)
-def Challenge__IsStormyNightPitchBlack(orig, challenge: Lawn.Challenge):
-    if cheat_option.noThunder:
-        return False
-    else:
-        return orig(challenge)
+# 设置天气
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.HasStorm)
+def Board__HasStorm(orig, board: Lawn.Board):
+    if weather.enabled:
+        return weather.storm
+    return orig(board)
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.HasRain)
+def Board__HasRain(orig, board: Lawn.Board):
+    if weather.enabled:
+        return weather.rain
+    return orig(board)
 
 # 去除右侧遮挡
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.DrawCoverLayer)
@@ -445,6 +452,26 @@ def GridItem__UpdateScaryPot(orig, griditem: Lawn.GridItem):
     orig(griditem)
     if cheat_option.transScaryPot:
         griditem.mTransparentCounter = 50
+
+# 砸罐子无间隔
+# 挂载较大的鼠标调用者，避免 ScaryPotterMalletPot 被运行时内联后钩子失效。
+# 直接开罐可以使 ChallengeState 保持 Normal，因此下一次 MouseHitTest
+# 仍能命中罐子，也不会留下无人回收的锤子动画。
+@LawnMod.MonoModUtils.HookTo(Lawn.Challenge.MouseDown)
+def Challenge__MouseDown(orig, challenge: Lawn.Challenge, x: int, y: int, theClickCount: int, theHitResult: Lawn.HitResult):
+    if (
+        cheat_option.scaryPotterNoDelay
+        and challenge.mApp.IsScaryPotterLevel()
+        and challenge.mApp.mGameScene == Lawn.GameScenes.Playing
+        and (
+            not challenge.mBoard.IsScaryPotterDaveTalking()
+            or challenge.mApp.mCrazyDaveMessageIndex == -1
+        )
+        and theHitResult.mObjectType == Lawn.GameObjectType.ScaryPot
+    ):
+        challenge.ScaryPotterOpenPot(theHitResult.mObject)
+        return True
+    return orig(challenge, x, y, theClickCount, theHitResult)
 
 # 三线射手不浪费子弹
 

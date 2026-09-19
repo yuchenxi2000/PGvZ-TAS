@@ -9,7 +9,7 @@
                                               ↕ Python 对象
                                     pgvztool/sync.py (SyncRegistry)
                                               ↕ Serializable
-                                    cheat_option、placer 等对象
+                                    cheat_option、placer、weather 等对象
 ```
 
 ## HTTP 服务器 (cheat-gui.py)
@@ -69,6 +69,13 @@ ready = app is not None and app.mLoadingThreadStarted
 就绪响应使用 `{"action":"bootstrapReady","ready":...}` 与普通执行结果、状态同步和心跳
 区分。自定义代码仍允许在引导失败时直接发送，以便调试。
 
+### 游戏版本警告
+
+启动就绪后，GUI 先通过 `import Lawn` 读取 `Lawn.LawnApp.AppVersionNumber`，再发送
+`BOOTSTRAP_CODE` 导入 `pgvz` 和 `pgvztool`。若 `PGvZ x.y.z` 中的版本低于 1.3.0，网页额外
+显示警告，提示用户升级游戏或下载旧版本修改器。此检查不会阻止
+后续引导；即使版本过旧，网页仍会继续尝试加载修改器。
+
 ### JSON 引号问题
 
 JSON 布尔值（`true`/`false`）不是有效的 Python 语法。从 Web 端发送 JSON 数据给 `json.loads()` 解析时，必须将 JSON 字符串整体包裹为 Python 字符串字面量（单引号）：
@@ -103,7 +110,9 @@ const msg = JSON.parse(r);
 
 ### sync（状态同步）
 
-由 `sync_reg.serialize()` 生成。`sync_reg` 是 `SyncRegistry` 实例，注册了 `cheat`（`CheatOption`）和 `placer`（`Placer`）两个对象。序列化通过 `Serializable.to_dict()` 自动完成——包括简单属性和脚本单例的 `@property`。
+由 `sync_reg.serialize()` 生成。`sync_reg` 是 `SyncRegistry` 实例，注册了 `cheat`
+（`CheatOption`）、`placer`（`Placer`）和 `weather`（`WeatherControl`）三个对象。序列化通过
+`Serializable.to_dict()` 自动完成——包括简单属性和脚本单例的 `@property`。
 
 **发送**（手机端连接并申请 GUI 会话，同时拉取状态）：
 
@@ -135,12 +144,17 @@ sync_reg.connect('<clientId>')
       "easyPlaceMode": "plant",
       "easyPlaceEnabled": true,
       ...
+    },
+    "weather": {
+      "enabled": false,
+      "rain": false,
+      "storm": false
     }
   }
 }
 ```
 
-GUI 收到后分别遍历 `cheat` 和 `placer` 对象更新状态。
+GUI 收到后分别读取 `cheat`、`placer` 和 `weather` 对象更新状态。
 
 ### apply（Web → Python 控制）
 
@@ -164,6 +178,10 @@ send(`sync_reg.connect('${clientId}', '${state}')`, true);
 ```
 
 Python 端 `SyncRegistry.apply()` 解析 JSON 后，遍历各对象调用 `Serializable.from_dict()`。`from_dict` 通过 `setattr` 写入——普通属性直接赋值，有 setter 的 `@property` 自动走 setter（如 `cheat_option.autoCollect = True` 会调用 `auto_collector.On()`）。
+
+天气控制也走同一条路径。网页的五档单选项会映射到 `weather.enabled`、`weather.rain` 和
+`weather.storm`；`enabled` 为 `false` 时使用关卡默认天气，为 `true` 时另外两个字段分别控制
+降雨和雷暴。
 
 官方 GUI 的每次 `apply()` 都携带 `_clientId`。存在活动会话时，后端会拒绝客户端 ID 不匹配或缺失的任何修改；即使当前没有活动会话，也会额外拒绝不带 `_clientId`、且同时包含 `cheat` 和 `placer` 的旧版完整同步，防止残留旧页面在游戏重连后用默认值覆盖状态。
 

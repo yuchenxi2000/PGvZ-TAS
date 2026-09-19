@@ -2,6 +2,10 @@
 
 ## 安装
 
+PGvZ-TAS/PGvZTool v1.14.0 及以后版本要求 PGvZ 1.3.0 或更高版本，不再支持此前的游戏版本。
+建议升级游戏至最新版，或从
+[GitHub Releases](https://github.com/yuchenxi2000/PGvZ-TAS/releases) 下载旧版本修改器。
+
 ### PC
 
 1. 退出游戏。如果修改过旧版修改器中的文件，请先自行备份修改内容。

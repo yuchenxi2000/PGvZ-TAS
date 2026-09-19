@@ -111,11 +111,20 @@ const app = createApp({
 
         const connected = ref(false);
         const sessionRejected = ref(false);
+        const legacyGameVersionWarning = ref(false);
         const connectionState = ref('disconnected');
         const statusText = computed(() => t(`status.${connectionState.value}`));
         const activeTab = ref('player');
         const speed = ref(1);
         const speedOptions = [0.1, 0.2, 0.5, 1, 2, 5, 10];
+        const weather = ref('default');
+        const weatherOptions = computed(() => [
+            { label: t('weather.default'), value: 'default' },
+            { label: t('weather.sunny'), value: 'sunny' },
+            { label: t('weather.rain'), value: 'rain' },
+            { label: t('weather.storm'), value: 'storm' },
+            { label: t('weather.rainStorm'), value: 'rainStorm' },
+        ]);
 
         const sunValue = ref(9990);
         const moneyValue = ref(999999);
@@ -154,6 +163,7 @@ const app = createApp({
                 'runBackground',
                 'skipLevelIntro',
                 'freePlant',
+                'unlockBannedSeeds',
                 'noCooldown',
                 'plantAnyWhere',
                 'infSun',
@@ -188,12 +198,12 @@ const app = createApp({
                 'doubleGatlingpea',
                 'fullAreaGloomshroom',
                 'planternAlwaysTransform',
+                'scaryPotterNoDelay',
             ],
             scene: [
                 'noFog',
                 'transScaryPot',
                 'visibleGhoul',
-                'noThunder',
                 'noCover',
                 'showSeedPacketNumbers',
                 'showCraterCooldown',
@@ -285,6 +295,17 @@ const app = createApp({
 
         function setCheatOption(key, value) {
             send(`sync_reg.apply('${JSON.stringify({ _clientId: clientId, cheat: { [key]: value } })}')`);
+        }
+
+        function setWeather(value) {
+            const states = {
+                default: { enabled: false, rain: false, storm: false },
+                sunny: { enabled: true, rain: false, storm: false },
+                rain: { enabled: true, rain: true, storm: false },
+                storm: { enabled: true, rain: false, storm: true },
+                rainStorm: { enabled: true, rain: true, storm: true },
+            };
+            send(`sync_reg.apply('${JSON.stringify({ _clientId: clientId, weather: states[value] })}')`);
         }
 
         function saveCheckboxState() {
@@ -413,6 +434,14 @@ const app = createApp({
                 if (p.easyPlaceMode) easyPlaceMode.value = p.easyPlaceMode;
                 if (p.easyPlaceEnabled !== undefined) easyPlaceEnabled.value = p.easyPlaceEnabled;
             }
+            if (state.weather) {
+                const w = state.weather;
+                if (!w.enabled) weather.value = 'default';
+                else if (w.rain && w.storm) weather.value = 'rainStorm';
+                else if (w.rain) weather.value = 'rain';
+                else if (w.storm) weather.value = 'storm';
+                else weather.value = 'sunny';
+            }
             nextTick(() => {
                 applyingRemoteState = false;
             });
@@ -434,7 +463,8 @@ const app = createApp({
                         const msg = PGvZProtocol.parseResultMessage(data.result);
                         if (msg && msg.action === 'bootstrapReady') {
                             if (msg.ready) {
-                                startBootstrap();
+                                stopBootstrapProbe();
+                                ws.send(PGvZProtocol.GAME_VERSION_PROBE_CODE);
                             } else {
                                 retryBootstrapReady();
                             }
@@ -446,6 +476,11 @@ const app = createApp({
                         if (msg && msg.action === 'sessionRejected') {
                             stopHeartbeat();
                             showSessionRejected();
+                            return;
+                        }
+                        if (msg && msg.action === 'gameVersion') {
+                            legacyGameVersionWarning.value = PGvZProtocol.isLegacyGameVersion(msg.version);
+                            startBootstrap();
                             return;
                         }
                         if (data.result) {
@@ -567,10 +602,13 @@ const app = createApp({
             optionLabel,
             connected,
             sessionRejected,
+            legacyGameVersionWarning,
             statusText,
             activeTab,
             speed,
             speedOptions,
+            weather,
+            weatherOptions,
             sunValue,
             moneyValue,
             treeHeight,
@@ -621,6 +659,7 @@ const app = createApp({
             currentLineupList,
             dataLabel,
             send,
+            setWeather,
             syncCheatOptions,
             pyBool: PGvZProtocol.pyBool,
             sendCustomCode,

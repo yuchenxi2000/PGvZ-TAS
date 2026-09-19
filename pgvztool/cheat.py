@@ -10,12 +10,22 @@ from pgvz.lineup import LineUp
 from .util import main_thread
 from .sync import Serializable
 
+# 天气控制
+class WeatherControl(Serializable):
+    def __init__(self) -> None:
+        self.enabled = False
+        self.rain = False
+        self.storm = False
+
+weather = WeatherControl()
+
 # 作弊选项，其中成员设置为True就是开启。还包括一些包装好的函数
 # 推荐配合网页修改器使用
 class CheatOption(Serializable):
     def __init__(self) -> None:
         self.wontLose = False
         self.freePlant = False
+        self._unlockBannedSeeds = False
         self.plantAnyWhere = False
         self.plantNoDie = False
         self.zombieNoDie = False
@@ -28,10 +38,10 @@ class CheatOption(Serializable):
         self.blowAwayPropeller = False
         self.blowAwayThrownImp = False
         self.visibleGhoul = False
-        self.noThunder = False
         self.diamondZenTools = False
         self.noFog = False
         self.transScaryPot = False
+        self.scaryPotterNoDelay = False
         self.conveyorNoCooling = False
         self.featureThreePeater = False
         self.butterPult = False
@@ -384,15 +394,6 @@ class CheatOption(Serializable):
             return
         LineUp.from_str(linup_code_b64).to_board(board)
 
-    def UnlockCrazyDaveSeed(self):
-        if GetBoard() is None:
-            return
-        lawnApp = GetLawnApp()
-        for i in range(60):
-            chosenSeed = lawnApp.mSeedChooserScreen.mChosenSeeds[i]
-            if chosenSeed is not None:
-                chosenSeed.mCrazyDavePicked = False
-
     @main_thread
     def SetAdventureLevel(self, level: int):
         lawnApp = GetLawnApp()
@@ -409,6 +410,14 @@ class CheatOption(Serializable):
     @autoCollect.setter
     def autoCollect(self, value):
         auto_collector.On() if value else auto_collector.Off()
+
+    @property
+    def unlockBannedSeeds(self):
+        return self._unlockBannedSeeds
+    @unlockBannedSeeds.setter
+    def unlockBannedSeeds(self, value):
+        self._unlockBannedSeeds = value
+        script_unlock_crazydaveseed.On() if value else script_unlock_crazydaveseed.Off()
 
     @property
     def infSun(self):
@@ -485,6 +494,19 @@ def ScriptSkipLevelIntro():
     cutscene.CancelIntro()
 
 script_manager.Register(ScriptSkipLevelIntro, runmode=ScriptRunMode.GLOBAL)
+
+# 解锁戴夫卡片
+def ScriptUnlockCrazyDaveSeed():
+    lawnApp = GetLawnApp()
+    seedChooser = lawnApp.mSeedChooserScreen
+    if seedChooser is None:
+        return
+    for i in range(65):
+        chosenSeed = seedChooser.mChosenSeeds[i]
+        if chosenSeed is not None:
+            chosenSeed.mCrazyDavePicked = False
+script_unlock_crazydaveseed = script_manager.Register(ScriptUnlockCrazyDaveSeed, runmode=ScriptRunMode.FOREVER)
+script_unlock_crazydaveseed.Off()
 
 # 无限阳光
 def ScriptInfSun():
