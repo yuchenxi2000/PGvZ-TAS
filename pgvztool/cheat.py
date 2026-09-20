@@ -74,7 +74,19 @@ class CheatOption(Serializable):
         lawnapp.DoDialog(7, True, title, msg, '好的', 3)
 
     @main_thread
-    def FailImmediately(self, zombietype: Lawn.ZombieType):
+    def WinLevel(self):
+        lawnApp = GetLawnApp()
+        board = lawnApp.mBoard
+        if board is None:
+            return
+        if not lawnApp.IsIZombieLevel():
+            for zombie in IterAliveZombies():
+                zombie.DieNoLoot(False)
+        lawnApp.KillDialog(19)
+        board.FadeOutLevel()
+
+    @main_thread
+    def LoseLevel(self, zombietype: Lawn.ZombieType):
         lawnApp = GetLawnApp()
         board = lawnApp.mBoard
         if board is None:
@@ -94,7 +106,10 @@ class CheatOption(Serializable):
         zombie.mPosX = board_EDGE
         # 没有这个会崩溃，因为游戏失败对话和暂停貌似会冲突
         lawnApp.KillDialog(19)
+        prevState = self.wontLose
+        self.wontLose = False
         board.ZombiesWon(zombie)
+        self.wontLose = prevState
 
     @main_thread
     def GivePottedPlant(self, seedtype: Lawn.SeedType, reverse: bool = False):

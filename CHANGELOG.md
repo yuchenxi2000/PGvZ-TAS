@@ -1,5 +1,11 @@
 # 更新日志
 
+## [unreleased]
+
+### 改进
+
+- 整理直接过关相关代码。
+
 ## [1.14.1] - 2026-09-19
 
 ### 新增
@@ -339,7 +345,8 @@
 - 修复安卓部分区域无法自动收集、移除天尸诅咒不完整，以及过长命令结果挤出网页界面的问题。
 - 进入月夜无尽前检查屋顶无尽存档，避免未经提示直接覆盖。
 
-[1.14.1]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.14.0...HEAD
+[unreleased]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.14.1...HEAD
+[1.14.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.14.1
 [1.14.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.14.0
 [1.13.8]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.8
 [1.13.7]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.7
