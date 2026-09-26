@@ -3,14 +3,15 @@ window.PGvZI18n = (() => {
         zh: {
             app: {
                 title: '植物娘修改器',
-                subtitle: '本地网页控制台',
+                modVersion: '修改器版本',
+                gameVersion: '游戏版本',
             },
             tabs: {
                 player: '基础',
                 world: '场地',
                 stage: '关卡',
                 lineup: '出怪与布阵',
-                custom: '自定义',
+                custom: '调试',
             },
             sections: {
                 resources: '资源与进度',
@@ -93,6 +94,7 @@ window.PGvZI18n = (() => {
                 infiniteMowers: '无限割草机',
                 removePlant: '移除植物',
                 removeZombie: '杀死僵尸',
+                removeEnemyZombie: '杀死僵尸（敌方）',
                 removeGridItem: '移除场地物品',
                 removeSelectedGridItem: '移除场地物品（选中）',
                 removeCoin: '移除掉落物',
@@ -194,6 +196,8 @@ window.PGvZI18n = (() => {
                 showSeedPacketNumbers: '显示卡槽数字',
                 showCraterCooldown: '显示弹坑冷却',
                 drawPlantHp: '显示植物血量',
+                drawPlantCooldown: '显示植物CD',
+                drawSunProductionCooldown: '显示阳光生产CD',
                 drawZombieHp: '显示僵尸血量',
                 selectZombieHp: '血量只显示精英怪',
                 gloveNoCooling: '手套无冷却',
@@ -208,14 +212,15 @@ window.PGvZI18n = (() => {
         en: {
             app: {
                 title: 'PlantGirls Cheat Console',
-                subtitle: 'Local web control panel',
+                modVersion: 'Mod version',
+                gameVersion: 'Game version',
             },
             tabs: {
                 player: 'Basics',
                 world: 'Board',
                 stage: 'Stage',
                 lineup: 'Spawns & Lineup',
-                custom: 'Custom',
+                custom: 'Debug',
             },
             sections: {
                 resources: 'Resources & Progress',
@@ -297,7 +302,8 @@ window.PGvZI18n = (() => {
                 startMower: 'Start Mower',
                 infiniteMowers: 'Infinite Mowers',
                 removePlant: 'Remove Plant',
-                removeZombie: 'Kill Zombie',
+                removeZombie: 'Kill Zombies',
+                removeEnemyZombie: 'Kill Zombies (Enemies)',
                 removeGridItem: 'Remove Grid Item',
                 removeSelectedGridItem: 'Remove Selected Grid Item',
                 removeCoin: 'Remove Drop',
@@ -399,6 +405,8 @@ window.PGvZI18n = (() => {
                 showSeedPacketNumbers: 'Show Seed Slot Numbers',
                 showCraterCooldown: 'Show Crater Cooldown',
                 drawPlantHp: 'Show Plant HP',
+                drawPlantCooldown: 'Show Plant Cooldown',
+                drawSunProductionCooldown: 'Show Sun Production Cooldown',
                 drawZombieHp: 'Show Zombie HP',
                 selectZombieHp: 'Elite HP Only',
                 gloveNoCooling: 'No Glove Cooldown',

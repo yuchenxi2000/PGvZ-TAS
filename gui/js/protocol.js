@@ -48,10 +48,15 @@ window.PGvZProtocol = (() => {
         return major < 1 || (major === 1 && minor < 3);
     }
 
+    function displayGameVersion(versionLabel) {
+        return String(versionLabel || '').replace(/^PGvZ\s+/, '');
+    }
+
     return {
         BOOTSTRAP_READY_PROBE_CODE,
         BOOTSTRAP_CODE,
         GAME_VERSION_PROBE_CODE,
+        displayGameVersion,
         isLegacyGameVersion,
         parseResultMessage,
         pyBool,

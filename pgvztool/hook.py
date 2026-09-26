@@ -672,6 +672,90 @@ def DrawPlantHpAll(board: Lawn.Board, g: Sexy.Graphics):
                     DrawPlantHp(plant2, g, 10, 50, color3, color4)
     g.SetColorizeImages(False)
 
+
+_PRODUCTION_COOLDOWN_PLANTS = (
+    Lawn.SeedType.Sunflower,
+    Lawn.SeedType.Twinsunflower,
+    Lawn.SeedType.Sunshroom,
+    Lawn.SeedType.SunflowerPea,
+    Lawn.SeedType.SunflowerWallnut,
+    Lawn.SeedType.Marigold,
+)
+
+
+def ProductionCooldown(plant: Lawn.Plant):
+    """用单株生产周期作分母，保留游戏随机缩短的效果。"""
+    if (plant.mSeedType not in _PRODUCTION_COOLDOWN_PLANTS
+            or plant.mLaunchRate <= 0 or plant.mLaunchCounter <= 0):
+        return None
+    app = plant.mApp
+    board = plant.mBoard
+    if (not plant.IsInPlay() or app.IsIZombieLevel()
+            or app.mGameMode in (Lawn.GameMode.Upsell, Lawn.GameMode.Intro)
+            or board.HasLevelAwardDropped()
+            or (app.mGameMode == Lawn.GameMode.ChallengeLastStand
+                and board.mChallenge.mChallengeState != Lawn.ChallengeState.LastStandOnslaught)):
+        return None
+    if (plant.mSeedType == Lawn.SeedType.Marigold
+            and plant.mState == Lawn.PlantState.MarigoldEnding
+            and plant.mStateCountdown <= 0):
+        return None
+    return min(plant.mLaunchCounter, plant.mLaunchRate), plant.mLaunchRate
+
+
+def PlantCooldown(plant: Lawn.Plant):
+    """返回当前冷却剩余帧和本次冷却总帧数；未冷却时返回 None。"""
+    state = plant.mState
+    seed_type = plant.mSeedType
+    remaining = plant.mStateCountdown
+    if remaining <= 0:
+        return None
+    if seed_type == Lawn.SeedType.Cobcannon and state == Lawn.PlantState.CobcannonArming:
+        # 初次种植只需 500 帧；发射后的装填需 3000 帧。
+        total = 500 if plant.mTargetX == -1 else 3000
+    elif seed_type == Lawn.SeedType.Chomper and state == Lawn.PlantState.ChomperDigesting:
+        total = 4000
+    elif seed_type == Lawn.SeedType.SuperChomper and state == Lawn.PlantState.ChomperDigesting:
+        total = 2500
+    elif seed_type == Lawn.SeedType.Potatomine and state == Lawn.PlantState.Notready:
+        total = 1500
+    elif (seed_type == Lawn.SeedType.Magnetshroom
+            and state in (Lawn.PlantState.MagnetshroomSucking,
+                          Lawn.PlantState.MagnetshroomCharging)):
+        total = 1500
+    else:
+        return None
+    return min(remaining, total), total
+
+
+def DrawPlantCooldowns(board: Lawn.Board, g: Sexy.Graphics, show_plant: bool, show_sun: bool):
+    blue = Sexy.SexyColor(51, 153, 255, 255).Color
+    dark_blue = Sexy.SexyColor(0, 51, 153, 255).Color
+    black = Sexy.SexyColor(0, 0, 0, 255).Color
+    g.SetColorizeImages(True)
+    for i in range(board.mPlants.Count):
+        plant = board.mPlants[i]
+        if plant.mDead:
+            continue
+        if plant.mSeedType in _PRODUCTION_COOLDOWN_PLANTS:
+            cooldown = ProductionCooldown(plant) if show_sun else None
+        else:
+            cooldown = PlantCooldown(plant) if show_plant else None
+        if cooldown is None:
+            continue
+        remaining, total = cooldown
+        width = 140 if plant.mSeedType == Lawn.SeedType.Cobcannon else 60
+        x = plant.mX + 10
+        # 血条位于 Y+50（投掷层）或 Y+60（主植物）；此处留至少 5 像素间距。
+        y = plant.mY + 40
+        g.SetColor(dark_blue)
+        g.FillRect(x, y, width, 5)
+        g.SetColor(blue)
+        g.FillRect(x, y, int(width * remaining / total), 5)
+        g.SetColor(black)
+        g.DrawRect(x, y, width, 5)
+    g.SetColorizeImages(False)
+
 def DrawZombieHp(zombie: Lawn.Zombie, g: Sexy.Graphics, marginX: int, offsetY: int, color1, color2, color3, color4):
     rect = zombie.GetZombieRect()
     totalWidth = rect.mWidth
@@ -754,11 +838,21 @@ def DrawZombieHpAll(board: Lawn.Board, g: Sexy.Graphics):
     color6 = Sexy.SexyColor(127, 0, 255, 255).Color
     color7 = Sexy.SexyColor(255, 0, 127, 255).Color
     color8 = Sexy.SexyColor(153, 0, 76, 255).Color
-    for zombie in IterAliveZombies():
+    mind_color1 = Sexy.SexyColor(51, 204, 102, 255).Color
+    mind_color2 = Sexy.SexyColor(0, 102, 51, 255).Color
+    mind_color3 = Sexy.SexyColor(51, 204, 255, 255).Color
+    mind_color4 = Sexy.SexyColor(0, 102, 153, 255).Color
+    for i in range(board.mZombies.Count):
+        zombie = board.mZombies[i]
+        if not zombie.mHasHead or zombie.IsDeadOrDying():
+            continue
         # 只画精英怪
         if cheat_option.selectZombieHp and zombie.mZombieType not in selectZbList:
             continue
-        DrawZombieHp(zombie, g, 0, 0, color5, color6, color7, color8)
+        if zombie.mMindControlled:
+            DrawZombieHp(zombie, g, 0, 0, mind_color1, mind_color2, mind_color3, mind_color4)
+        else:
+            DrawZombieHp(zombie, g, 0, 0, color5, color6, color7, color8)
     g.SetColorizeImages(False)
 
 CRATER_COOLDOWN_BAR_WIDTH = 60
@@ -974,6 +1068,9 @@ def Board__Draw(orig, board: Lawn.Board, g: Sexy.Graphics):
     board.mCamera.ApplyTransform(g)
     if cheat_option.drawPlantHp:
         DrawPlantHpAll(board, g)
+    if (board.mApp.mGameMode != Lawn.GameMode.ChallengeZenGarden
+            and (cheat_option.drawPlantCooldown or cheat_option.drawSunProductionCooldown)):
+        DrawPlantCooldowns(board, g, cheat_option.drawPlantCooldown, cheat_option.drawSunProductionCooldown)
     if cheat_option.drawZombieHp:
         DrawZombieHpAll(board, g)
     if cheat_option.showCraterCooldown:

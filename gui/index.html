@@ -14,7 +14,10 @@
         <header class="app-header">
             <div>
                 <h1>{{ t('app.title') }}</h1>
-                <p>{{ t('app.subtitle') }}</p>
+                <p class="version-line">
+                    <span>{{ t('app.modVersion') }}: {{ modVersion || '—' }}</span>
+                    <span>{{ t('app.gameVersion') }}: {{ gameVersion || '—' }}</span>
+                </p>
             </div>
             <div class="header-actions">
                 <el-tag :type="connected ? 'success' : 'danger'" effect="light" size="large">
@@ -241,6 +244,7 @@
                             <div class="button-stack">
                                 <el-button type="danger" @click="send(`placer.RemovePlantOnBoard()`)">{{ t('actions.removePlant') }}</el-button>
                                 <el-button type="danger" @click="send(`placer.RemoveZombieOnBoard()`)">{{ t('actions.removeZombie') }}</el-button>
+                                <el-button type="danger" @click="send(`placer.RemoveZombieOnBoard(True)`)">{{ t('actions.removeEnemyZombie') }}</el-button>
                                 <el-button type="danger" @click="send(`placer.RemoveCoinOnBoard(Lawn.CoinType.${selectedCoin})`)">{{ t('actions.removeCoin') }}</el-button>
                                 <el-button type="danger" @click="send(`placer.RemoveGridItemOnBoard(-1, -1, Lawn.GridItemType.${selectedGridItem})`)">{{ t('actions.removeGridItem') }}</el-button>
                                 <el-button type="danger" @click="send(`placer.RemoveGridItemOnBoard(${selectedRow}, ${selectedCol}, Lawn.GridItemType.${selectedGridItem})`)">{{ t('actions.removeSelectedGridItem') }}</el-button>

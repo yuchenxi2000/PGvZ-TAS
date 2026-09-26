@@ -54,6 +54,12 @@ body {
     font-size: 13px;
 }
 
+.version-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+}
+
 .header-actions {
     display: flex;
     align-items: center;

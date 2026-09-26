@@ -58,6 +58,8 @@ class CheatOption(Serializable):
         self.noCover = False
         self.stopSpawning = False
         self.drawPlantHp = False
+        self.drawPlantCooldown = False
+        self.drawSunProductionCooldown = False
         self.drawZombieHp = False
         self.selectZombieHp = False
         self.shovelNoReset = False

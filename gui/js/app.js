@@ -112,6 +112,8 @@ const app = createApp({
         const connected = ref(false);
         const sessionRejected = ref(false);
         const legacyGameVersionWarning = ref(false);
+        const gameVersion = ref('');
+        const modVersion = ref('');
         const connectionState = ref('disconnected');
         const statusText = computed(() => t(`status.${connectionState.value}`));
         const activeTab = ref('player');
@@ -216,6 +218,8 @@ const app = createApp({
                 'showCraterCooldown',
                 'showWaveInfo',
                 'drawPlantHp',
+                'drawPlantCooldown',
+                'drawSunProductionCooldown',
                 'drawZombieHp',
                 'selectZombieHp',
                 'drawSquirrel',
@@ -460,6 +464,8 @@ const app = createApp({
                 stopBootstrapProbe();
                 bootstrapStarted = false;
                 connected.value = false;
+                gameVersion.value = '';
+                modVersion.value = '';
                 connectionState.value = 'connecting';
                 requestBootstrapReady();
             };
@@ -486,6 +492,7 @@ const app = createApp({
                             return;
                         }
                         if (msg && msg.action === 'gameVersion') {
+                            gameVersion.value = PGvZProtocol.displayGameVersion(msg.version);
                             legacyGameVersionWarning.value = PGvZProtocol.isLegacyGameVersion(msg.version);
                             startBootstrap();
                             return;
@@ -498,6 +505,7 @@ const app = createApp({
 
                         if (msg && msg.action === 'sync' && msg.state) {
                             setResult(true, 'messages.syncOk');
+                            modVersion.value = String(msg.modVersion || '');
                             applySyncState(msg.state);
                             markConnected();
                             startHeartbeat();
@@ -524,6 +532,8 @@ const app = createApp({
                 bootstrapStarted = false;
                 stopHeartbeat();
                 connected.value = false;
+                gameVersion.value = '';
+                modVersion.value = '';
                 if (sessionRejected.value) {
                     connectionState.value = 'occupied';
                     return;
@@ -610,6 +620,8 @@ const app = createApp({
             connected,
             sessionRejected,
             legacyGameVersionWarning,
+            gameVersion,
+            modVersion,
             statusText,
             activeTab,
             speed,

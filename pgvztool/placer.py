@@ -209,13 +209,13 @@ class Placer(Serializable):
                 self._ZombieOnBoard(row1, col1, xi, zombietype, mind_ctrl)
 
     @main_thread
-    def RemoveZombieOnBoard(self):
+    def RemoveZombieOnBoard(self, enemy_only: bool = False):
         board = GetBoard()
-        if GetBoard() is None:
+        if board is None:
             return
         for i in range(board.mZombies.Count):
             zombie = board.mZombies[i]
-            if zombie.mHasHead and not zombie.IsDeadOrDying():
+            if zombie.mHasHead and not zombie.IsDeadOrDying() and (not enemy_only or not zombie.mMindControlled):
                 zombie.DieNoLoot(False)
 
     @main_thread
