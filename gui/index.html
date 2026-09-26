@@ -71,6 +71,16 @@
                                     </div>
                                     <div class="resource-row">
                                         <div class="resource-value">
+                                            <el-input-number v-model="chocolateValue" :min="0" :max="999" size="small" />
+                                        </div>
+                                        <div class="resource-action">
+                                            <el-button type="warning" @click="send(`cheat_option.SetChocolate(${chocolateValue})`)">
+                                                {{ t('actions.setChocolate') }}
+                                            </el-button>
+                                        </div>
+                                    </div>
+                                    <div class="resource-row">
+                                        <div class="resource-value">
                                             <el-input-number v-model="treeHeight" :min="0" :max="2147483647" size="small" />
                                         </div>
                                         <div class="resource-action">
@@ -89,6 +99,16 @@
                                             </el-button>
                                         </div>
                                     </div>
+                                    <div class="resource-row">
+                                        <div class="resource-value">
+                                            <el-input-number v-model="finishedAdventure" :min="0" :max="2147483647" :step="1" :precision="0" size="small" />
+                                        </div>
+                                        <div class="resource-action">
+                                            <el-button type="primary" @click="send(`cheat_option.SetFinishedAdventure(${finishedAdventure})`)">
+                                                {{ t('actions.setFinishedAdventure') }}
+                                            </el-button>
+                                        </div>
+                                    </div>
                                 </div>
                             </el-card>
 
@@ -99,8 +119,6 @@
                                     <el-button type="danger" @click="send('cheat_option.LoseLevel(Lawn.ZombieType.Normal)')">{{ t('actions.loseNow') }}</el-button>
                                     <el-button type="success" @click="send('cheat_option.CompleteAccount()')">{{ t('actions.completeAccount') }}</el-button>
                                     <el-button type="success" @click="send('cheat_option.PerfectAccount()')">{{ t('actions.perfectAccount') }}</el-button>
-                                    <el-button @click="send('GetBoard().mShowShovel = True')">{{ t('actions.showShovel') }}</el-button>
-                                    <el-button @click="send('GetBoard().mChallenge.mChallengeStateCounter = 2147483647')">{{ t('actions.freezePortal') }}</el-button>
                                 </div>
                             </el-card>
                         </div>

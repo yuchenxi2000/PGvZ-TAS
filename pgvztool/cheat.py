@@ -4,6 +4,7 @@
 """
 import System
 import Lawn
+import Lawn.Creative
 import Sexy
 from pgvz import *
 from pgvz.lineup import LineUp
@@ -47,7 +48,10 @@ class CheatOption(Serializable):
         self.butterPult = False
         self.doubleGatlingpea = False
         self.fullAreaGloomshroom = False
+        self.fullAreaUmbrella = False
         self.planternAlwaysTransform = False
+        self.hypnoCattailAlwaysHypnotize = False
+        self.allZombiesHypnotizable = False
         self.enableGlove = False
         self.zombieStop = False
         self.chomperNoCooling = False
@@ -57,6 +61,7 @@ class CheatOption(Serializable):
         self.drawZombieHp = False
         self.selectZombieHp = False
         self.shovelNoReset = False
+        self.showShovel = False
         self.runBackground = False
         self.skipLevelIntro = False
         self.gloveNoCooling = False
@@ -338,6 +343,11 @@ class CheatOption(Serializable):
         self._SetTreeHeight(height)
 
     @main_thread
+    def SetChocolate(self, count: int):
+        count = max(0, min(999, int(count)))
+        GetLawnApp().mPlayerInfo.mPurchases[int(Lawn.StoreItem.STORE_ITEM_CHOCOLATE)] = 1000 + count
+
+    @main_thread
     def CompleteAccount(self):
         self._CompleteAccount()
         self._RefreshAccountDisplay()
@@ -417,6 +427,14 @@ class CheatOption(Serializable):
             lawnApp.KillGameSelector()
             lawnApp.ShowGameSelector()
 
+    @main_thread
+    def SetFinishedAdventure(self, count: int):
+        lawnApp = GetLawnApp()
+        lawnApp.mPlayerInfo.mFinishedAdventure = max(0, min(2147483647, int(count)))
+        if lawnApp.mGameScene == Lawn.GameScenes.Menu:
+            lawnApp.KillGameSelector()
+            lawnApp.ShowGameSelector()
+
     # ===== 脚本单例状态（通过 property 暴露给 sync） =====
 
     @property
@@ -461,6 +479,14 @@ class CheatOption(Serializable):
     @autoRestock.setter
     def autoRestock(self, value):
         script_auto_restock.On() if value else script_auto_restock.Off()
+
+    @property
+    def freezePortal(self):
+        return script_freeze_portal.enabled
+
+    @freezePortal.setter
+    def freezePortal(self, value):
+        script_freeze_portal.On() if value else script_freeze_portal.Off()
 
     @property
     def noCooldown(self):
@@ -566,3 +592,20 @@ conf_auto_restock = ScriptConf(
 )
 script_auto_restock = script_manager.Register(ScriptAutoRestock, conf=conf_auto_restock)
 script_auto_restock.Off()
+
+# 传送门不移动
+def ScriptFreezePortal():
+    lawnApp = GetLawnApp()
+    board = lawnApp.mBoard
+    if lawnApp.mGameMode == Lawn.GameMode.ChallengePortalCombat:
+        board.mChallenge.mChallengeStateCounter = 6000
+        return
+
+    creativeLevel = lawnApp.mCreativeLevel
+    if creativeLevel is not None:
+        component = creativeLevel.GetComponent[Lawn.Creative.CSSpawnPortal]()
+        if component is not None and component.mRandomPortalTime >= 0:
+            # Update() 会先减一、再于 <=0 时移动；至少留两帧。
+            board.mChallenge.mRandomPortalCounter = max(2, component.mRandomPortalTime)
+script_freeze_portal = script_manager.Register(ScriptFreezePortal, runmode=ScriptRunMode.FOREVER)
+script_freeze_portal.Off()

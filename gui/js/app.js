@@ -128,8 +128,10 @@ const app = createApp({
 
         const sunValue = ref(9990);
         const moneyValue = ref(999999);
+        const chocolateValue = ref(999);
         const treeHeight = ref(1000);
         const level = ref(1);
+        const finishedAdventure = ref(2);
         const numSurvivalStage = ref(2000);
         const coinX = ref(400);
         const coinY = ref(300);
@@ -171,12 +173,14 @@ const app = createApp({
                 'enableGlove',
                 'gloveNoCooling',
                 'shovelNoReset',
+                'showShovel',
                 'enableTrashcan',
                 'plantNoDie',
                 'zombieNoDie',
                 'wontLose',
                 'zombieStop',
                 'stopSpawning',
+                'freezePortal',
                 'tasEnabled',
             ],
             features: [
@@ -197,7 +201,10 @@ const app = createApp({
                 'butterPult',
                 'doubleGatlingpea',
                 'fullAreaGloomshroom',
+                'fullAreaUmbrella',
                 'planternAlwaysTransform',
+                'hypnoCattailAlwaysHypnotize',
+                'allZombiesHypnotizable',
                 'scaryPotterNoDelay',
             ],
             scene: [
@@ -611,8 +618,10 @@ const app = createApp({
             weatherOptions,
             sunValue,
             moneyValue,
+            chocolateValue,
             treeHeight,
             level,
+            finishedAdventure,
             numSurvivalStage,
             coinX,
             coinY,

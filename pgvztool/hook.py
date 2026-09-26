@@ -150,6 +150,40 @@ def Zombie__DieWithLoot(orig, zombie: Lawn.Zombie):
     else:
         orig(zombie)
 
+# 原版 ApplyMindControl 仅限制目标类型；未通过时补做相同的魅惑效果。
+def _ForceMindControl(zombie: Lawn.Zombie):
+    related_zombie = zombie.mRelatedZombieID
+    zombie.StartMindControlled()
+    if zombie.mZombieType == Lawn.ZombieType.Bobsled:
+        # 雪橇队仍共用载具；StartMindControlled 会断开队员与队长的关联。
+        zombie.mRelatedZombieID = related_zombie
+    zombie.mApp.AddTodParticle(zombie.mPosX + 60, zombie.mPosY + 40,
+                               zombie.mRenderOrder + 1, Sexy.TodLib.ParticleEffect.MindControl)
+    zombie.TrySpawnLevelAward()
+    zombie.mAnimTicksPerFrame = 18
+    zombie.UpdateAnimSpeed()
+
+
+@LawnMod.MonoModUtils.HookTo(Lawn.Zombie.ApplyMindControl)
+def Zombie__ApplyMindControl(orig, zombie: Lawn.Zombie):
+    orig(zombie)
+    if (not cheat_option.allZombiesHypnotizable
+            or zombie.mMindControlled or zombie.IsDeadOrDying()):
+        return
+
+    if zombie.IsBobsledTeamWithSled():
+        leader = zombie.mBoard.ZombieTryToGet(zombie.mRelatedZombieID) or zombie
+        team = [leader]
+        for i in range(3):
+            member = zombie.mBoard.ZombieTryToGet(leader.mFollowerZombieID[i])
+            if member is not None:
+                team.append(member)
+        for member in team:
+            if not member.mMindControlled and not member.IsDeadOrDying():
+                _ForceMindControl(member)
+    else:
+        _ForceMindControl(zombie)
+
 # 1. 僵尸无敌：不能被三叶草吹走
 # 2. 特性修改：螺旋桨僵尸和空中小鬼僵尸可以被三叶草吹走
 @LawnMod.MonoModUtils.HookTo(Lawn.Plant.BlowAwayFliers)
@@ -187,6 +221,25 @@ def Projectile__GetProjectileDamage(orig, projectile: Lawn.Projectile):
         return 0
     return orig(projectile)
 
+# 魅惑香蒲刺命中时，将原版 NextNumber(20) == 0 的判定固定为成功。
+@LawnMod.MonoModUtils.HookTo(Lawn.Projectile.DoImpact)
+def Projectile__DoImpact(orig, projectile: Lawn.Projectile, zombie: Lawn.Zombie):
+    if (not cheat_option.hypnoCattailAlwaysHypnotize
+            or projectile.mProjectileType != Lawn.ProjectileType.HypnoCattailSpike
+            or zombie is None):
+        return orig(projectile, zombie)
+
+    had_override = 20 in rng_manip.forced_int_by_ceiling
+    old_value = rng_manip.forced_int_by_ceiling.get(20)
+    rng_manip.forced_int_by_ceiling[20] = 0
+    try:
+        return orig(projectile, zombie)
+    finally:
+        if had_override:
+            rng_manip.forced_int_by_ceiling[20] = old_value
+        else:
+            del rng_manip.forced_int_by_ceiling[20]
+
 # 植物免疫小丑爆炸
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.KillAllPlantsInRadius)
 def Board__KillAllPlantsInRadius(orig, board: Lawn.Board, theX: int, theY: int, theRadius: int):
@@ -214,6 +267,20 @@ def Plant__Squish(orig, plant: Lawn.Plant):
                 return
     else:
         orig(plant)
+
+# 莴苣伞全屏防护：原版蹦极落地和投射物命中都通过此方法找伞。
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.FindUmbrellaPlant)
+def Board__FindUmbrellaPlant(orig, board: Lawn.Board, gridX: int, gridY: int):
+    plant = orig(board, gridX, gridY)
+    if plant is not None or not cheat_option.fullAreaUmbrella:
+        return plant
+
+    for i in range(board.mPlants.Count):
+        plant = board.mPlants[i]
+        if (not plant.mDead and plant.mSeedType == Lawn.SeedType.Umbrella
+                and not plant.NotOnGround() and not plant.IsDisabled()):
+            return plant
+    return None
 
 # 植物无法被蹦极偷走
 @LawnMod.MonoModUtils.HookTo(Lawn.Zombie.BungeeStealTarget)
@@ -579,10 +646,13 @@ def DrawPlantHp(plant: Lawn.Plant, g: Sexy.Graphics, marginX: int, offsetY: int,
         x = plant.mX + marginX
         y = plant.mY + offsetY
         hpWidth = totalWidth * plant.mPlantHealth / plant.mPlantMaxHealth
+        color_black = Sexy.SexyColor(0, 0, 0, 255).Color
         g.SetColor(color2)
         g.FillRect(x, y, totalWidth, 5)
         g.SetColor(color1)
         g.FillRect(x, y, int(hpWidth), 5)
+        g.SetColor(color_black)
+        g.DrawRect(x, y, totalWidth, 5)
 
 def DrawPlantHpAll(board: Lawn.Board, g: Sexy.Graphics):
     g.SetColorizeImages(True)
@@ -649,17 +719,22 @@ def DrawZombieHp(zombie: Lawn.Zombie, g: Sexy.Graphics, marginX: int, offsetY: i
     if zombie.mHasShield and zombie.mShieldHealth < zombie.mShieldMaxHealth:
         hpWidth2 = totalWidth * zombie.mShieldHealth / zombie.mShieldMaxHealth
         plotHp2 = True
+    color_black = Sexy.SexyColor(0, 0, 0, 255).Color
     # 开始绘制
     if plotHp1:
         g.SetColor(color2)
         g.FillRect(x, y, totalWidth, 5)
         g.SetColor(color1)
         g.FillRect(x, y, int(hpWidth), 5)
+        g.SetColor(color_black)
+        g.DrawRect(x, y, totalWidth, 5)
     if plotHp2:
         g.SetColor(color4)
         g.FillRect(x, y + 10, totalWidth, 5)
         g.SetColor(color3)
         g.FillRect(x, y + 10, int(hpWidth2), 5)
+        g.SetColor(color_black)
+        g.DrawRect(x, y + 10, totalWidth, 5)
 
 selectZbList = [
     Lawn.ZombieType.Football,
@@ -713,7 +788,17 @@ def DrawCraterCooldowns(board: Lawn.Board, g: Sexy.Graphics):
         g.FillRect(bar_x, bar_y, CRATER_COOLDOWN_BAR_WIDTH, CRATER_COOLDOWN_BAR_HEIGHT)
         g.SetColor(bar_color)
         g.FillRect(bar_x, bar_y, remaining_width, CRATER_COOLDOWN_BAR_HEIGHT)
+        color_black = Sexy.SexyColor(0, 0, 0, 255).Color
+        g.SetColor(color_black)
+        g.DrawRect(bar_x, bar_y, CRATER_COOLDOWN_BAR_WIDTH, CRATER_COOLDOWN_BAR_HEIGHT)
         g.SetColorizeImages(False)
+
+# 显示铲子。HasShovel 同时供按钮显示和铲子使用判断调用。
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.HasShovel)
+def Board__HasShovel(orig, board: Lawn.Board):
+    if cheat_option.showShovel:
+        return True
+    return orig(board)
 
 # 连续铲子
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.MouseDownWithTool)
