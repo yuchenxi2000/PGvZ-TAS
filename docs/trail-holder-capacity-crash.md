@@ -1,6 +1,6 @@
 # 拖尾容器容量耗尽崩溃修复
 
-本文依据 PGvZ 1.2.6 的反编译代码，记录 `TrailHolder` 容量耗尽时游戏崩溃的原因，以及 `pgvztool/hook.py` 中现有修复的工作方式。大量香蒲子弹是这个问题的常见触发方式，但底层缺陷不属于香蒲专用逻辑。这里的“香蒲”对应 `SeedType.Cattail`，旧代码注释中也称“猫尾草”。
+本文依据 PGvZ 1.2.6 的反编译代码，记录 `TrailHolder` 容量耗尽时游戏崩溃的原因，以及 `pgvztool/hook.py` 中修复的工作方式，并核对 PGvZ 1.3.2 的原生修复。大量香蒲子弹是这个问题的常见触发方式，但底层缺陷不属于香蒲专用逻辑。这里的“香蒲”对应 `SeedType.Cattail`，旧代码注释中也称“猫尾草”。
 
 ## 现象与真正的容量限制
 
@@ -66,7 +66,7 @@ mTrails[mTrails.IndexOf(theTrail)]
 
 ## 修改器中的修复
 
-`pgvztool/hook.py` 挂钩 `TrailHolder.AllocTrailFromDef`。调用原函数前，如果列表正好填满，就把容量扩大为原来的两倍：
+`pgvztool/hook.py` 将 `pgvz.__game_version__` 字符串的各段转为整数，仅在游戏版本低于 1.3.2 时挂钩 `TrailHolder.AllocTrailFromDef`。调用原函数前，如果列表正好填满，就把容量扩大为原来的两倍：
 
 ```python
 if trailHolder.mTrails.Count == trailHolder.mTrails.Capacity:
@@ -77,6 +77,8 @@ return orig(trailHolder, theRenderOrder, theDefinition)
 这样进入原函数时 `Count < Capacity`，原有的 `Trail` 初始化、随机持续时间计算和入表逻辑仍由游戏执行。正常初始化的 `TrailHolder` 容量从 128 开始，因此翻倍不会遇到零容量仍为零的问题。
 
 该修复挂在通用拖尾分配入口，所以同时覆盖普通香蒲刺、魅惑香蒲刺和火红莲刺，也会覆盖以后经由该入口创建的其他拖尾。它不是香蒲专用的子弹数量补丁。
+
+PGvZ 1.3.2 的 `Sexy/TodLib/TrailHolder.cs` 已删除容量满时返回 `null` 的分支，直接创建拖尾并调用 `mTrails.Add(trail)`，由 .NET 列表自动扩容。调用者 `AllocTrail` 和 `Lawn/Projectile.cs` 中的拖尾创建路径仍沿用上述调用链。因此，1.3.2 及以后不再安装此 bugfix 钩子；版本判断发生在模块导入、注册钩子时。
 
 ## 生命周期与修复边界
 

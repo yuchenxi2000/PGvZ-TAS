@@ -24,6 +24,7 @@ auto_collector = script_manager.Register(AutoCollect, runmode=ScriptRunMode.FORE
 
 __version__ = PROJECT_VERSION
 __supported_game_versions__ = SUPPORTED_GAME_VERSIONS
+__game_version__ = Lawn.LawnApp.AppVersionNumber.split()[1]
 
 # 这个钩子起到补充作用，为了在主界面、选卡界面等仍能运行/管理脚本
 @LawnMod.MonoModUtils.HookTo(Lawn.LawnApp.UpdateFrames)
@@ -59,5 +60,5 @@ __all__ = [
     "script_manager", "auto_collector",
     "SetZombies",
     "PROJECT_VERSION", "TOOL_VERSION", "MOD_VERSION", "SUPPORTED_GAME_VERSIONS",
-    "__version__", "__supported_game_versions__",
+    "__version__", "__supported_game_versions__", "__game_version__",
 ]

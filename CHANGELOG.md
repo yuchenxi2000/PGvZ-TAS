@@ -1,5 +1,23 @@
 # 更新日志
 
+## [1.15.1] - 2026-10-05
+
+### 新增
+
+- `pgvz` 新增 `__game_version__`，从 `Lawn.LawnApp.AppVersionNumber` 提取实际游戏版本字符串（如 `"1.3.2"`）。
+
+### 改进
+
+- 拖尾容器扩容 bugfix 仅在游戏版本低于 1.3.2 时安装钩子；1.3.2 及以后使用游戏原生修复。
+- 网页页眉游戏版本改为通过状态同步读取 `pgvz.__game_version__`；加载前版本探测仍用于旧版游戏警告。
+- 植物娘和原版的特性差异文档 `docs/pgvz-vs-pvz.md` 增加裂荚射手的特性差异。
+- 更新 1.3.2 版本的类型存根。
+- 锤僵尸示例脚本能在开启锤僵尸模式的自定义关卡运行。
+
+### 修复
+
+- 修复 1.3.2 版本游戏“手套无冷却”失效的问题，同时支持手套融合植物。
+
 ## [1.15.0] - 2026-09-27
 
 ### 新增
@@ -362,7 +380,8 @@
 - 修复安卓部分区域无法自动收集、移除天尸诅咒不完整，以及过长命令结果挤出网页界面的问题。
 - 进入月夜无尽前检查屋顶无尽存档，避免未经提示直接覆盖。
 
-[1.15.0]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.14.1...HEAD
+[1.15.1]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.15.0...HEAD
+[1.15.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.15.0
 [1.14.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.14.1
 [1.14.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.14.0
 [1.13.8]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.13.8

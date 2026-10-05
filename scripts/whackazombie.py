@@ -36,13 +36,7 @@ def WhackZombie():
 
 # 锤僵尸
 def IsWhackAZombie():
-    gamemode = GetLawnApp().mGameMode
-    if gamemode == Lawn.GameMode.ChallengeWhackAZombie:
-        return True
-    elif gamemode == Lawn.GameMode.Adventure:
-        return GetBoard().mLevel == 15
-    else:
-        return False
+    return GetLawnApp().IsWhackAZombieLevel()
 
 script_whackazombie = script_manager.Register(
     WhackZombie,

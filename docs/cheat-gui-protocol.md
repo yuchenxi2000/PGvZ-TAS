@@ -71,11 +71,12 @@ ready = app is not None and app.mLoadingThreadStarted
 
 ### 游戏版本警告
 
-启动就绪后，GUI 先通过 `import Lawn` 读取 `Lawn.LawnApp.AppVersionNumber`，用于页眉游戏版本显示和旧版本警告，再发送
+启动就绪后，GUI 先通过 `import Lawn` 读取 `Lawn.LawnApp.AppVersionNumber`，用于旧版本警告，再发送
 `BOOTSTRAP_CODE` 导入 `pgvz` 和 `pgvztool`。若 `PGvZ x.y.z` 中的版本低于 1.3.0，网页额外
 显示警告，提示用户升级游戏或下载旧版本修改器。此检查不会阻止
 后续引导；即使版本过旧，网页仍会继续尝试加载修改器。
-页眉展示时只去掉版本字符串开头的 `PGvZ `，旧版本判断仍读取原始字符串。
+保留加载前探测，确保包导入失败时仍能提示旧版本；页眉游戏版本由后续 `sync` 消息中的
+`gameVersion` 提供，直接使用 `pgvz.__game_version__` 的版本字符串（如 `"1.3.2"`）。
 
 ### JSON 引号问题
 
@@ -114,7 +115,8 @@ const msg = JSON.parse(r);
 由 `sync_reg.serialize()` 生成。`sync_reg` 是 `SyncRegistry` 实例，注册了 `cheat`
 （`CheatOption`）、`placer`（`Placer`）和 `weather`（`WeatherControl`）三个对象。序列化通过
 `Serializable.to_dict()` 自动完成——包括简单属性和脚本单例的 `@property`。响应顶层的
-`modVersion` 来自 `pgvz.version.MOD_VERSION`，用于页眉修改器版本显示。
+`modVersion` 来自 `pgvz.version.MOD_VERSION`，用于页眉修改器版本显示；`gameVersion`
+从 `pgvz` 包导入 `__game_version__`，用于页眉游戏版本显示。
 
 **发送**（手机端连接并申请 GUI 会话，同时拉取状态）：
 
@@ -128,6 +130,7 @@ sync_reg.connect('<clientId>')
 {
   "action": "sync",
   "modVersion": "x.y.z",
+  "gameVersion": "1.3.2",
   "state": {
     "cheat": {
       "wontLose": false,

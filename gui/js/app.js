@@ -492,7 +492,6 @@ const app = createApp({
                             return;
                         }
                         if (msg && msg.action === 'gameVersion') {
-                            gameVersion.value = PGvZProtocol.displayGameVersion(msg.version);
                             legacyGameVersionWarning.value = PGvZProtocol.isLegacyGameVersion(msg.version);
                             startBootstrap();
                             return;
@@ -506,6 +505,7 @@ const app = createApp({
                         if (msg && msg.action === 'sync' && msg.state) {
                             setResult(true, 'messages.syncOk');
                             modVersion.value = String(msg.modVersion || '');
+                            gameVersion.value = String(msg.gameVersion || '');
                             applySyncState(msg.state);
                             markConnected();
                             startHeartbeat();

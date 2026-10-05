@@ -2115,8 +2115,9 @@ class Comics(typing.SupportsInt):
     CartoonSun : Comics # 18
     CartoonHypnoshroom : Comics # 19
     CartoonFumeshroom : Comics # 20
-    CartoonIceshroom : Comics # 21
-    ComicsCount : Comics # 22
+    CartoonPuffshroom : Comics # 21
+    CartoonIceshroom : Comics # 22
+    ComicsCount : Comics # 23
 
 
 class ComicSelector(LawnDialog):
@@ -4722,6 +4723,7 @@ class LawnApp(SexyAppBase):
     def ShowGameSelectorWithOptions(self) -> None: ...
     def ShowLeaderboardDialog(self, aType: LeaderBoardType) -> None: ...
     def ShowLeaderboardScreen(self) -> None: ...
+    def ShowNewVersionDialog(self, version: str) -> None: ...
     def ShowSeedChooserScreen(self) -> None: ...
     def ShowStoreScreen(self, theListener: StoreListener) -> StoreScreen: ...
     def ShowUpsellScreen(self) -> UpsellScreen: ...
@@ -4740,6 +4742,7 @@ class LawnApp(SexyAppBase):
     def UpdatePlayerProfileForFinishingLevel(self) -> bool: ...
     def UpdatePlayTimeStats(self) -> None: ...
     def UpdateRegisterInfo(self) -> None: ...
+    def UpdateVersionCheck(self) -> None: ...
     def Vibrate(self, vibrationTime: typing.Optional[TimeSpan] = ...) -> None: ...
     def WriteCurrentUserConfig(self) -> bool: ...
     def WriteRestoreInfo(self) -> None: ...
@@ -5709,16 +5712,84 @@ class MowerHeight(typing.SupportsInt):
 class Music:
     def __init__(self) -> None: ...
     mApp : LawnApp
+    mBaseBPM : int
+    mBaseModSpeed : int
+    mBurstOverride : int
+    mBurstStateCounter : int
+    mCurMusicFileDrums : MusicTune
+    mCurMusicFileHihats : MusicTune
+    mCurMusicFileMain : MusicTune
     mCurMusicTune : MusicTune
+    mDrumsStateCounter : int
+    mFadeOutCounter : int
+    mFadeOutDuration : int
+    mMusicBurstState : MusicBurstState
+    mMusicDisabled : bool
+    mMusicDrumsState : MusicDrumsState
     mMusicInterface : MusicInterface
-    def FadeOut(self, aFadeOutDuration: int) -> None: ...
-    def GameMusicPause(self, thePause: bool) -> None: ...
+    mPaused : bool
+    mPauseOffset : int
+    mPauseOffsetDrums : int
+    mQueuedDrumTrackPackedOrder : int
+    mUseMo3 : bool
+    def FadeOut(self, theFadeOutDuration: int) -> None: ...
+    def GetMusicOrder(self, theMusicFile: MusicTune) -> int: ...
     def GetNumLoadingTasks(self) -> int: ...
     def MakeSureMusicIsPlaying(self, theMusicTune: MusicTune) -> None: ...
     def MusicInit(self) -> None: ...
+    @staticmethod
+    def MusicIsInMo3(theMusicTune: MusicTune) -> bool: ...
+    def MusicResync(self) -> None: ...
+    def MusicResyncChannel(self, theMusicFileToMatch: MusicTune, theMusicFileToSync: MusicTune) -> None: ...
     def MusicTitleScreenInit(self) -> None: ...
+    @staticmethod
+    def MusicTuneHasDrum(theMusicTune: MusicTune) -> bool: ...
+    def MusicUpdate(self) -> None: ...
+    def PlayFromOffset(self, theMusicTune: MusicTune, theOffset: int, theVolume: float) -> None: ...
+    def PlayMusic(self, theMusicTune: MusicTune, theOffset: int, theDrumsOffset: int) -> None: ...
+    def SetupMusicFileForTune(self, theMusicTune: MusicTune, theCurMusicTune: MusicTune) -> None: ...
+    def StartBurst(self) -> None: ...
     def StartGameMusic(self) -> None: ...
     def StopAllMusic(self) -> None: ...
+    def UpdateMusicBurst(self) -> None: ...
+    # Skipped GameMusicPause due to it being static, abstract and generic.
+
+    GameMusicPause : GameMusicPause_MethodGroup
+    class GameMusicPause_MethodGroup:
+        @typing.overload
+        def __call__(self, thePause: bool) -> None:...
+        @typing.overload
+        def __call__(self, thePause: bool, theForcePause: bool) -> None:...
+
+
+
+class MusicBurstState(typing.SupportsInt):
+    @typing.overload
+    def __init__(self, value : int) -> None: ...
+    @typing.overload
+    def __init__(self, value : int, force_if_true: bool) -> None: ...
+    def __int__(self) -> int: ...
+    
+    # Values:
+    MUSIC_BURST_OFF : MusicBurstState # 0
+    MUSIC_BURST_STARTING : MusicBurstState # 1
+    MUSIC_BURST_ON : MusicBurstState # 2
+    MUSIC_BURST_FINISHING : MusicBurstState # 3
+
+
+class MusicDrumsState(typing.SupportsInt):
+    @typing.overload
+    def __init__(self, value : int) -> None: ...
+    @typing.overload
+    def __init__(self, value : int, force_if_true: bool) -> None: ...
+    def __int__(self) -> int: ...
+    
+    # Values:
+    MUSIC_DRUMS_OFF : MusicDrumsState # 0
+    MUSIC_DRUMS_ON_QUEUED : MusicDrumsState # 1
+    MUSIC_DRUMS_ON : MusicDrumsState # 2
+    MUSIC_DRUMS_OFF_QUEUED : MusicDrumsState # 3
+    MUSIC_DRUMS_FADING : MusicDrumsState # 4
 
 
 class MusicFile(typing.SupportsInt):
@@ -5759,7 +5830,10 @@ class MusicTune(typing.SupportsInt):
     ZenGarden : MusicTune # 12
     FinalBoss2 : MusicTune # 13
     ZenGardenSH : MusicTune # 14
-    MusicTuneCount : MusicTune # 15
+    MainMusic : MusicTune # 15
+    Drums : MusicTune # 16
+    Hihats : MusicTune # 17
+    MusicTuneCount : MusicTune # 18
     None_ : MusicTune # -1
 
 
@@ -6761,6 +6835,7 @@ class PlantWeapon(typing.SupportsInt):
     # Values:
     Primary : PlantWeapon # 0
     Secondary : PlantWeapon # 1
+    Tertiary : PlantWeapon # 2
 
 
 class PlayerInfo:
@@ -6772,6 +6847,7 @@ class PlayerInfo:
     mAdventureModeHard : bool
     mCardGroup : Array_1[CardGroup]
     mChallengeRecords : Array_1[int]
+    mCoinAutoCollect : bool
     mCoins : int
     mDidntPurchasePacketUpgrade : int
     mDoVibration : bool
@@ -7449,6 +7525,7 @@ class SaveFileVersion(typing.SupportsInt):
     FumeshroomDynamic : SaveFileVersion # 14
     AdventureModeHard : SaveFileVersion # 15
     OnlineLevelRecords : SaveFileVersion # 16
+    CoinAutoCollect : SaveFileVersion # 17
 
 
 class ScaryPotType(typing.SupportsInt):
@@ -8366,6 +8443,7 @@ class TitleScreen(Widget, ButtonListener):
     mNeedToInit : bool
     mNeedToUnpackAtlas : bool
     mNextImageIndex : int
+    mNoAIButton : ButtonWidget
     mParent : WidgetContainer
     mPrevLoadingPercent : float
     mPriority : int
@@ -8434,6 +8512,7 @@ class TitleScreens(typing.SupportsInt):
     # Values:
     TitleScreen_Start : TitleScreens # 0
     TitleScreen_Register : TitleScreens # 1
+    TitleScreen_NoAI : TitleScreens # 2
 
 
 class TitleState(typing.SupportsInt):

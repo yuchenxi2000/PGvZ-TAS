@@ -113,11 +113,12 @@ def Board__HasGlove(orig, board: Lawn.Board):
         return orig(board)
 
 # 手套无冷却
-@LawnMod.MonoModUtils.HookTo(Lawn.Challenge.MovePlant)
-def Challenge__MovePlant(orig, challenge: Lawn.Challenge, plant: Lawn.Plant, gridX: int, gridY: int):
-    orig(challenge, plant, gridX, gridY)
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.MouseUpWithPlant)
+def Board__MouseUpWithPlant(orig, board: Lawn.Board, x: int, y: int, theClickCount: int):
+    orig(board, x, y, theClickCount)
     if cheat_option.gloveNoCooling:
-        challenge.mGloveCounter = 0
+        # 冷却在 MovePlant 返回后由 Board 写入；融合分支也在这里设置冷却。
+        board.mChallenge.mGloveCounter = 0
 
 # 僵尸停滞不前
 @LawnMod.MonoModUtils.HookTo(Lawn.Zombie.UpdateZombieWalking)
@@ -1121,11 +1122,13 @@ def _DrawTasFrameCounter(board: Lawn.Board, g: Sexy.Graphics):
     Sexy.TodLib.TodCommon.TodDrawString(g, text, x, y, font, color, Sexy.TodLib.DrawStringJustification.Right)
 
 # BUG FIX: 拖尾容器满时，AllocTrailFromDef直接返回null而不是扩容；大量猫尾草子弹是常见触发方式
-@LawnMod.MonoModUtils.HookTo(Sexy.TodLib.TrailHolder.AllocTrailFromDef)
-def TrailHolder__AllocTrailFromDef(orig, trailHolder: Sexy.TodLib.TrailHolder, theRenderOrder: int, theDefinition: Sexy.TodLib.TrailDefinition):
-    if trailHolder.mTrails.Count == trailHolder.mTrails.Capacity:
-        trailHolder.mTrails.Capacity *= 2
-    return orig(trailHolder, theRenderOrder, theDefinition)
+# 1.3.2 版本及以后被修复
+if tuple(int(part) for part in __game_version__.split('.')) < (1, 3, 2):
+    @LawnMod.MonoModUtils.HookTo(Sexy.TodLib.TrailHolder.AllocTrailFromDef)
+    def TrailHolder__AllocTrailFromDef(orig, trailHolder: Sexy.TodLib.TrailHolder, theRenderOrder: int, theDefinition: Sexy.TodLib.TrailDefinition):
+        if trailHolder.mTrails.Count == trailHolder.mTrails.Capacity:
+            trailHolder.mTrails.Capacity *= 2
+        return orig(trailHolder, theRenderOrder, theDefinition)
 
 @LawnMod.MonoModUtils.HookTo(Sexy.WidgetManager.SetFocus)
 def WidgetManager__SetFocus(orig, widget_manager: Sexy.WidgetManager, widget: Sexy.Widget):

@@ -241,6 +241,7 @@ helper_script = script_manager.RunInThread(HelperScript)
 | `SUPPORTED_GAME_VERSIONS` | 当前支持的 PGvZ 游戏版本元组。 |
 | `__version__` | `PROJECT_VERSION` 的标准模块别名。 |
 | `__supported_game_versions__` | `SUPPORTED_GAME_VERSIONS` 的标准模块别名。 |
+| `__game_version__` | 游戏版本，从 `Lawn.LawnApp.AppVersionNumber` 字符串提取，比如原字符串 `"PGvZ 1.3.2"` 对应游戏版本 `"1.3.2"`。 |
 
 ### 2. 速度控制
 

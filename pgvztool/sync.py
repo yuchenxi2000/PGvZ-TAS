@@ -6,6 +6,7 @@ import time
 import traceback
 import Sexy
 import System
+from pgvz import __game_version__
 from pgvz.version import MOD_VERSION
 
 
@@ -101,7 +102,10 @@ class SyncRegistry:
         data = {}
         for name, obj in self._objects.items():
             data[name] = obj.to_dict()
-        return json.dumps({"action": "sync", "state": data, "modVersion": MOD_VERSION})
+        return json.dumps({
+            "action": "sync", "state": data,
+            "modVersion": MOD_VERSION, "gameVersion": __game_version__,
+        })
 
     def _session_is_active(self):
         return (
