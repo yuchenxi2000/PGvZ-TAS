@@ -12,6 +12,16 @@
                                     cheat_option、placer、weather 等对象
 ```
 
+## 网页代码分工
+
+- `gui/js/protocol.js`：引导探测代码、结果解析和 Python 布尔值转换。
+- `gui/js/connection.js`：WebSocket 连接、引导、单客户端会话、待发送指令队列、心跳和重连。
+- `gui/js/options.js`：开关分组、默认值和复选框状态的本地存储。
+- `gui/js/app.js`：Vue 界面、业务操作、状态同步和组装上述模块。
+
+这些文件按 `gui/index.html` 中的脚本顺序加载，不需要构建步骤。连接模块通过回调触发
+`app.js` 中的初始状态同步和远端状态应用；PC 推送、手机拉取的规则不变。
+
 ## HTTP 服务器 (cheat-gui.py)
 
 位于 `cheat-gui.py`，使用 Python 标准库 `http.server`。启动时自动挂在 `localhost:58080`，将所有请求路由到 `gui/` 目录下的文件。根路径 `/` 返回 `gui/index.html`。
@@ -251,7 +261,7 @@ def xxx(self, value):
 
 ### 2. GUI 端：注册选项
 
-在 `gui/js/app.js` 的对应 `switchGroups` 分组中添加 `'xxx'`。`optionConfig` 会自动从所有分组生成，`CheckGroupCard` 也会自动创建复选框，因此不需要再手写一份控件。随后在 `gui/js/i18n.js` 的中英文 `options` 中分别添加显示名称。
+在 `gui/js/options.js` 的对应 `switchGroups` 分组中添加 `'xxx'`。`optionConfig` 会自动从所有分组生成，`CheckGroupCard` 也会自动创建复选框，因此不需要再手写一份控件。随后在 `gui/js/i18n.js` 的中英文 `options` 中分别添加显示名称。
 
 ### 3. 通信流程
 

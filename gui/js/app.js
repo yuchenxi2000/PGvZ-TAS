@@ -4,30 +4,7 @@ const savedLanguage = localStorage.getItem('pgvz-gui-language');
 const initialLanguage = savedLanguage || ((navigator.language || '').toLowerCase().startsWith('en') ? 'en' : 'zh');
 const i18n = PGvZI18n.createI18n(initialLanguage);
 
-const CHECKBOX_STATE_STORAGE_KEY = 'pgvz-gui-checkbox-state';
-
-function readCheckboxState() {
-    try {
-        const item = localStorage.getItem(CHECKBOX_STATE_STORAGE_KEY);
-        if (!item) return null;
-        const state = JSON.parse(item);
-        return state && typeof state === 'object' ? state : null;
-    } catch {
-        return null;
-    }
-}
-
-function writeCheckboxState(state) {
-    try {
-        localStorage.setItem(CHECKBOX_STATE_STORAGE_KEY, JSON.stringify(state));
-    } catch {
-        // 隐私模式或存储空间不可用时仍允许修改器正常工作。
-    }
-}
-
-function savedBoolean(state, key, fallback) {
-    return state && typeof state[key] === 'boolean' ? state[key] : fallback;
-}
+const { readCheckboxState, writeCheckboxState, savedBoolean } = PGvZOptions;
 
 const SwitchRow = {
     props: {
@@ -77,16 +54,11 @@ const app = createApp({
         CheckGroupCard,
     },
     setup() {
-        const wsParams = new URLSearchParams(location.search);
-        const SERVER_URL = wsParams.get('ws') || 'ws://localhost:8080/Py';
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         // 手机端始终以游戏内状态为准；PC 端才从 localStorage 恢复并推送状态。
         const savedCheckboxState = isMobile ? null : readCheckboxState();
         const savedCheatState = savedCheckboxState && savedCheckboxState.cheat;
         const savedPlacerState = savedCheckboxState && savedCheckboxState.placer;
-        const clientId = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
-            ? globalThis.crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
         const {
             seedTypes,
             zombieTypes,
@@ -109,13 +81,6 @@ const app = createApp({
             { label: 'English', value: 'en' },
         ]);
 
-        const connected = ref(false);
-        const sessionRejected = ref(false);
-        const legacyGameVersionWarning = ref(false);
-        const gameVersion = ref('');
-        const modVersion = ref('');
-        const connectionState = ref('disconnected');
-        const statusText = computed(() => t(`status.${connectionState.value}`));
         const activeTab = ref('player');
         const speed = ref(1);
         const speedOptions = [0.1, 0.2, 0.5, 1, 2, 5, 10];
@@ -161,79 +126,7 @@ const app = createApp({
         const easyPlaceMode = ref('plant');
         const easyPlaceEnabled = ref(savedBoolean(savedPlacerState, 'easyPlaceEnabled', true));
 
-        const switchGroups = {
-            common: [
-                'autoCollect',
-                'runBackground',
-                'skipLevelIntro',
-                'freePlant',
-                'unlockBannedSeeds',
-                'noCooldown',
-                'plantAnyWhere',
-                'infSun',
-                'conveyorNoCooling',
-                'enableGlove',
-                'gloveNoCooling',
-                'shovelNoReset',
-                'showShovel',
-                'enableTrashcan',
-                'plantNoDie',
-                'zombieNoDie',
-                'wontLose',
-                'zombieStop',
-                'stopSpawning',
-                'freezePortal',
-                'tasEnabled',
-            ],
-            features: [
-                'disableTalisman',
-                'disableNinja',
-                'jackInTheBoxNoExplode',
-                'jalapenoHeadNoExplode',
-                'blowAwayPropeller',
-                'blowAwayThrownImp',
-                'diamondZenTools',
-                'autoRestock',
-                'mushroomAwake',
-                'cobNoCooling',
-                'chomperNoCooling',
-                'potatoNoCooling',
-                'skillNoCooling',
-                'featureThreePeater',
-                'butterPult',
-                'doubleGatlingpea',
-                'fullAreaGloomshroom',
-                'fullAreaUmbrella',
-                'planternAlwaysTransform',
-                'hypnoCattailAlwaysHypnotize',
-                'allZombiesHypnotizable',
-                'scaryPotterNoDelay',
-            ],
-            scene: [
-                'noFog',
-                'transScaryPot',
-                'visibleGhoul',
-                'noCover',
-                'showSeedPacketNumbers',
-                'showCraterCooldown',
-                'showWaveInfo',
-                'drawPlantHp',
-                'drawPlantCooldown',
-                'drawSunProductionCooldown',
-                'drawZombieHp',
-                'selectZombieHp',
-                'drawSquirrel',
-            ],
-        };
-
-        const optionConfig = [...new Set(Object.values(switchGroups).flat())];
-        const cheatOption = reactive({});
-        optionConfig.forEach(item => {
-            cheatOption[item] = savedBoolean(savedCheatState, item, false);
-        });
-        cheatOption.autoCollect = savedBoolean(savedCheatState, 'autoCollect', true);
-        cheatOption.runBackground = savedBoolean(savedCheatState, 'runBackground', true);
-        cheatOption.tasEnabled = savedBoolean(savedCheatState, 'tasEnabled', true);
+        const { switchGroups, optionConfig, cheatOption } = PGvZOptions.createCheatOptions(savedCheatState);
 
         const scenes = computed(() => [
             { label: t('scene.day'), value: 'day' },
@@ -246,12 +139,15 @@ const app = createApp({
 
         const currentLineupList = computed(() => lineupCodeMap[selectedScene.value] || []);
 
-        let ws = null;
         let applyingRemoteState = false;
-        let pendingCodes = [];
-        let heartbeatTimer = null;
-        let bootstrapProbeTimer = null;
-        let bootstrapStarted = false;
+        const {
+            clientId, connected, sessionRejected, legacyGameVersionWarning,
+            gameVersion, modVersion, connectionState,
+            send, connect, releaseSession,
+        } = PGvZConnection.create({
+            isMobile, t, setResult, syncCheatOptions, applySyncState, lineupCode,
+        });
+        const statusText = computed(() => t(`status.${connectionState.value}`));
 
         function dataLabel(item) {
             if (language.value === 'zh') return item.label;
@@ -262,46 +158,6 @@ const app = createApp({
             lastResult.ok = ok;
             lastResult.key = key;
             lastResult.text = text;
-        }
-
-        function showSessionRejected(showToast = true) {
-            sessionRejected.value = true;
-            connected.value = false;
-            connectionState.value = 'occupied';
-            pendingCodes = [];
-            setResult(false, 'messages.sessionOccupied');
-            if (showToast) {
-                ElementPlus.ElMessage.error(t('messages.sessionOccupied'));
-            }
-        }
-
-        function send(code, allowBeforeReady = false) {
-            if (sessionRejected.value && !allowBeforeReady) {
-                showSessionRejected();
-                return;
-            }
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
-                ElementPlus.ElMessage.error(t('messages.notConnected'));
-                return;
-            }
-            if (!connected.value && !allowBeforeReady) {
-                pendingCodes.push(code);
-                return;
-            }
-            ws.send(allowBeforeReady
-                ? code
-                : `sync_reg.require_client('${clientId}')\n${code}`
-            );
-            setResult(true, 'messages.sent');
-        }
-
-        function markConnected() {
-            sessionRejected.value = false;
-            connected.value = true;
-            connectionState.value = 'connected';
-            const queuedCodes = pendingCodes;
-            pendingCodes = [];
-            queuedCodes.forEach(code => send(code));
         }
 
         function setCheatOption(key, value) {
@@ -349,62 +205,6 @@ const app = createApp({
                 ? `sync_reg.connect('${clientId}', '${state}')`
                 : `sync_reg.apply('${state}')`;
             send(withBootstrap ? `${PGvZProtocol.BOOTSTRAP_CODE}\n${syncCode}` : syncCode, withBootstrap);
-        }
-
-        function stopHeartbeat() {
-            if (heartbeatTimer !== null) {
-                clearInterval(heartbeatTimer);
-                heartbeatTimer = null;
-            }
-        }
-
-        function startHeartbeat() {
-            stopHeartbeat();
-            heartbeatTimer = setInterval(() => {
-                if (ws && ws.readyState === WebSocket.OPEN && connected.value) {
-                    ws.send(`sync_reg.heartbeat('${clientId}')`);
-                }
-            }, 3000);
-        }
-
-        function releaseSession() {
-            if (ws && ws.readyState === WebSocket.OPEN && connected.value) {
-                try {
-                    ws.send(`sync_reg.release('${clientId}')`);
-                } catch {
-                    // 页面关闭期间 WebSocket 可能已经被浏览器释放。
-                }
-            }
-        }
-
-        function stopBootstrapProbe() {
-            if (bootstrapProbeTimer !== null) {
-                clearTimeout(bootstrapProbeTimer);
-                bootstrapProbeTimer = null;
-            }
-        }
-
-        function requestBootstrapReady() {
-            stopBootstrapProbe();
-            if (!ws || ws.readyState !== WebSocket.OPEN || bootstrapStarted) return;
-            ws.send(PGvZProtocol.BOOTSTRAP_READY_PROBE_CODE);
-        }
-
-        function retryBootstrapReady() {
-            stopBootstrapProbe();
-            bootstrapProbeTimer = setTimeout(requestBootstrapReady, 100);
-        }
-
-        function startBootstrap() {
-            if (bootstrapStarted || !ws || ws.readyState !== WebSocket.OPEN) return;
-            stopBootstrapProbe();
-            bootstrapStarted = true;
-            if (isMobile) {
-                send(`${PGvZProtocol.BOOTSTRAP_CODE}\nsync_reg.connect('${clientId}')`, true);
-            } else {
-                // 保证新游戏进程中先完成导入，再恢复网页保留的状态。
-                syncCheatOptions(true);
-            }
         }
 
         watch(
@@ -456,95 +256,6 @@ const app = createApp({
             nextTick(() => {
                 applyingRemoteState = false;
             });
-        }
-
-        function connect() {
-            ws = new WebSocket(SERVER_URL);
-            ws.onopen = () => {
-                stopBootstrapProbe();
-                bootstrapStarted = false;
-                connected.value = false;
-                gameVersion.value = '';
-                modVersion.value = '';
-                connectionState.value = 'connecting';
-                requestBootstrapReady();
-            };
-            ws.onmessage = event => {
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.statuscode === 0) {
-                        const msg = PGvZProtocol.parseResultMessage(data.result);
-                        if (msg && msg.action === 'bootstrapReady') {
-                            if (msg.ready) {
-                                stopBootstrapProbe();
-                                ws.send(PGvZProtocol.GAME_VERSION_PROBE_CODE);
-                            } else {
-                                retryBootstrapReady();
-                            }
-                            return;
-                        }
-                        if (msg && msg.action === 'heartbeat') {
-                            return;
-                        }
-                        if (msg && msg.action === 'sessionRejected') {
-                            stopHeartbeat();
-                            showSessionRejected();
-                            return;
-                        }
-                        if (msg && msg.action === 'gameVersion') {
-                            legacyGameVersionWarning.value = PGvZProtocol.isLegacyGameVersion(msg.version);
-                            startBootstrap();
-                            return;
-                        }
-                        if (data.result) {
-                            setResult(true, '', data.result);
-                        } else {
-                            setResult(true, 'messages.success');
-                        }
-
-                        if (msg && msg.action === 'sync' && msg.state) {
-                            setResult(true, 'messages.syncOk');
-                            modVersion.value = String(msg.modVersion || '');
-                            gameVersion.value = String(msg.gameVersion || '');
-                            applySyncState(msg.state);
-                            markConnected();
-                            startHeartbeat();
-                            return;
-                        }
-                        if (msg && msg.action === 'lineup' && msg.code) {
-                            setResult(true, 'messages.lineupOk');
-                            lineupCode.value = msg.code;
-                            return;
-                        }
-                    } else {
-                        if (data.errortype) {
-                            setResult(false, '', data.errortype);
-                        } else {
-                            setResult(false, 'messages.unknownError');
-                        }
-                    }
-                } catch {
-                    setResult(true, '', event.data);
-                }
-            };
-            ws.onclose = () => {
-                stopBootstrapProbe();
-                bootstrapStarted = false;
-                stopHeartbeat();
-                connected.value = false;
-                gameVersion.value = '';
-                modVersion.value = '';
-                if (sessionRejected.value) {
-                    connectionState.value = 'occupied';
-                    return;
-                }
-                connectionState.value = 'reconnecting';
-                setTimeout(connect, 3000);
-            };
-            ws.onerror = () => {
-                connected.value = false;
-                connectionState.value = 'error';
-            };
         }
 
         function sendCustomCode() {

@@ -75,6 +75,10 @@ case RenderObjectType.TopUi:
 1. Camera Apply（场地坐标）→ 画植物/僵尸血量
 2. Camera Reset（屏幕坐标）→ 画轻松放置 UI、波数信息
 
+血量、冷却条、场地提示、轻松放置和 TAS UI 的绘制辅助函数位于
+`pgvztool/overlay.py`。`Board.Draw`、`SeedBank.Draw` 等挂钩声明及其调用顺序仍保留在
+`pgvztool/hook.py`；Camera 变换由钩子管理，辅助函数沿用调用时的坐标空间。
+
 ### 种子栏叠加绘制
 
 `SeedBank.Draw()` 在正常关卡中按以下顺序定位每张卡片：

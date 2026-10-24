@@ -86,7 +86,8 @@ S0(100) → S1(200) → S2(350) → [live frame 400]
 | 文件 | 内容 |
 |---|---|
 | `pgvztool/tas.py` | `TasManager` 类 + 协程脚本 |
-| `pgvztool/hook.py` | 按钮创建/绘制/点击 + 帧计数器绘制 |
+| `pgvztool/hook.py` | 绘制和点击挂钩，调用 TAS UI 辅助函数 |
+| `pgvztool/overlay.py` | 按钮创建/绘制 + 帧计数器绘制 |
 | `pgvztool/cheat.py` | `tasEnabled` 开关 |
 
 ## 限制

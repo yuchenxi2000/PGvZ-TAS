@@ -45,4 +45,4 @@
 - `Lawn/LawnApp.cs`：`IsIZombieLevel`，包括创意关卡中的“我是僵尸”组件。
 - `Lawn/Board.cs`：`HasLevelAwardDropped`，用于判断关卡奖励是否已掉落。
 - `Lawn/GameConstants.cs`：相关植物的 `PlantDefinition`。
-- `pgvztool/hook.py`：修改器的 `PlantCooldown`、`ProductionCooldown` 和 `DrawPlantCooldowns`。
+- `pgvztool/overlay.py`：修改器的 `PlantCooldown`、`ProductionCooldown` 和 `DrawPlantCooldowns`；绘制入口仍位于 `pgvztool/hook.py` 的 `Board.Draw` 挂钩。

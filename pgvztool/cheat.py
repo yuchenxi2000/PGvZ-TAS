@@ -81,16 +81,52 @@ class CheatOption(Serializable):
         lawnapp.DoDialog(7, True, title, msg, '好的', 3)
 
     @main_thread
-    def WinLevel(self):
-        lawnApp = GetLawnApp()
-        board = lawnApp.mBoard
-        if board is None:
-            return
+    def ToggleFullscreen(self):
+        GetLawnApp().ToggleFullscreen()
+
+    def _WinLevel(self, lawnApp: Lawn.LawnApp, board: Lawn.Board):
+        if lawnApp.mSeedChooserScreen is not None:
+            # StartLevelIntro 不会清除旧的选卡标志，换轮前必须先结束选卡。
+            board.mCutScene.EndSeedChooser()
+        if lawnApp.IsSurvivalMode():
+            # 地狱生存后两轮波数会变化，按目标 stage 补齐本轮波数。
+            board.mNumWaves = board.GetNumWavesPerSurvivalStage()
+            board.mCurrentWave = board.mNumWaves
+            if board.IsFinalSurvivalStage():
+                # 非 Playing 时 FadeOutLevel 直接结束，不会设置此计数器。
+                # 结算时保持非负，避免 GetSurvivalFlagsCompleted 少算最后一旗。
+                board.mBoardFadeOutCounter = 600
         if not lawnApp.IsIZombieLevel():
             for zombie in IterAliveZombies():
                 zombie.DieNoLoot(False)
         lawnApp.KillDialog(19)
         board.FadeOutLevel()
+
+    @main_thread
+    def WinLevel(self):
+        lawnApp = GetLawnApp()
+        board = lawnApp.mBoard
+        if board is None:
+            return
+        if lawnApp.IsSurvivalMode():
+            creativeLevel = lawnApp.mCreativeLevel
+            survival = (creativeLevel.GetComponent[Lawn.Creative.CSSurvivalLevel]()
+                        if creativeLevel is not None else None)
+            if survival is not None:
+                if not survival.mEndless:
+                    board.mChallenge.mSurvivalStage = survival.mStages - 1
+            elif not lawnApp.IsSurvivalEndless(lawnApp.mGameMode):
+                # 普通、困难和地狱生存的终轮均为 stage 4（从 0 开始）。
+                board.mChallenge.mSurvivalStage = 4
+        self._WinLevel(lawnApp, board)
+
+    @main_thread
+    def NextStage(self):
+        lawnApp = GetLawnApp()
+        board = lawnApp.mBoard
+        if board is None:
+            return
+        self._WinLevel(lawnApp, board)
 
     @main_thread
     def LoseLevel(self, zombietype: Lawn.ZombieType):
@@ -111,6 +147,8 @@ class CheatOption(Serializable):
             board_EDGE = Sexy.Constants.BOARD_EDGE - 30
         zombie = board.AddZombie(zombietype, 0)
         zombie.mPosX = board_EDGE
+        # 关闭选卡界面，避免失败过场仍可点击图鉴。
+        lawnApp.KillSeedChooserScreen()
         # 没有这个会崩溃，因为游戏失败对话和暂停貌似会冲突
         lawnApp.KillDialog(19)
         prevState = self.wontLose

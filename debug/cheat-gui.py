@@ -111,6 +111,7 @@ _pgvztool_files = (
     'pgvztool/cheat.py',
     'pgvztool/hook.py',
     'pgvztool/keybinds.py',
+    'pgvztool/overlay.py',
     'pgvztool/placer.py',
     'pgvztool/sync.py',
     'pgvztool/tas.py',
@@ -120,8 +121,10 @@ _gui_files = [
     'gui/index.html',
     'gui/styles.css',
     'gui/js/app.js',
+    'gui/js/connection.js',
     'gui/js/data.js',
     'gui/js/i18n.js',
+    'gui/js/options.js',
     'gui/js/protocol.js',
 ]
 _gui_index_path = _join_mod_path('gui/index.html')
