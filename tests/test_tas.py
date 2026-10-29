@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import pathlib
 import sys
 import tempfile
@@ -318,6 +319,27 @@ class TasRecoveryTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 manager._init_save_dir()
         self.assertIsNone(manager._saveDir)
+
+    def test_init_save_dir_supports_legacy_mkdir_and_existing_directory(self):
+        self.tas.Sexy.GlobalStaticVars.gSexyAppBase.applicationStoragePath = self.directory.name
+        expected = pathlib.Path(self.directory.name) / 'docs' / 'userdata' / 'tas_saves'
+
+        def legacy_mkdir(path, mode=0o777, parents=False):
+            # Match IronPython's signature: no exist_ok keyword.
+            if parents:
+                os.makedirs(str(path), mode)
+            else:
+                os.mkdir(str(path), mode)
+
+        with patch.object(pathlib.Path, 'mkdir', legacy_mkdir):
+            manager = self.tas.TasManager()
+            manager._init_save_dir()
+            self.assertEqual(manager._saveDir, expected)
+            self.assertTrue(expected.is_dir())
+            # A fresh manager must also accept the directory left by an earlier run.
+            another = self.tas.TasManager()
+            another._init_save_dir()
+            self.assertEqual(another._saveDir, expected)
 
 
 if __name__ == '__main__':

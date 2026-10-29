@@ -59,6 +59,9 @@ S0(100) → S1(200) → S2(350) → [live frame 400]
 
 `{游戏存档根目录}/docs/userdata/tas_saves/`
 
+目录不存在时通过 `Path.mkdir(parents=True)` 创建，已存在时直接复用；游戏内 IronPython 的
+`Path.mkdir()` 不支持 `exist_ok` 参数。
+
 ### 文件格式
 
 正常关卡文件名格式：

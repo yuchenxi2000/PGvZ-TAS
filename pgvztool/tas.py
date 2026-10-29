@@ -65,7 +65,8 @@ class TasManager:
             return
         storage = Sexy.GlobalStaticVars.gSexyAppBase.applicationStoragePath
         directory = Path(storage) / 'docs' / 'userdata' / 'tas_saves'
-        directory.mkdir(parents=True, exist_ok=True)
+        if not directory.is_dir():
+            directory.mkdir(parents=True)
         self._saveDir = directory
 
     def _file_stem(self, lawnApp: Lawn.LawnApp):
