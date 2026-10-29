@@ -17,6 +17,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 class GuiDispatcherTests(unittest.TestCase):
     def setUp(self):
         self.calls = []
+        self.request_counter = 0
         self.main_thread = False
         self.owner_thread = threading.get_ident()
         self.board = types.SimpleNamespace(mSunMoney=0, mChallenge=types.SimpleNamespace(mSurvivalStage=0))
@@ -133,12 +134,14 @@ class GuiDispatcherTests(unittest.TestCase):
         self.registry.connect('client-1')
         self.main_thread = False
 
-    def submit(self, kind, client_id='client-1', request_id='request-1', **details):
+    def submit(self, kind, client_id='client-1', request_id=None, **details):
+        self.request_counter += 1
+        request_id = request_id or 'request-{}'.format(self.request_counter)
         return json.loads(self.dispatcher.submit(json.dumps(dict(
             details, _clientId=client_id, id=request_id, kind=kind,
         ))))
 
-    def dispatch(self, name, args=None, client_id='client-1', request_id='request-1'):
+    def dispatch(self, name, args=None, client_id='client-1', request_id=None):
         return self.submit('action', client_id, request_id, name=name, args={} if args is None else args)
 
     def run_tasks(self):
@@ -149,7 +152,9 @@ class GuiDispatcherTests(unittest.TestCase):
             self.main_thread = False
 
     def results(self, client_id='client-1'):
-        return json.loads(self.dispatcher.poll(client_id))['results']
+        results = json.loads(self.dispatcher.poll(client_id))['results']
+        self.dispatcher.acknowledge(client_id, json.dumps([result['id'] for result in results]))
+        return results
 
     def test_game_state_is_only_accessed_when_main_thread_task_runs(self):
         queued = self.dispatch('setSun', {'value': 9990})
@@ -230,7 +235,7 @@ class GuiDispatcherTests(unittest.TestCase):
                 self.dispatch(name, args)
                 self.run_tasks()
                 result = self.results()[0]
-                self.assertEqual(result['id'], 'request-1')
+                self.assertTrue(result['id'].startswith('request-'))
                 self.assertFalse(result['ok'])
                 self.assertTrue(result['error'])
         self.assertEqual(self.board.mSunMoney, 0)
@@ -372,6 +377,78 @@ class GuiDispatcherTests(unittest.TestCase):
                 self.assertTrue(all((isinstance(d, ast.Name) and d.id == 'property')
                                     or (isinstance(d, ast.Attribute) and d.attr == 'setter')
                                     for d in method.decorator_list), method.name)
+
+    def test_duplicate_request_executes_once_and_replays_cached_result(self):
+        for _ in range(2):
+            self.dispatch('placeMower', request_id='same')
+        self.run_tasks()
+        self.assertEqual(len(self.calls), 1)
+        first = self.results()
+        self.dispatch('placeMower', request_id='same')
+        self.run_tasks()
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(self.results(), first)
+        with self.assertRaises(ValueError):
+            self.dispatch('startMower', request_id='same')
+
+    def test_poll_repeats_results_until_client_acknowledges(self):
+        self.dispatch('placeMower')
+        self.run_tasks()
+        first = json.loads(self.dispatcher.poll('client-1'))
+        self.assertEqual(json.loads(self.dispatcher.poll('client-1')), first)
+        self.dispatcher.acknowledge('other', json.dumps([first['results'][0]['id']]))
+        self.assertEqual(json.loads(self.dispatcher.poll('client-1')), first)
+        self.results()
+        self.assertEqual(json.loads(self.dispatcher.poll('client-1'))['results'], [])
+
+    def test_pending_request_expires_without_executing(self):
+        with patch.object(self.dispatcher_module.time, 'monotonic', return_value=100):
+            self.dispatch('placeMower')
+        with patch.object(self.dispatcher_module.time, 'monotonic', return_value=131):
+            self.run_tasks()
+            result = self.results()[0]
+        self.assertEqual(result['errortype'], 'RequestExpired')
+        self.assertEqual(self.calls, [])
+
+    def test_completed_and_uncollected_results_are_eventually_removed(self):
+        with patch.object(self.dispatcher_module.time, 'monotonic', return_value=100):
+            self.dispatch('placeMower', request_id='acknowledged')
+            self.run_tasks()
+            self.results()
+            self.dispatch('startMower', request_id='orphan')
+            self.run_tasks()
+        with patch.object(self.dispatcher_module.time, 'monotonic', return_value=161):
+            self.run_tasks()
+        self.assertEqual(self.dispatcher._records, {})
+        self.assertEqual(self.dispatcher._pending, [])
+
+    def test_cancelled_pending_request_cannot_run_or_affect_other_clients(self):
+        self.dispatch('placeMower', request_id='cancel-me')
+        self.dispatcher.cancel('other', '["cancel-me"]')
+        self.assertEqual(self.dispatcher._records[('client-1', 'cancel-me')]['status'], 'pending')
+        self.dispatcher.cancel('client-1', '["cancel-me"]')
+        self.run_tasks()
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.results(), [])
+        # 即使取消响应丢失后重复提交，也只取回取消结果。
+        self.dispatch('placeMower', request_id='cancel-me')
+        self.run_tasks()
+        self.assertEqual(self.results()[0]['errortype'], 'RequestCancelled')
+        self.assertEqual(self.calls, [])
+
+    def test_cancelling_running_request_discards_reply_without_interrupting_game_code(self):
+        def operation():
+            thread = threading.Thread(target=lambda: self.dispatcher.cancel('client-1', '["running"]'))
+            thread.start()
+            thread.join(timeout=1)
+            self.assertFalse(thread.is_alive())
+            self.calls.append(('completed', ()))
+        self.dispatcher._actions['operation'] = (operation, ())
+        self.dispatch('operation', request_id='running')
+        self.run_tasks()
+        self.assertEqual(self.calls, [('completed', ())])
+        self.assertEqual(self.results(), [])
+        self.assertEqual(self.dispatcher._records[('client-1', 'running')]['status'], 'done')
 
 
 if __name__ == '__main__':

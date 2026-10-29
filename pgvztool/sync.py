@@ -78,15 +78,23 @@ class Serializable:
 
     def from_dict(self, data):
         for k, v in data.items():
-            if hasattr(self, k) and not k.startswith('_'):
-                curr = getattr(self, k)
-                if isinstance(curr, bool):
-                    setattr(self, k, v)
-                elif _get_dotnet_enum_type(curr) is not None:
-                    setattr(self, k, System.Enum.Parse(curr.GetType(), v))
-                elif isinstance(curr, (int, float, str)):
-                    setattr(self, k, v)
-                # 其他类型跳过
+            if k.startswith('_'):
+                continue
+            curr = getattr(self, k, None)
+            enum_type = _get_dotnet_enum_type(curr)
+            if enum_type is not None:
+                try:
+                    v = System.Enum.Parse(enum_type, v)
+                except Exception:
+                    # 无法转换的枚举值跳过，不影响其余选项。
+                    continue
+            elif not isinstance(curr, (bool, int, float, str)):
+                continue
+            try:
+                setattr(self, k, v)
+            except (AttributeError, TypeError, ValueError):
+                # 属性不存在、只读或无法赋值时跳过。
+                continue
 
 
 class SyncRegistry:
@@ -111,7 +119,7 @@ class SyncRegistry:
     def _session_is_active(self):
         return (
             self._active_client_id is not None
-            and time.time() - self._active_client_seen_at <= _SESSION_LEASE_SECONDS
+            and time.monotonic() - self._active_client_seen_at <= _SESSION_LEASE_SECONDS
         )
 
     def _session_result(self, accepted):
@@ -139,7 +147,7 @@ class SyncRegistry:
 
         previous = self._active_client_id, self._active_client_seen_at
         self._active_client_id = client_id
-        self._active_client_seen_at = time.time()
+        self._active_client_seen_at = time.monotonic()
 
         try:
             if json_str is not None:
@@ -152,17 +160,17 @@ class SyncRegistry:
 
     def heartbeat(self, client_id):
         if client_id == self._active_client_id:
-            self._active_client_seen_at = time.time()
+            self._active_client_seen_at = time.monotonic()
             return self._session_result(True)
         return self._session_result(False)
 
     def require_client(self, client_id):
         """供官方 GUI 在每条指令前校验会话所有权。"""
-        if client_id != self._active_client_id:
+        if not client_id or client_id != self._active_client_id:
             raise RuntimeError(
                 'another pgvztool GUI session is already active'
             )
-        self._active_client_seen_at = time.time()
+        self._active_client_seen_at = time.monotonic()
 
     def release(self, client_id):
         if client_id == self._active_client_id:
@@ -170,36 +178,15 @@ class SyncRegistry:
             self._active_client_seen_at = 0.0
 
     def apply(self, json_str):
-        name = None
-        field = None
-        client_id = None
+        name = field = client_id = None
         try:
             msg = json.loads(json_str)
             client_id = msg.get('_clientId')
-            if (
-                self._session_is_active()
-                and client_id != self._active_client_id
-            ):
-                Sexy.Debug.Log(
-                    '[pgvztool.sync] ignored apply from client_id={} active_client_id={}'.format(
-                        client_id or '<unknown>',
-                        self._active_client_id,
-                    )
-                )
-                return
-            is_full_sync = (
-                isinstance(msg.get('cheat'), dict)
-                and isinstance(msg.get('placer'), dict)
-            )
-            if is_full_sync and not client_id:
-                Sexy.Debug.Log(
-                    '[pgvztool.sync] ignored legacy full sync without client_id'
-                )
-                return
+            self.require_client(client_id)
             for name, obj in self._objects.items():
-                if name in msg and isinstance(msg[name], dict):
-                    # 逐字段应用，便于在同步失败时定位具体属性。
-                    for field, value in msg[name].items():
+                data = msg.get(name)
+                if isinstance(data, dict):
+                    for field, value in data.items():
                         obj.from_dict({field: value})
         except Exception:
             _log_apply_error(json_str, name, field, client_id)

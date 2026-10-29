@@ -1,12 +1,17 @@
 """GUI 协议分发器。网络线程只交接数据，所有会话、状态与业务调用由主线程执行。"""
 import json
 import threading
+import time
 
 import Lawn
 from pgvz import SetGlobalSpeed
 from .cheat_actions import cheat_actions
 from .placer import placer
 from .sync import sync_reg
+
+
+REQUEST_TIMEOUT_SECONDS = 30.0
+RESULT_RETENTION_SECONDS = 60.0
 
 
 REQUEST_KINDS = ('connect', 'apply', 'snapshot', 'action', 'heartbeat', 'release')
@@ -51,8 +56,9 @@ class GuiDispatcher:
     def __init__(self):
         # 此锁只保护跨线程的数据交接；业务执行期间不持锁，也不需要递归锁。
         self._lock = threading.Lock()
-        self._results = {}
+        self._records = {}
         self._pending = []
+        self._next_order = 0
         seed = _enum(Lawn.SeedType)
         zombie = _enum(Lawn.ZombieType)
         grid_item = _enum(Lawn.GridItemType)
@@ -117,40 +123,121 @@ class GuiDispatcher:
             raise ValueError('request ID is required')
         if request.get('kind') not in REQUEST_KINDS:
             raise ValueError('unknown GUI request kind')
+        key = request['_clientId'], request_id
         with self._lock:
-            self._pending.append(request)
+            self._cleanup_locked()
+            record = self._records.get(key)
+            if record is not None:
+                if record['request'] != request:
+                    raise ValueError('request ID was already used with different data')
+                # 同一请求只执行一次；重复提交可再次领取缓存结果。
+                record['acknowledged'] = False
+                record['abandoned'] = False
+            else:
+                self._next_order += 1
+                record = {
+                    'request': request, 'created': time.monotonic(), 'finished': None,
+                    'status': 'pending', 'result': None, 'order': self._next_order,
+                    'acknowledged': False, 'abandoned': False,
+                }
+                self._records[key] = record
+                self._pending.append(record)
         return json.dumps({'action': 'queued', 'id': request_id})
 
+    def _error_result(self, request, error_type, message):
+        return {'id': request['id'], 'kind': request['kind'], 'name': request.get('name'),
+                'ok': False, 'errortype': error_type, 'error': message}
+
+    def _finish_locked(self, record, result):
+        record['status'] = 'done'
+        record['finished'] = time.monotonic()
+        record['result'] = result
+        record['acknowledged'] = record['abandoned']
+
+    def _cleanup_locked(self):
+        now = time.monotonic()
+        expired = []
+        for key, record in self._records.items():
+            if record['status'] == 'pending' and now - record['created'] >= REQUEST_TIMEOUT_SECONDS:
+                self._finish_locked(record, self._error_result(
+                    record['request'], 'RequestExpired', 'request expired before execution'))
+            elif record['status'] == 'done' and now - record['finished'] >= RESULT_RETENTION_SECONDS:
+                expired.append(key)
+        for key in expired:
+            del self._records[key]
+        self._pending = [record for record in self._pending if record['status'] == 'pending']
+
     def run_pending(self):
-        """只由 hook.py 调用；交换队列后立即释放锁，在主线程同步执行。"""
+        """只由 hook.py 调用；业务执行期间不持队列锁。"""
         with self._lock:
+            self._cleanup_locked()
             pending = self._pending
             self._pending = []
-        for request in pending:
-            result = {
-                'id': request['id'], 'kind': request['kind'],
-                'name': request.get('name'),
-            }
+        for record in pending:
+            with self._lock:
+                self._cleanup_locked()
+                if record['status'] != 'pending':
+                    continue
+                record['status'] = 'running'
+            request = record['request']
+            result = {'id': request['id'], 'kind': request['kind'], 'name': request.get('name')}
             try:
                 result['value'] = self._execute(request)
-                # 保证跨线程回传的是 JSON 数据，不将游戏对象交给网络线程。
                 json.dumps(result['value'])
                 result['ok'] = True
             except Exception as error:
                 result.update(ok=False, error=str(error), errortype=type(error).__name__)
-            client_id = request['_clientId']
             with self._lock:
+                self._finish_locked(record, result)
                 if request['kind'] == 'release':
-                    self._results.pop(client_id, None)
-                else:
-                    self._results.setdefault(client_id, []).append(result)
+                    for other in self._records.values():
+                        if other['request']['_clientId'] == request['_clientId'] and other['status'] == 'done':
+                            other['acknowledged'] = True
 
     def poll(self, client_id):
-        """网络线程只取回该页面的结果；连接尚未获准时也可领取拒绝消息。"""
+        """结果保留至 ack 或过期；轮询响应丢失不会丢掉已执行动作的结果。"""
         self._client_id(client_id)
         with self._lock:
-            results = self._results.pop(client_id, [])
+            self._cleanup_locked()
+            records = sorted(self._records.values(), key=lambda record: record['order'])
+            results = [record['result'] for record in records
+                       if record['request']['_clientId'] == client_id
+                       and record['status'] == 'done' and not record['acknowledged']]
         return json.dumps({'action': 'results', 'results': results})
+
+    def _request_ids(self, client_id, json_ids):
+        self._client_id(client_id)
+        ids = json.loads(json_ids)
+        if not isinstance(ids, list) or any(not isinstance(value, str) for value in ids):
+            raise TypeError('request IDs must be a list of strings')
+        return [(client_id, value) for value in ids]
+
+    def acknowledge(self, client_id, json_ids):
+        keys = self._request_ids(client_id, json_ids)
+        with self._lock:
+            self._cleanup_locked()
+            for key in keys:
+                record = self._records.get(key)
+                if record is not None and record['status'] == 'done':
+                    record['acknowledged'] = True
+        return json.dumps({'action': 'acknowledged'})
+
+    def cancel(self, client_id, json_ids):
+        keys = self._request_ids(client_id, json_ids)
+        with self._lock:
+            self._cleanup_locked()
+            for key in keys:
+                record = self._records.get(key)
+                if record is None:
+                    continue
+                record['abandoned'] = True
+                if record['status'] == 'pending':
+                    self._finish_locked(record, self._error_result(
+                        record['request'], 'RequestCancelled', 'request cancelled before execution'))
+                elif record['status'] == 'done':
+                    record['acknowledged'] = True
+                # running 不能安全中断；完成后只保留缓存，不再主动回传。
+        return json.dumps({'action': 'cancelled'})
 
     def _client_id(self, value):
         if not isinstance(value, str) or not value:

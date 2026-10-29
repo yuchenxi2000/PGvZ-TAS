@@ -37,6 +37,14 @@ window.PGvZProtocol = (() => {
         return `gui_dispatcher.poll(${pythonString(clientId)})`;
     }
 
+    function acknowledgeCode(clientId, ids) {
+        return `gui_dispatcher.acknowledge(${pythonString(clientId)}, ${pythonString(JSON.stringify(ids))})`;
+    }
+
+    function cancelCode(clientId, ids) {
+        return `gui_dispatcher.cancel(${pythonString(clientId)}, ${pythonString(JSON.stringify(ids))})`;
+    }
+
     function unwrapReprString(value) {
         if (typeof value !== 'string') return value;
         if ((value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))) {
@@ -72,5 +80,7 @@ window.PGvZProtocol = (() => {
         parseResultMessage,
         requestCode,
         pollCode,
+        acknowledgeCode,
+        cancelCode,
     };
 })();

@@ -1,5 +1,7 @@
 // WebSocket 连接与统一请求结果回传。会话、状态和动作都由后端主线程分发器处理。
 window.PGvZConnection = (() => {
+    const REQUEST_TIMEOUT_MS = 30000;
+    const POLL_TIMEOUT_MS = 5000;
     function create({ isMobile, t, setResult, getInitialState, applySyncState, lineupCode }) {
         const { ref } = Vue;
         const wsParams = new URLSearchParams(location.search);
@@ -22,7 +24,8 @@ window.PGvZConnection = (() => {
         let requestCounter = 0;
         let resultPollTimer = null;
         let resultPollInFlight = false;
-        const pendingRequests = new Set();
+        let resultPollDeadline = null;
+        const pendingRequests = new Map();
 
         function showSessionRejected(showToast = true) {
             sessionRejected.value = true;
@@ -32,12 +35,12 @@ window.PGvZConnection = (() => {
             stopHeartbeat();
             stopResultPolling();
             resultPollInFlight = false;
-            pendingRequests.clear();
+            clearRequests();
             setResult(false, 'messages.sessionOccupied');
             if (showToast) ElementPlus.ElMessage.error(t('messages.sessionOccupied'));
         }
 
-        function transmit(code, { allowBeforeReady = false, quiet = false } = {}) {
+        function transmit(code, { allowBeforeReady = false, quiet = false, requestId = null } = {}) {
             if (sessionRejected.value && !allowBeforeReady) {
                 showSessionRejected();
                 return false;
@@ -46,11 +49,20 @@ window.PGvZConnection = (() => {
                 ElementPlus.ElMessage.error(t('messages.notConnected'));
                 return false;
             }
+            if (connectionState.value === 'error' && !allowBeforeReady) {
+                ElementPlus.ElMessage.error(t('messages.notConnected'));
+                return false;
+            }
             if (!connected.value && !allowBeforeReady) {
-                pendingCodes.push(code);
+                pendingCodes.push({ code, quiet, requestId });
                 return true;
             }
-            ws.send(code);
+            try {
+                ws.send(code);
+            } catch {
+                ElementPlus.ElMessage.error(t('messages.notConnected'));
+                return false;
+            }
             if (!quiet) setResult(true, 'messages.sent');
             return true;
         }
@@ -60,10 +72,58 @@ window.PGvZConnection = (() => {
         }
 
         function submit(kind, details = {}, options = {}) {
+            if (sessionRejected.value && !options.allowBeforeReady) {
+                showSessionRejected();
+                return;
+            }
             const id = `${clientId}:${++requestCounter}`;
             let code = PGvZProtocol.requestCode(clientId, id, kind, details);
             if (options.bootstrap) code = `${PGvZProtocol.BOOTSTRAP_CODE}\n${code}`;
-            if (transmit(code, options) && options.expectResult !== false) pendingRequests.add(id);
+            if (options.expectResult !== false) {
+                pendingRequests.set(id, { kind, timer: setTimeout(() => requestTimedOut(id), REQUEST_TIMEOUT_MS) });
+            }
+            if (!transmit(code, { ...options, requestId: id })) finishRequest(id);
+            scheduleResultPoll();
+        }
+
+        function finishRequest(id) {
+            const request = pendingRequests.get(id);
+            if (!request) return null;
+            if (request.timer !== null) clearTimeout(request.timer);
+            pendingRequests.delete(id);
+            return request;
+        }
+
+        function cancelRequests(ids) {
+            if (ids.length && ws && ws.readyState === WebSocket.OPEN) {
+                try { ws.send(PGvZProtocol.cancelCode(clientId, ids)); } catch { /* socket closed */ }
+            }
+        }
+
+        function clearRequests() {
+            const ids = [...pendingRequests.keys()];
+            ids.forEach(finishRequest);
+            cancelRequests(ids);
+            stopPollDeadline();
+            resultPollInFlight = false;
+        }
+
+        function requestTimedOut(id) {
+            const request = pendingRequests.get(id);
+            if (!request) return;
+            const sessionFailed = request.kind === 'connect' || request.kind === 'heartbeat';
+            const ids = sessionFailed ? [...pendingRequests.keys()] : [id];
+            ids.forEach(finishRequest);
+            cancelRequests(ids);
+            pendingCodes = pendingCodes.filter(item => !ids.includes(item.requestId));
+            if (sessionFailed) {
+                pendingCodes = [];
+                connected.value = false;
+                connectionState.value = 'error';
+                stopHeartbeat();
+            }
+            setResult(false, 'messages.requestTimeout');
+            scheduleResultPoll();
         }
 
         function sendAction(name, args = {}) {
@@ -85,15 +145,32 @@ window.PGvZConnection = (() => {
             }
         }
 
+        function stopPollDeadline() {
+            if (resultPollDeadline !== null) {
+                clearTimeout(resultPollDeadline);
+                resultPollDeadline = null;
+            }
+        }
+
         function scheduleResultPoll() {
             stopResultPolling();
             // connect 的结果也要轮询，所以这里不能依赖 connected。
-            if (!pendingRequests.size || !bootstrapStarted || !ws || ws.readyState !== WebSocket.OPEN || resultPollInFlight) return;
+            if (!pendingRequests.size) {
+                stopPollDeadline();
+                resultPollInFlight = false;
+                return;
+            }
+            if (!bootstrapStarted || !ws || ws.readyState !== WebSocket.OPEN || resultPollInFlight) return;
             resultPollTimer = setTimeout(() => {
                 resultPollTimer = null;
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     resultPollInFlight = true;
-                    ws.send(PGvZProtocol.pollCode(clientId));
+                    try { ws.send(PGvZProtocol.pollCode(clientId)); } catch { /* deadline retries result polling */ }
+                    resultPollDeadline = setTimeout(() => {
+                        resultPollDeadline = null;
+                        resultPollInFlight = false;
+                        scheduleResultPoll(); // 只重试取结果，不重放副作用动作。
+                    }, POLL_TIMEOUT_MS);
                 }
             }, 100);
         }
@@ -112,13 +189,16 @@ window.PGvZConnection = (() => {
         }
 
         function applyRequestResults(results) {
+            const acknowledged = [];
             for (const result of results) {
-                if (!pendingRequests.delete(result.id)) continue;
+                acknowledged.push(result.id);
+                if (!finishRequest(result.id)) continue;
                 if (!result.ok) {
-                    setResult(false, '', `${result.errortype}: ${result.error}`);
+                    if (result.errortype === 'RequestExpired') setResult(false, 'messages.requestExpired');
+                    else setResult(false, '', `${result.errortype}: ${result.error}`);
                     if (result.kind === 'connect') {
                         pendingCodes = [];
-                        pendingRequests.clear();
+                        clearRequests();
                         connectionState.value = 'error';
                         stopHeartbeat();
                     }
@@ -131,6 +211,9 @@ window.PGvZConnection = (() => {
                     setResult(true, 'messages.success');
                 }
             }
+            if (acknowledged.length && ws && ws.readyState === WebSocket.OPEN) {
+                try { ws.send(PGvZProtocol.acknowledgeCode(clientId, acknowledged)); } catch { /* cached results expire */ }
+            }
             scheduleResultPoll();
         }
 
@@ -140,7 +223,7 @@ window.PGvZConnection = (() => {
             connectionState.value = 'connected';
             const queuedCodes = pendingCodes;
             pendingCodes = [];
-            queuedCodes.forEach(code => transmit(code));
+            queuedCodes.forEach(({ code, quiet, requestId }) => transmit(code, { quiet, requestId }));
         }
 
         function stopHeartbeat() {
@@ -162,6 +245,8 @@ window.PGvZConnection = (() => {
         function releaseSession() {
             if (ws && ws.readyState === WebSocket.OPEN && connected.value) {
                 try {
+                    clearRequests();
+                    pendingCodes = [];
                     submit('release', {}, { quiet: true, expectResult: false });
                 } catch {
                     // 页面关闭期间 WebSocket 可能已经被浏览器释放。
@@ -225,18 +310,17 @@ window.PGvZConnection = (() => {
                             startBootstrap();
                         } else if (message && message.action === 'queued') {
                             scheduleResultPoll();
+                        } else if (message && (message.action === 'acknowledged' || message.action === 'cancelled')) {
+                            // 仅确认传输层交接，不覆盖业务结果。
                         } else if (message && message.action === 'results') {
+                            stopPollDeadline();
                             resultPollInFlight = false;
                             applyRequestResults(message.results);
                         } else {
                             setResult(true, data.result ? '' : 'messages.success', data.result || '');
                         }
                     } else {
-                        if (resultPollInFlight) {
-                            resultPollInFlight = false;
-                            pendingRequests.clear();
-                            stopResultPolling();
-                        }
+                        // 原始调试代码的错误没有请求 ID，不能清空其他动作的等待状态。
                         if (data.errortype) setResult(false, '', `${data.errortype}: ${data.error || ''}`);
                         else setResult(false, 'messages.unknownError');
                     }
@@ -251,7 +335,7 @@ window.PGvZConnection = (() => {
                 stopHeartbeat();
                 stopResultPolling();
                 resultPollInFlight = false;
-                pendingRequests.clear();
+                clearRequests();
                 pendingCodes = [];
                 connected.value = false;
                 gameVersion.value = '';
@@ -266,6 +350,9 @@ window.PGvZConnection = (() => {
             socket.onerror = () => {
                 if (ws !== socket) return;
                 stopResultPolling();
+                stopHeartbeat();
+                clearRequests();
+                pendingCodes = [];
                 connected.value = false;
                 connectionState.value = 'error';
             };

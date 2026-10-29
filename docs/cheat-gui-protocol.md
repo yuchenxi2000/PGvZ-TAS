@@ -7,7 +7,7 @@
     ├─ HTTP (localhost:58080) ─────→ cheat-gui.py ─→ gui/ 静态文件
     └─ WebSocket (localhost:8080/Py) → 游戏 IronPython 引擎
                                               ↕ Python 对象
-                                    gui_dispatcher.submit / poll
+                            gui_dispatcher.submit / poll / acknowledge / cancel
                                               ↕ 请求 / 结果队列
                                     hook.py → 主线程 run_pending
                                               ↕
@@ -121,6 +121,15 @@ ready = app is not None and app.mLoadingThreadStarted
 
 ## 应用层协议
 
+### HTTP 静态文件边界
+
+正式和调试入口以 `mods/gui/` 为 URL 根目录。URL 解码后统一斜杠，通过 `abspath()`
+规范化路径，再用 `normcase()` 比较目录边界，允许 `gui` 本身及其子路径，拒绝穿越到父目录
+或同名前缀的相邻目录。越界的 GET/HEAD 请求返回 403；查询参数不参与文件定位。
+
+目录检查不解析符号链接或 Windows junction，用户可自行通过链接访问其他位置的文件。
+路径段末尾的点、空格等由操作系统处理，不添加专门限制。
+
 ### GUI 单客户端会话
 
 官方 GUI 的每个页面实例生成唯一 `_clientId`。连接、心跳和释放也作为请求排队，在主线程
@@ -137,7 +146,8 @@ ready = app is not None and app.mLoadingThreadStarted
 
 ### 请求、执行和结果交接
 
-网络线程只调用 `gui_dispatcher.submit(json_str)` 和 `poll(client_id)`。
+网络线程只调用 `gui_dispatcher.submit(json_str)`、`poll(client_id)`、
+`acknowledge(client_id, json_ids)` 和 `cancel(client_id, json_ids)`，后两者仅处理队列元数据。
 `submit()` 验证请求外壳后入队，立即返回 `queued`；所有会话、状态和业务调用都在
 `run_pending()` 中执行。请求格式如下：
 
@@ -171,18 +181,38 @@ ready = app is not None and app.mLoadingThreadStarted
 ```
 
 执行异常保留请求 ID、kind 和 name，并返回 `ok: false`、`errortype` 和 `error`。
-初始连接失败会取消尚未发送的操作并停止等待。读取后结果移出队列；页面正常退出时的
-`release` 也会清理结果。断线或会话被拒绝时前端取消等待，重连不重放旧操作。
+结果不会在 `poll()` 时删除，网页处理后通过 `acknowledge()` 确认，确认后不再主动回传；
+因此轮询响应丢失时仍能重新领取。完成记录（包括已确认记录）保留 60 秒后清理，防止无人
+领取的结果永久累积。在这段缓存期内，同一页面重复提交相同 ID 和内容只重新领取结果，
+不会重复执行；同一 ID 携带不同内容会报错。页面重连不重放旧操作，也不在缓存过期后自动
+重试原动作。
 
-队列使用一个普通 `threading.Lock`。网络线程追加请求或取走结果时、主线程交换请求队列
+后端等待主线程执行超过 30 秒的请求以 `RequestExpired` 完成，不再执行游戏操作。前端每个
+请求从提交开始最多等待 30 秒，超时后停止等待并发送 `cancel()`；尚未执行的请求会取消，
+正在执行的游戏调用不能安全中断，只丢弃后续主动回包。因此前端超时不代表动作一定没有
+执行，界面提示先确认游戏状态。排队等待引导的本地操作也有超时，过期后不会随连接成功
+补发。初始连接失败或连接/心跳超时会清空其余等待操作；断线、会话被拒绝和 socket 错误
+会清理相应计时器。正常退出时 `release` 清理未领取结果。
+
+结果轮询响应等待 5 秒后可以重试，重试仅调用 `poll()`。网页在提交后就开始轮询，不依赖
+`queued` 回包必达；重复或迟到的结果会确认但不再次更新界面。原始调试代码的异常没有请求
+ID，只展示错误，不清空其他业务请求的等待状态。请求过期、取消和结果保留时间以及会话
+租约均使用单调时钟计时。
+
+队列使用一个普通 `threading.Lock`。网络线程交接请求、结果或确认信息时、主线程交换请求队列
 或提交结果时短暂持锁；会话检查、参数转换、游戏调用和状态序列化期间均不持锁。
 
 ### 状态快照和选项应用
 
 `SyncRegistry` 注册 `cheat`（`CheatOption`）、`placer`（`Placer`）和 `weather`
-（`WeatherControl`）。`Serializable.to_dict()` 读取简单属性及 `@property`，`from_dict()`
-应用属性并调用相应 setter。这些操作都在主线程完成，包括 `noCooldown` 对游戏字段的读写
-和脚本开关的启停。
+（`WeatherControl`）。`Serializable.to_dict()` 自动读取公开的简单实例属性和 `@property`，
+不需要登记字段表。`from_dict()` 按现有属性逐项应用：简单属性直接赋值，.NET 枚举通过
+`System.Enum.Parse()` 转换，不额外校验类型或范围。不存在、私有或不支持的属性会跳过；
+枚举转换失败、属性只读或赋值时出现类型转换错误，也跳过该项并继续处理其余选项。
+未知状态对象和非字典的对象数据同样忽略，不做整份请求预校验。
+
+这些操作都在主线程完成，包括 `noCooldown` 对游戏字段的读写和脚本开关的启停。
+会话校验保持不变；其他游戏运行时异常仍按请求 ID 回传。
 
 `connect` 和 `snapshot` 请求的 `value` 是以下消息；连接模块据此更新界面：
 
@@ -259,7 +289,7 @@ def xxx(self, value):
     script_xxx.On() if value else script_xxx.Off()
 ```
 
-`Serializable.to_dict()` 会自动发现 `@property` 并包含在序列化中。
+`Serializable.to_dict()` 会自动发现公开简单属性及 `@property` 并包含在序列化中，无需登记字段表。
 
 ### 2. GUI 端：注册选项
 

@@ -28,10 +28,22 @@ _GUI_PORT = 58080
 
 class _GUIHandler(http.server.SimpleHTTPRequestHandler):
     def translate_path(self, path):
-        path = urllib.parse.unquote(path.split('?', 1)[0]).lstrip('/')
-        gui_dir = os.path.join(modsDirPath, 'gui')
-        result = os.path.join(gui_dir, path) if path else gui_dir
-        return result
+        root = os.path.abspath(os.path.join(modsDirPath, 'gui'))
+        decoded = urllib.parse.unquote(urllib.parse.urlsplit(path).path)
+        relative = decoded.replace('\\', '/').lstrip('/')
+        candidate = os.path.abspath(os.path.join(root, relative))
+        normalized_root = os.path.normcase(root)
+        normalized_path = os.path.normcase(candidate)
+        if normalized_path != normalized_root and not normalized_path.startswith(normalized_root + os.sep):
+            raise PermissionError('path is outside the GUI directory')
+        return candidate
+
+    def send_head(self):
+        try:
+            return super().send_head()
+        except (PermissionError, ValueError):
+            self.send_error(403, 'Forbidden')
+            return None
 
     def end_headers(self):
         # 防止之后的页面加载复用缓存；已在运行的旧页面仍需由会话校验拦截。

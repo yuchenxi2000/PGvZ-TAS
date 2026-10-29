@@ -90,7 +90,7 @@ function decodeCall(code) {
     let call;
     const capture = name => (...args) => { call = { name, args }; };
     const context = {
-        gui_dispatcher: { submit: capture('submit'), poll: capture('poll') },
+        gui_dispatcher: { submit: capture('submit'), poll: capture('poll'), acknowledge: capture('acknowledge'), cancel: capture('cancel') },
     };
     // Fixed protocol calls and their quoted string arguments are valid in both languages.
     vm.runInNewContext(code, context);
@@ -157,7 +157,8 @@ test('remote synchronization updates UI without echoing its changes', () => {
     assert.equal(gui.model.cheatOption.freePlant, true);
     assert.equal(gui.model.selectedSeedType.value, 'Sunflower');
     assert.equal(gui.model.weather.value, 'rain');
-    assert.equal(ws.sent.length, count);
+    assert.equal(ws.sent.length, count + 1);
+    assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
 });
 
 test('actions wait for actual completion and poll only while results are pending', () => {
@@ -202,7 +203,8 @@ test('concurrent actions share one result poll in flight', () => {
     gui.model.sendAction('nextStage');
     const second = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
     ws.message({ action: 'queued', id: second.id });
-    assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
+    assert.equal([...gui.timers.values()].filter(timer => timer.delay === 100).length, 0);
+    assert.equal([...gui.timers.values()].filter(timer => timer.delay === 5000).length, 1);
     ws.message({ action: 'results', results: [{ ...first, ok: true, value: null }] });
     gui.runTimer(100);
     ws.message({ action: 'results', results: [{ ...second, ok: true, value: null }] });
@@ -285,4 +287,86 @@ test('heartbeat and release use the same request API without changing the result
     assert.equal(release.kind, 'release');
     ws.message({ action: 'queued', id: release.id });
     assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
+});
+
+test('missing queue acknowledgement still polls results and lost polls retry without replaying actions', () => {
+    const gui = loadGui();
+    const ws = gui.bootstrap();
+    gui.model.sendAction('winLevel');
+    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    gui.runTimer(100); // queued acknowledgement was lost
+    assert.equal(decodeCall(ws.sent.at(-1)).name, 'poll');
+    gui.runTimer(5000); // poll response was lost
+    gui.runTimer(100);
+    assert.equal(decodeCall(ws.sent.at(-1)).name, 'poll');
+    assert.equal(ws.sent.filter(code => code.includes('winLevel')).length, 1);
+    const result = { ...request, ok: true, value: null };
+    ws.message({ action: 'results', results: [result] });
+    assert.equal(gui.model.lastResult.key, 'messages.success');
+    assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
+    gui.model.lastResult.key = 'later-banner';
+    ws.message({ action: 'results', results: [result] }); // ack was lost
+    assert.equal(gui.model.lastResult.key, 'later-banner');
+    assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
+    assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
+});
+
+test('request timeout cancels pending work and ignores late results', () => {
+    const gui = loadGui();
+    const ws = gui.bootstrap();
+    gui.model.sendAction('winLevel');
+    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    gui.runTimer(100);
+    gui.runTimer(30000);
+    assert.equal(gui.model.lastResult.ok, false);
+    assert.equal(gui.model.lastResult.key, 'messages.requestTimeout');
+    const cancel = decodeCall(ws.sent.at(-1));
+    assert.equal(cancel.name, 'cancel');
+    assert.deepEqual(JSON.parse(cancel.args[1]), [request.id]);
+    ws.message({ action: 'results', results: [{ ...request, ok: true, value: null }] });
+    assert.equal(gui.model.lastResult.key, 'messages.requestTimeout');
+    assert.equal(ws.sent.filter(code => code.includes('winLevel')).length, 1);
+    assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
+});
+
+test('unrelated debug errors do not discard concurrent action results', () => {
+    const gui = loadGui();
+    const ws = gui.bootstrap();
+    gui.model.getLineupCode();
+    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    gui.runTimer(100);
+    ws.onmessage({ data: JSON.stringify({ statuscode: 1, errortype: 'SyntaxError', error: 'debug-only' }) });
+    assert.match(gui.model.lastResult.text, /debug-only/);
+    ws.message({ action: 'results', results: [{ ...request, ok: true, value: 'lineup-after-debug-error' }] });
+    assert.equal(gui.model.lineupCode.value, 'lineup-after-debug-error');
+    assert.equal(gui.model.lastResult.key, 'messages.lineupOk');
+    assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
+});
+
+test('queued actions time out before bootstrap and are never flushed later', () => {
+    const gui = loadGui();
+    const ws = gui.sockets[0];
+    ws.open();
+    gui.model.sendAction('winLevel');
+    gui.runTimer(30000);
+    assert.equal(gui.model.lastResult.key, 'messages.requestTimeout');
+    gui.bootstrap();
+    assert.equal(ws.sent.some(code => code.includes('winLevel')), false);
+});
+
+test('heartbeat timeout clears all pending requests and socket errors clear timers', () => {
+    for (const socketError of [false, true]) {
+        const gui = loadGui();
+        const ws = gui.bootstrap();
+        gui.runTimer(3000, true);
+        gui.model.sendAction('winLevel');
+        if (socketError) ws.onerror();
+        else gui.runTimer(30000);
+        assert.equal(gui.model.connected.value, false);
+        assert.equal(gui.timers.size, 0);
+        const count = ws.sent.length;
+        gui.model.sendAction('nextStage');
+        assert.equal(ws.sent.length, count);
+        assert.equal(gui.timers.size, 0);
+    }
 });
