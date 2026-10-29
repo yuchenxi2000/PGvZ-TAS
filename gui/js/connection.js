@@ -1,6 +1,6 @@
-// WebSocket 引导、GUI 会话、心跳和重连；界面状态同步通过回调交给 app.js。
+// WebSocket 连接与统一请求结果回传。会话、状态和动作都由后端主线程分发器处理。
 window.PGvZConnection = (() => {
-    function create({ isMobile, t, setResult, syncCheatOptions, applySyncState, lineupCode }) {
+    function create({ isMobile, t, setResult, getInitialState, applySyncState, lineupCode }) {
         const { ref } = Vue;
         const wsParams = new URLSearchParams(location.search);
         const SERVER_URL = wsParams.get('ws') || 'ws://localhost:8080/Py';
@@ -19,36 +19,119 @@ window.PGvZConnection = (() => {
         let heartbeatTimer = null;
         let bootstrapProbeTimer = null;
         let bootstrapStarted = false;
+        let requestCounter = 0;
+        let resultPollTimer = null;
+        let resultPollInFlight = false;
+        const pendingRequests = new Set();
 
         function showSessionRejected(showToast = true) {
             sessionRejected.value = true;
             connected.value = false;
             connectionState.value = 'occupied';
             pendingCodes = [];
+            stopHeartbeat();
+            stopResultPolling();
+            resultPollInFlight = false;
+            pendingRequests.clear();
             setResult(false, 'messages.sessionOccupied');
-            if (showToast) {
-                ElementPlus.ElMessage.error(t('messages.sessionOccupied'));
-            }
+            if (showToast) ElementPlus.ElMessage.error(t('messages.sessionOccupied'));
         }
 
-        function send(code, allowBeforeReady = false) {
+        function transmit(code, { allowBeforeReady = false, quiet = false } = {}) {
             if (sessionRejected.value && !allowBeforeReady) {
                 showSessionRejected();
-                return;
+                return false;
             }
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 ElementPlus.ElMessage.error(t('messages.notConnected'));
-                return;
+                return false;
             }
             if (!connected.value && !allowBeforeReady) {
                 pendingCodes.push(code);
-                return;
+                return true;
             }
-            ws.send(allowBeforeReady
-                ? code
-                : `sync_reg.require_client('${clientId}')\n${code}`
-            );
-            setResult(true, 'messages.sent');
+            ws.send(code);
+            if (!quiet) setResult(true, 'messages.sent');
+            return true;
+        }
+
+        function send(code, allowBeforeReady = false) {
+            return transmit(code, { allowBeforeReady });
+        }
+
+        function submit(kind, details = {}, options = {}) {
+            const id = `${clientId}:${++requestCounter}`;
+            let code = PGvZProtocol.requestCode(clientId, id, kind, details);
+            if (options.bootstrap) code = `${PGvZProtocol.BOOTSTRAP_CODE}\n${code}`;
+            if (transmit(code, options) && options.expectResult !== false) pendingRequests.add(id);
+        }
+
+        function sendAction(name, args = {}) {
+            submit('action', { name, args });
+        }
+
+        function applyState(state) {
+            submit('apply', { state });
+        }
+
+        function refreshState() {
+            submit('snapshot');
+        }
+
+        function stopResultPolling() {
+            if (resultPollTimer !== null) {
+                clearTimeout(resultPollTimer);
+                resultPollTimer = null;
+            }
+        }
+
+        function scheduleResultPoll() {
+            stopResultPolling();
+            // connect 的结果也要轮询，所以这里不能依赖 connected。
+            if (!pendingRequests.size || !bootstrapStarted || !ws || ws.readyState !== WebSocket.OPEN || resultPollInFlight) return;
+            resultPollTimer = setTimeout(() => {
+                resultPollTimer = null;
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    resultPollInFlight = true;
+                    ws.send(PGvZProtocol.pollCode(clientId));
+                }
+            }, 100);
+        }
+
+        function applyStateMessage(message) {
+            if (message.action === 'sessionRejected') {
+                showSessionRejected();
+            } else if (message.action === 'sync' && message.state) {
+                setResult(true, 'messages.syncOk');
+                modVersion.value = String(message.modVersion || '');
+                gameVersion.value = String(message.gameVersion || '');
+                applySyncState(message.state);
+                markConnected();
+                startHeartbeat();
+            }
+        }
+
+        function applyRequestResults(results) {
+            for (const result of results) {
+                if (!pendingRequests.delete(result.id)) continue;
+                if (!result.ok) {
+                    setResult(false, '', `${result.errortype}: ${result.error}`);
+                    if (result.kind === 'connect') {
+                        pendingCodes = [];
+                        pendingRequests.clear();
+                        connectionState.value = 'error';
+                        stopHeartbeat();
+                    }
+                } else if (result.kind === 'connect' || result.kind === 'snapshot' || result.kind === 'heartbeat') {
+                    applyStateMessage(result.value);
+                } else if (result.kind === 'action' && result.name === 'getLineup') {
+                    lineupCode.value = result.value;
+                    setResult(true, 'messages.lineupOk');
+                } else {
+                    setResult(true, 'messages.success');
+                }
+            }
+            scheduleResultPoll();
         }
 
         function markConnected() {
@@ -57,7 +140,7 @@ window.PGvZConnection = (() => {
             connectionState.value = 'connected';
             const queuedCodes = pendingCodes;
             pendingCodes = [];
-            queuedCodes.forEach(code => send(code));
+            queuedCodes.forEach(code => transmit(code));
         }
 
         function stopHeartbeat() {
@@ -71,7 +154,7 @@ window.PGvZConnection = (() => {
             stopHeartbeat();
             heartbeatTimer = setInterval(() => {
                 if (ws && ws.readyState === WebSocket.OPEN && connected.value) {
-                    ws.send(`sync_reg.heartbeat('${clientId}')`);
+                    submit('heartbeat', {}, { quiet: true });
                 }
             }, 3000);
         }
@@ -79,7 +162,7 @@ window.PGvZConnection = (() => {
         function releaseSession() {
             if (ws && ws.readyState === WebSocket.OPEN && connected.value) {
                 try {
-                    ws.send(`sync_reg.release('${clientId}')`);
+                    submit('release', {}, { quiet: true, expectResult: false });
                 } catch {
                     // 页面关闭期间 WebSocket 可能已经被浏览器释放。
                 }
@@ -108,17 +191,14 @@ window.PGvZConnection = (() => {
             if (bootstrapStarted || !ws || ws.readyState !== WebSocket.OPEN) return;
             stopBootstrapProbe();
             bootstrapStarted = true;
-            if (isMobile) {
-                send(`${PGvZProtocol.BOOTSTRAP_CODE}\nsync_reg.connect('${clientId}')`, true);
-            } else {
-                // 保证新游戏进程中先完成导入，再恢复网页保留的状态。
-                syncCheatOptions(true);
-            }
+            const state = isMobile ? undefined : getInitialState();
+            submit('connect', { state }, { allowBeforeReady: true, bootstrap: true });
         }
 
         function connect() {
-            ws = new WebSocket(SERVER_URL);
-            ws.onopen = () => {
+            const socket = new WebSocket(SERVER_URL);
+            ws = socket;
+            socket.onopen = () => {
                 stopBootstrapProbe();
                 bootstrapStarted = false;
                 connected.value = false;
@@ -127,68 +207,52 @@ window.PGvZConnection = (() => {
                 connectionState.value = 'connecting';
                 requestBootstrapReady();
             };
-            ws.onmessage = event => {
+            socket.onmessage = event => {
+                if (ws !== socket) return;
                 try {
                     const data = JSON.parse(event.data);
                     if (data.statuscode === 0) {
-                        const msg = PGvZProtocol.parseResultMessage(data.result);
-                        if (msg && msg.action === 'bootstrapReady') {
-                            if (msg.ready) {
+                        const message = PGvZProtocol.parseResultMessage(data.result);
+                        if (message && message.action === 'bootstrapReady') {
+                            if (message.ready) {
                                 stopBootstrapProbe();
-                                ws.send(PGvZProtocol.GAME_VERSION_PROBE_CODE);
+                                socket.send(PGvZProtocol.GAME_VERSION_PROBE_CODE);
                             } else {
                                 retryBootstrapReady();
                             }
-                            return;
-                        }
-                        if (msg && msg.action === 'heartbeat') {
-                            return;
-                        }
-                        if (msg && msg.action === 'sessionRejected') {
-                            stopHeartbeat();
-                            showSessionRejected();
-                            return;
-                        }
-                        if (msg && msg.action === 'gameVersion') {
-                            legacyGameVersionWarning.value = PGvZProtocol.isLegacyGameVersion(msg.version);
+                        } else if (message && message.action === 'gameVersion') {
+                            legacyGameVersionWarning.value = PGvZProtocol.isLegacyGameVersion(message.version);
                             startBootstrap();
-                            return;
-                        }
-                        if (data.result) {
-                            setResult(true, '', data.result);
+                        } else if (message && message.action === 'queued') {
+                            scheduleResultPoll();
+                        } else if (message && message.action === 'results') {
+                            resultPollInFlight = false;
+                            applyRequestResults(message.results);
                         } else {
-                            setResult(true, 'messages.success');
-                        }
-
-                        if (msg && msg.action === 'sync' && msg.state) {
-                            setResult(true, 'messages.syncOk');
-                            modVersion.value = String(msg.modVersion || '');
-                            gameVersion.value = String(msg.gameVersion || '');
-                            applySyncState(msg.state);
-                            markConnected();
-                            startHeartbeat();
-                            return;
-                        }
-                        if (msg && msg.action === 'lineup' && msg.code) {
-                            setResult(true, 'messages.lineupOk');
-                            lineupCode.value = msg.code;
-                            return;
+                            setResult(true, data.result ? '' : 'messages.success', data.result || '');
                         }
                     } else {
-                        if (data.errortype) {
-                            setResult(false, '', data.errortype);
-                        } else {
-                            setResult(false, 'messages.unknownError');
+                        if (resultPollInFlight) {
+                            resultPollInFlight = false;
+                            pendingRequests.clear();
+                            stopResultPolling();
                         }
+                        if (data.errortype) setResult(false, '', `${data.errortype}: ${data.error || ''}`);
+                        else setResult(false, 'messages.unknownError');
                     }
                 } catch {
-                    setResult(true, '', event.data);
+                    setResult(false, 'messages.unknownError');
                 }
             };
-            ws.onclose = () => {
+            socket.onclose = () => {
+                if (ws !== socket) return;
                 stopBootstrapProbe();
                 bootstrapStarted = false;
                 stopHeartbeat();
+                stopResultPolling();
+                resultPollInFlight = false;
+                pendingRequests.clear();
+                pendingCodes = [];
                 connected.value = false;
                 gameVersion.value = '';
                 modVersion.value = '';
@@ -199,7 +263,9 @@ window.PGvZConnection = (() => {
                 connectionState.value = 'reconnecting';
                 setTimeout(connect, 3000);
             };
-            ws.onerror = () => {
+            socket.onerror = () => {
+                if (ws !== socket) return;
+                stopResultPolling();
                 connected.value = false;
                 connectionState.value = 'error';
             };
@@ -208,7 +274,7 @@ window.PGvZConnection = (() => {
         return {
             clientId, connected, sessionRejected, legacyGameVersionWarning,
             gameVersion, modVersion, connectionState,
-            send, connect, releaseSession,
+            send, sendAction, applyState, refreshState, connect, releaseSession,
         };
     }
 

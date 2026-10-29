@@ -1,5 +1,4 @@
 import ast
-import functools
 import pathlib
 import types
 import unittest
@@ -125,36 +124,25 @@ class FakeApp:
 
 
 def load_actions(app):
-    # Load the actual methods and main_thread decorator without importing .NET
-    # or registering all the unrelated cheat scripts under CPython.
-    queue = []
+    # Load real domain methods without .NET imports or unrelated script registration.
     namespace = {
-        'wraps': functools.wraps,
-        'script_manager': types.SimpleNamespace(Register=lambda func, **kw: queue.append(func)),
-        'ScriptRunMode': types.SimpleNamespace(GLOBAL=1),
         'Lawn': types.SimpleNamespace(LawnApp=FakeApp, Board=FakeBoard,
                                      Creative=types.SimpleNamespace(CSSurvivalLevel=object)),
         'GetLawnApp': lambda: app,
         'IterAliveZombies': lambda: [],
     }
-    util = ast.parse((ROOT / 'pgvztool/util.py').read_text(encoding='utf-8'))
-    decorator = next(node for node in util.body if isinstance(node, ast.FunctionDef) and node.name == 'main_thread')
-    source = ast.parse((ROOT / 'pgvztool/cheat.py').read_text(encoding='utf-8'))
-    cls = next(node for node in source.body if isinstance(node, ast.ClassDef) and node.name == 'CheatOption')
-    cls.bases = []
+    source = ast.parse((ROOT / 'pgvztool/cheat_actions.py').read_text(encoding='utf-8'))
+    cls = next(node for node in source.body if isinstance(node, ast.ClassDef) and node.name == 'CheatActions')
     cls.body = [node for node in cls.body if isinstance(node, ast.FunctionDef)
-                and node.name in ('_WinLevel', 'WinLevel', 'NextStage')]
-    exec(compile(ast.Module(body=[decorator, cls], type_ignores=[]), 'cheat-actions', 'exec'), namespace)
-    return namespace['CheatOption'](), queue
+                and node.name in ('__init__', '_WinLevel', 'WinLevel', 'NextStage')]
+    exec(compile(ast.Module(body=[cls], type_ignores=[]), 'cheat-actions', 'exec'), namespace)
+    return namespace['CheatActions'](types.SimpleNamespace(wontLose=False))
 
 
 class CheatCompletionTests(unittest.TestCase):
     def run_action(self, app, action):
-        cheat, queue = load_actions(app)
+        cheat = load_actions(app)
         getattr(cheat, action)()
-        self.assertEqual(app.dialogs, [])
-        for script in queue:
-            list(script())
         self.assertEqual(app.record, 0, 'Save records through the native completion flow')
 
     def test_win_records_full_trophy_score_from_battle_and_chooser(self):
@@ -214,6 +202,33 @@ class CheatCompletionTests(unittest.TestCase):
             app.mBoard = None
             self.run_action(app, action)
             self.assertEqual(app.dialogs, [])
+
+    def test_lose_level_restores_option_when_native_call_fails(self):
+        names = ('Normal', 'Gargantuar', 'RedeyeGargantuar', 'Polevaulter', 'Catapult',
+                 'Football', 'Zamboni', 'BackupDancer', 'Dancer', 'Snorkel')
+        zombie_types = types.SimpleNamespace(**{name: name for name in names})
+        options = types.SimpleNamespace(wontLose=True)
+        zombie = types.SimpleNamespace(mPosX=0)
+
+        def fail(zombie):
+            self.assertFalse(options.wontLose)
+            raise RuntimeError('native failure')
+
+        board = types.SimpleNamespace(AddZombie=lambda *args: zombie, ZombiesWon=fail)
+        app = types.SimpleNamespace(mBoard=board, KillDialog=lambda *args: None,
+                                    KillSeedChooserScreen=lambda: None)
+        namespace = {
+            'Lawn': types.SimpleNamespace(ZombieType=zombie_types),
+            'Sexy': types.SimpleNamespace(Constants=types.SimpleNamespace(BOARD_EDGE=0)),
+            'GetLawnApp': lambda: app,
+        }
+        tree = ast.parse((ROOT / 'pgvztool/cheat_actions.py').read_text(encoding='utf-8'))
+        cls = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == 'CheatActions')
+        method = next(node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name == 'LoseLevel')
+        exec(compile(ast.Module(body=[method], type_ignores=[]), 'lose-level', 'exec'), namespace)
+        with self.assertRaisesRegex(RuntimeError, 'native failure'):
+            namespace['LoseLevel'](types.SimpleNamespace(options=options))
+        self.assertTrue(options.wontLose)
 
 
 if __name__ == '__main__':

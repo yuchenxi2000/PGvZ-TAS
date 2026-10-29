@@ -57,7 +57,7 @@
                                             <el-input-number v-model="sunValue" :min="0" :max="9990" size="small" />
                                         </div>
                                         <div class="resource-action">
-                                            <el-button type="primary" @click="send(`Sexy.GlobalStaticVars.gLawnApp.mBoard.mSunMoney = ${sunValue}`)">
+                                            <el-button type="primary" @click="sendAction('setSun', { value: sunValue })">
                                                 {{ t('actions.setSun') }}
                                             </el-button>
                                         </div>
@@ -67,7 +67,7 @@
                                             <el-input-number v-model="moneyValue" :min="0" :max="999999" size="small" />
                                         </div>
                                         <div class="resource-action">
-                                            <el-button type="warning" @click="send(`Sexy.GlobalStaticVars.gLawnApp.mPlayerInfo.mCoins = ${moneyValue}`)">
+                                            <el-button type="warning" @click="sendAction('setMoney', { value: moneyValue })">
                                                 {{ t('actions.setMoney') }}
                                             </el-button>
                                         </div>
@@ -77,7 +77,7 @@
                                             <el-input-number v-model="chocolateValue" :min="0" :max="999" size="small" />
                                         </div>
                                         <div class="resource-action">
-                                            <el-button type="warning" @click="send(`cheat_option.SetChocolate(${chocolateValue})`)">
+                                            <el-button type="warning" @click="sendAction('setChocolate', { value: chocolateValue })">
                                                 {{ t('actions.setChocolate') }}
                                             </el-button>
                                         </div>
@@ -87,7 +87,7 @@
                                             <el-input-number v-model="treeHeight" :min="0" :max="2147483647" size="small" />
                                         </div>
                                         <div class="resource-action">
-                                            <el-button type="warning" @click="send(`cheat_option.SetTreeHeight(${treeHeight})`)">
+                                            <el-button type="warning" @click="sendAction('setTreeHeight', { value: treeHeight })">
                                                 {{ t('actions.setTreeHeight') }}
                                             </el-button>
                                         </div>
@@ -97,7 +97,7 @@
                                             <el-input-number v-model="level" :min="1" :max="50" size="small" />
                                         </div>
                                         <div class="resource-action">
-                                            <el-button type="primary" @click="send(`cheat_option.SetAdventureLevel(${level})`)">
+                                            <el-button type="primary" @click="sendAction('setAdventureLevel', { value: level })">
                                                 {{ t('actions.setAdventureLevel') }}
                                             </el-button>
                                         </div>
@@ -107,7 +107,7 @@
                                             <el-input-number v-model="finishedAdventure" :min="0" :max="2147483647" :step="1" :precision="0" size="small" />
                                         </div>
                                         <div class="resource-action">
-                                            <el-button type="primary" @click="send(`cheat_option.SetFinishedAdventure(${finishedAdventure})`)">
+                                            <el-button type="primary" @click="sendAction('setFinishedAdventure', { value: finishedAdventure })">
                                                 {{ t('actions.setFinishedAdventure') }}
                                             </el-button>
                                         </div>
@@ -118,12 +118,12 @@
                             <el-card shadow="never" class="tool-card">
                                 <template #header>{{ t('sections.quickActions') }}</template>
                                 <div class="button-grid two">
-                                    <el-button type="primary" @click="send('cheat_option.WinLevel()')">{{ t('actions.winNow') }}</el-button>
-                                    <el-button type="primary" @click="send('cheat_option.NextStage()')">{{ t('actions.nextStage') }}</el-button>
-                                    <el-button type="danger" @click="send('cheat_option.LoseLevel(Lawn.ZombieType.Normal)')">{{ t('actions.loseNow') }}</el-button>
-                                    <el-button type="primary" @click="send('cheat_option.ToggleFullscreen()')">{{ t('actions.toggleFullscreen') }}</el-button>
-                                    <el-button type="success" @click="send('cheat_option.CompleteAccount()')">{{ t('actions.completeAccount') }}</el-button>
-                                    <el-button type="success" @click="send('cheat_option.PerfectAccount()')">{{ t('actions.perfectAccount') }}</el-button>
+                                    <el-button type="primary" @click="sendAction('winLevel')">{{ t('actions.winNow') }}</el-button>
+                                    <el-button type="primary" @click="sendAction('nextStage')">{{ t('actions.nextStage') }}</el-button>
+                                    <el-button type="danger" @click="sendAction('loseLevel')">{{ t('actions.loseNow') }}</el-button>
+                                    <el-button type="primary" @click="sendAction('toggleFullscreen')">{{ t('actions.toggleFullscreen') }}</el-button>
+                                    <el-button type="success" @click="sendAction('completeAccount')">{{ t('actions.completeAccount') }}</el-button>
+                                    <el-button type="success" @click="sendAction('perfectAccount')">{{ t('actions.perfectAccount') }}</el-button>
                                 </div>
                             </el-card>
                         </div>
@@ -140,13 +140,13 @@
                             <div class="form-stack">
                                 <label class="field">
                                     <span>{{ t('fields.seedType') }}</span>
-                                    <el-select v-model="selectedSeedType" filterable :placeholder="t('placeholders.seed')" @change="val => send(`placer.seedType = Lawn.SeedType.${val}`)">
+                                    <el-select v-model="selectedSeedType" filterable :placeholder="t('placeholders.seed')" @change="val => setPlacerOption('seedType', val)">
                                         <el-option v-for="item in seedTypes" :key="item.value" :label="dataLabel(item)" :value="item.value" />
                                     </el-select>
                                 </label>
                                 <label class="field">
                                     <span>{{ t('fields.zombieType') }}</span>
-                                    <el-select v-model="selectedZombieType" filterable :placeholder="t('placeholders.zombie')" @change="val => send(`placer.zombieType = Lawn.ZombieType.${val}`)">
+                                    <el-select v-model="selectedZombieType" filterable :placeholder="t('placeholders.zombie')" @change="val => setPlacerOption('zombieType', val)">
                                         <el-option v-for="item in zombieTypes" :key="item.value" :label="dataLabel(item)" :value="item.value" />
                                     </el-select>
                                 </label>
@@ -170,9 +170,9 @@
                                         <el-option v-for="item in packetIdx" :key="item.value" :label="dataLabel(item)" :value="item.value" />
                                     </el-select>
                                 </label>
-                                <switch-row :label="t('fields.imitater')" v-model="isImitater" @change="val => send(`placer.imitater = ${pyBool(val)}`)"></switch-row>
-                                <switch-row :label="t('fields.mindCtrl')" v-model="mindCtrl" @change="val => send(`placer.mindCtrl = ${pyBool(val)}`)"></switch-row>
-                                <switch-row :label="t('fields.potReverse')" v-model="potLeft" @change="val => send(`placer.potReverse = ${pyBool(val)}`)"></switch-row>
+                                <switch-row :label="t('fields.imitater')" v-model="isImitater" @change="val => setPlacerOption('imitater', val)"></switch-row>
+                                <switch-row :label="t('fields.mindCtrl')" v-model="mindCtrl" @change="val => setPlacerOption('mindCtrl', val)"></switch-row>
+                                <switch-row :label="t('fields.potReverse')" v-model="potLeft" @change="val => setPlacerOption('potReverse', val)"></switch-row>
                             </div>
                         </el-card>
 
@@ -181,13 +181,13 @@
                             <div class="form-stack">
                                 <label class="field">
                                     <span>{{ t('fields.gridItem') }}</span>
-                                    <el-select v-model="selectedGridItem" filterable :placeholder="t('placeholders.gridItem')" @change="val => send(`placer.gridItemType = Lawn.GridItemType.${val}`)">
+                                    <el-select v-model="selectedGridItem" filterable :placeholder="t('placeholders.gridItem')" @change="val => setPlacerOption('gridItemType', val)">
                                         <el-option v-for="item in gridItemTypes" :key="item.value" :label="dataLabel(item)" :value="item.value" />
                                     </el-select>
                                 </label>
                                 <label class="field">
                                     <span>{{ t('fields.coinType') }}</span>
-                                    <el-select v-model="selectedCoin" filterable :placeholder="t('placeholders.coin')" @change="val => send(`placer.coinType = Lawn.CoinType.${val}`)">
+                                    <el-select v-model="selectedCoin" filterable :placeholder="t('placeholders.coin')" @change="val => setPlacerOption('coinType', val)">
                                         <el-option v-for="item in coinTypes" :key="item.value" :label="dataLabel(item)" :value="item.value" />
                                     </el-select>
                                 </label>
@@ -215,45 +215,45 @@
                                 </label>
                                 <label class="field">
                                     <span>{{ t('fields.easyPlaceMode') }}</span>
-                                    <el-select v-model="easyPlaceMode" filterable :placeholder="t('placeholders.easyPlaceMode')" @change="value => send(`placer.SetEasyPlaceMode('${value}')`)">
+                                    <el-select v-model="easyPlaceMode" filterable :placeholder="t('placeholders.easyPlaceMode')" @change="value => setPlacerOption('easyPlaceMode', value)">
                                         <el-option v-for="item in easyPlaceModeList" :key="item.value" :label="dataLabel(item)" :value="item.value" />
                                     </el-select>
                                 </label>
-                                <switch-row :label="t('fields.easyPlaceEnabled')" v-model="easyPlaceEnabled" @change="value => send(`placer.easyPlaceEnabled = ${pyBool(value)}`)"></switch-row>
+                                <switch-row :label="t('fields.easyPlaceEnabled')" v-model="easyPlaceEnabled" @change="value => setPlacerOption('easyPlaceEnabled', value)"></switch-row>
                             </div>
                         </el-card>
 
                         <el-card shadow="never" class="tool-card">
                             <template #header>{{ t('sections.place') }}</template>
                             <div class="button-stack">
-                                <el-button type="primary" @click="send(`placer.PlantOnBoard(${selectedRow}, ${selectedCol}, Lawn.SeedType.${selectedSeedType}, ${pyBool(isImitater)})`)">{{ t('actions.placePlant') }}</el-button>
-                                <el-button type="primary" @click="send(`placer.ZombieOnBoard(${selectedRow}, ${selectedCol}, Lawn.ZombieType.${selectedZombieType}, mind_ctrl=${pyBool(mindCtrl)})`)">{{ t('actions.placeZombie') }}</el-button>
-                                <el-button type="primary" @click="send(`placer.SetSeedPacket(${selectedPacketIdx}, Lawn.SeedType.${selectedSeedType}, ${pyBool(isImitater)})`)">{{ t('actions.setSeedPacket') }}</el-button>
+                                <el-button type="primary" @click="sendAction('placePlant', { row: selectedRow, col: selectedCol, seedType: selectedSeedType, imitater: isImitater })">{{ t('actions.placePlant') }}</el-button>
+                                <el-button type="primary" @click="sendAction('placeZombie', { row: selectedRow, col: selectedCol, zombieType: selectedZombieType, mindCtrl })">{{ t('actions.placeZombie') }}</el-button>
+                                <el-button type="primary" @click="sendAction('setSeedPacket', { index: selectedPacketIdx, seedType: selectedSeedType, imitater: isImitater })">{{ t('actions.setSeedPacket') }}</el-button>
                                 <el-button type="primary" @click="AddGridItem">{{ t('actions.placeGridItem') }}</el-button>
-                                <el-button type="primary" @click="send(`placer.AddCoinOnBoard(${coinX}, ${coinY}, Lawn.CoinType.${selectedCoin}, Lawn.SeedType.${selectedSeedType}, ${pyBool(potLeft)})`)">{{ t('actions.dropCoin') }}</el-button>
-                                <el-button type="primary" @click="send(`placer.PlaceIceOnBoard(${selectedRow}, ${selectedCol})`)">{{ t('actions.placeIce') }}</el-button>
-                                <el-button @click="send(`placer.AddLadderSmart()`)">{{ t('actions.smartLadder') }}</el-button>
-                                <el-button @click="send(`cheat_option.GivePottedPlant(Lawn.SeedType.${selectedSeedType}, reverse=${pyBool(potLeft)})`)">{{ t('actions.givePottedPlant') }}</el-button>
-                                <el-button @click="send(`cheat_option.GiveAllPottedPlants()`)">{{ t('actions.giveAllPottedPlants') }}</el-button>
-                                <el-button @click="send(`placer.AddLawnMower()`)">{{ t('actions.placeMower') }}</el-button>
-                                <el-button @click="send(`placer.StartLawnMower()`)">{{ t('actions.startMower') }}</el-button>
-                                <el-button @click="send(`Sexy.GlobalStaticVars.gLawnApp.mBoard.mBonusLawnMowersRemaining = 2147483647`)">{{ t('actions.infiniteMowers') }}</el-button>
+                                <el-button type="primary" @click="sendAction('dropCoin', { x: coinX, y: coinY, coinType: selectedCoin, seedType: selectedSeedType, reverse: potLeft })">{{ t('actions.dropCoin') }}</el-button>
+                                <el-button type="primary" @click="sendAction('placeIce', { row: selectedRow, col: selectedCol })">{{ t('actions.placeIce') }}</el-button>
+                                <el-button @click="sendAction('smartLadder')">{{ t('actions.smartLadder') }}</el-button>
+                                <el-button @click="sendAction('givePottedPlant', { seedType: selectedSeedType, reverse: potLeft })">{{ t('actions.givePottedPlant') }}</el-button>
+                                <el-button @click="sendAction('giveAllPottedPlants')">{{ t('actions.giveAllPottedPlants') }}</el-button>
+                                <el-button @click="sendAction('placeMower')">{{ t('actions.placeMower') }}</el-button>
+                                <el-button @click="sendAction('startMower')">{{ t('actions.startMower') }}</el-button>
+                                <el-button @click="sendAction('infiniteMowers')">{{ t('actions.infiniteMowers') }}</el-button>
                             </div>
                         </el-card>
 
                         <el-card shadow="never" class="tool-card">
                             <template #header>{{ t('sections.remove') }}</template>
                             <div class="button-stack">
-                                <el-button type="danger" @click="send(`placer.RemovePlantOnBoard()`)">{{ t('actions.removePlant') }}</el-button>
-                                <el-button type="danger" @click="send(`placer.RemoveZombieOnBoard()`)">{{ t('actions.removeZombie') }}</el-button>
-                                <el-button type="danger" @click="send(`placer.RemoveZombieOnBoard(True)`)">{{ t('actions.removeEnemyZombie') }}</el-button>
-                                <el-button type="danger" @click="send(`placer.RemoveCoinOnBoard(Lawn.CoinType.${selectedCoin})`)">{{ t('actions.removeCoin') }}</el-button>
-                                <el-button type="danger" @click="send(`placer.RemoveGridItemOnBoard(-1, -1, Lawn.GridItemType.${selectedGridItem})`)">{{ t('actions.removeGridItem') }}</el-button>
-                                <el-button type="danger" @click="send(`placer.RemoveGridItemOnBoard(${selectedRow}, ${selectedCol}, Lawn.GridItemType.${selectedGridItem})`)">{{ t('actions.removeSelectedGridItem') }}</el-button>
-                                <el-button type="danger" @click="send(`placer.RemoveIceOnBoard(${selectedRow}, ${selectedCol})`)">{{ t('actions.removeIce') }}</el-button>
-                                <el-button @click="send(`placer.RemoveTalisman()`)">{{ t('actions.removeTalisman') }}</el-button>
-                                <el-button @click="send(`placer.RemoveLawnMower()`)">{{ t('actions.removeMower') }}</el-button>
-                                <el-button @click="send(`placer.OpenScaryPotterOnBoard()`)">{{ t('actions.openScaryPot') }}</el-button>
+                                <el-button type="danger" @click="sendAction('removePlants')">{{ t('actions.removePlant') }}</el-button>
+                                <el-button type="danger" @click="sendAction('removeZombies', { enemyOnly: false })">{{ t('actions.removeZombie') }}</el-button>
+                                <el-button type="danger" @click="sendAction('removeZombies', { enemyOnly: true })">{{ t('actions.removeEnemyZombie') }}</el-button>
+                                <el-button type="danger" @click="sendAction('removeCoins', { coinType: selectedCoin })">{{ t('actions.removeCoin') }}</el-button>
+                                <el-button type="danger" @click="sendAction('removeGridItems', { row: -1, col: -1, gridItemType: selectedGridItem })">{{ t('actions.removeGridItem') }}</el-button>
+                                <el-button type="danger" @click="sendAction('removeGridItems', { row: selectedRow, col: selectedCol, gridItemType: selectedGridItem })">{{ t('actions.removeSelectedGridItem') }}</el-button>
+                                <el-button type="danger" @click="sendAction('removeIce', { row: selectedRow, col: selectedCol })">{{ t('actions.removeIce') }}</el-button>
+                                <el-button @click="sendAction('removeTalisman')">{{ t('actions.removeTalisman') }}</el-button>
+                                <el-button @click="sendAction('removeMowers')">{{ t('actions.removeMower') }}</el-button>
+                                <el-button @click="sendAction('openScaryPots')">{{ t('actions.openScaryPot') }}</el-button>
                             </div>
                         </el-card>
                     </section>
@@ -274,7 +274,7 @@
                                     </div>
                                     <div class="radio-control">
                                         <span>{{ t('fields.speed') }}</span>
-                                        <el-radio-group v-model="speed" @change="value => send(`_ = SetGlobalSpeed(${value})`)">
+                                        <el-radio-group v-model="speed" @change="value => sendAction('setSpeed', { value })">
                                             <el-radio-button v-for="item in speedOptions" :key="item" :label="item">{{ item }}</el-radio-button>
                                         </el-radio-group>
                                     </div>
@@ -290,18 +290,18 @@
                                         </el-select>
                                     </label>
                                     <div class="button-grid two">
-                                        <el-button type="primary" @click="send(`cheat_option.EnterNewGame(Lawn.GameMode.${selectedLevel})`)">{{ t('actions.enterLevel') }}</el-button>
-                                        <el-button @click="send(`Sexy.GlobalStaticVars.gLawnApp.mGameMode = Lawn.GameMode.${selectedLevel}`)">{{ t('actions.chaosLevel') }}</el-button>
+                                        <el-button type="primary" @click="sendAction('enterLevel', { mode: selectedLevel })">{{ t('actions.enterLevel') }}</el-button>
+                                        <el-button @click="sendAction('setGameMode', { mode: selectedLevel })">{{ t('actions.chaosLevel') }}</el-button>
                                     </div>
                                     <div class="resource-row">
                                         <div class="resource-value">
                                             <el-input-number v-model="numSurvivalStage" :min="0" :max="2147483647" size="small"></el-input-number>
                                         </div>
                                         <div class="resource-action">
-                                            <el-button type="success" @click="send(`Sexy.GlobalStaticVars.gLawnApp.mBoard.mChallenge.mSurvivalStage = ${numSurvivalStage}`)">{{ t('fields.survivalStage') }}</el-button>
+                                            <el-button type="success" @click="sendAction('setSurvivalStage', { value: numSurvivalStage })">{{ t('fields.survivalStage') }}</el-button>
                                         </div>
                                     </div>
-                                    <el-button type="primary" @click="send(`cheat_option.EnterMoonEndless()`)">{{ t('actions.enterMoonEndless') }}</el-button>
+                                    <el-button type="primary" @click="sendAction('enterMoonEndless')">{{ t('actions.enterMoonEndless') }}</el-button>
                                 </div>
                             </el-card>
                         </div>

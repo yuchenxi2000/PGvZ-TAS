@@ -7,20 +7,38 @@
     ├─ HTTP (localhost:58080) ─────→ cheat-gui.py ─→ gui/ 静态文件
     └─ WebSocket (localhost:8080/Py) → 游戏 IronPython 引擎
                                               ↕ Python 对象
-                                    pgvztool/sync.py (SyncRegistry)
-                                              ↕ Serializable
-                                    cheat_option、placer、weather 等对象
+                                    gui_dispatcher.submit / poll
+                                              ↕ 请求 / 结果队列
+                                    hook.py → 主线程 run_pending
+                                              ↕
+                      CheatActions / Placer / SyncRegistry
 ```
 
 ## 网页代码分工
 
-- `gui/js/protocol.js`：引导探测代码、结果解析和 Python 布尔值转换。
-- `gui/js/connection.js`：WebSocket 连接、引导、单客户端会话、待发送指令队列、心跳和重连。
+- `gui/js/protocol.js`：引导探测代码、固定接口调用的编码、Python 字符串转义和结果解析。
+- `gui/js/connection.js`：WebSocket 连接、引导、单客户端会话、待发送指令队列、请求结果轮询、心跳和重连。
 - `gui/js/options.js`：开关分组、默认值和复选框状态的本地存储。
 - `gui/js/app.js`：Vue 界面、业务操作、状态同步和组装上述模块。
 
 这些文件按 `gui/index.html` 中的脚本顺序加载，不需要构建步骤。连接模块通过回调触发
-`app.js` 中的初始状态同步和远端状态应用；PC 推送、手机拉取的规则不变。
+`app.js` 中的 `getInitialState()` 和 `applySyncState()` 获取初始状态及应用远端状态；
+PC 推送、手机拉取的规则不变。
+
+常用按钮调用 `sendAction(name, args)`，开关与放置器选项调用 `applyState(state)`。
+`index.html` 和 `app.js` 不访问 `Lawn`、`Sexy` 或游戏字段，也不构造 Python 枚举表达式。
+后端分工：
+
+- `cheat.py`：`CheatOption` 持续选项、`WeatherControl` 天气状态及相关逐帧脚本。
+- `cheat_actions.py`：`CheatActions` 一次性作弊操作，显式持有 `CheatOption`。
+- `placer.py`：同步放置、移除和场地交互，包括罐子内容的换算。
+- `sync.py`：状态序列化、状态应用和 GUI 会话，运行时只由主线程访问。
+- `dispatcher.py`：`GuiDispatcher` 请求协议、动作映射、跨线程队列和结果交接。
+- `hook.py`：调用分发器的主线程入口，集中声明所有修改器挂钩。
+
+`CheatActions` 和 `Placer` 的方法都同步执行，不带调度装饰器。游戏钩子和主线程脚本可
+直接调用；WebSocket 代码必须通过分发器提交请求。调试区仍允许发送任意 Python，调用者
+同样需要遵守主线程约束。启动就绪与版本探测发生在分发器导入前，仍留在协议模块。
 
 ## HTTP 服务器 (cheat-gui.py)
 
@@ -34,7 +52,7 @@
 
 由游戏内 `IronPyInteractive` 启动（IronPyInteractive.cs:199-219）。行为类似 **Python 交互式控制台（REPL）**：
 
-- **表达式**（如 `1+1`、`sync_reg.serialize()`）：执行后返回 `repr()` 的字符串结果
+- **表达式**（如 `1+1`、`gui_dispatcher.poll(client_id)`）：执行后返回 `repr()` 的字符串结果
 - **语句**（如 `cheat_option.xxx = True`）：执行后无返回值
 
 服务端响应是统一的 JSON 格式：
@@ -88,153 +106,137 @@ ready = app is not None and app.mLoadingThreadStarted
 保留加载前探测，确保包导入失败时仍能提示旧版本；页眉游戏版本由后续 `sync` 消息中的
 `gameVersion` 提供，直接使用 `pgvz.__game_version__` 的版本字符串（如 `"1.3.2"`）。
 
-### JSON 引号问题
+### JSON 编码和 Python 字符串
 
-JSON 布尔值（`true`/`false`）不是有效的 Python 语法。从 Web 端发送 JSON 数据给 `json.loads()` 解析时，必须将 JSON 字符串整体包裹为 Python 字符串字面量（单引号）：
+游戏的 WebSocket 接收的是 Python 代码，因此请求需要先编码成 JSON，再编码成 Python
+字符串字面量。`PGvZProtocol.requestCode(clientId, id, kind, details)` 统一处理这些步骤；
+`index.html` 和 `app.js` 只调用 `sendAction()`、`applyState()` 等前端接口。
 
-```javascript
-// ✅ 正确：JSON 作为 Python 字符串传入
-send(`sync_reg.apply('${JSON.stringify(obj)}')`);
+编码器转义反斜杠、单引号和控制字符；JSON 布尔值也不会被误当作 Python 语法。
+服务端固定执行 `gui_dispatcher.submit(json_str)`，不能通过请求指定任意 Python 方法或字段。
 
-// ❌ 错误：JSON 直接作为 Python 代码，true/false 会触发 UnboundNameException
-send(`sync_reg.apply(${JSON.stringify(obj)})`);
-```
-
-反之，WebSocket 返回的 `result` 字段是 `repr()` 输出，字符串会被额外包裹一层引号。GUI 解析前需去掉外层引号：
-
-```javascript
-let r = data.result;
-if ((r.startsWith("'") && r.endsWith("'")) || (r.startsWith('"') && r.endsWith('"'))) {
-    r = r.slice(1, -1);
-}
-const msg = JSON.parse(r);
-```
+响应的 `result` 字段是 Python `repr()` 输出。`PGvZProtocol.parseResultMessage()` 先去掉
+外层引号、解码一层 Python 字符串转义，再解析 JSON，支持引号、反斜杠、换行和中文。
+不能只用 `slice(1, -1)` 去掉引号。
 
 ## 应用层协议
 
 ### GUI 单客户端会话
 
-官方 GUI 的每个页面实例会生成唯一 `_clientId`，连接后通过 `sync_reg.connect(...)` 申请会话。`SyncRegistry` 只允许一个活动页面，页面每 3 秒调用 `sync_reg.heartbeat(...)` 续租；正常关闭时调用 `sync_reg.release(...)`，异常消失的租约会在 15 秒后过期。
+官方 GUI 的每个页面实例生成唯一 `_clientId`。连接、心跳和释放也作为请求排队，在主线程
+调用 `SyncRegistry.connect()`、`heartbeat()` 和 `release()`。只允许一个活动页面，每
+3 秒提交一次心跳，租约在 15 秒后过期；初始化同步失败时恢复此前的会话所有权。
 
-后打开的页面收到 `sessionRejected` 后显示“另一个修改器页面已连接”，不再自动重连抢占。其后用户点击控件时仍会得到相同提示。官方 GUI 发出的每条正常指令前还会调用 `sync_reg.require_client(...)`，在 IronPython 端再次校验会话所有权。
+后打开的页面收到 `sessionRejected` 后显示“另一个修改器页面已连接”，不再自动重连。
+主线程在执行动作、应用选项或读取状态前调用 `require_client()`，因此排队期间失去会话的
+请求也不会执行游戏操作。网络线程不读取或修改 `SyncRegistry`。
 
-这是 `pgvztool` 的应用层保护，不是 `/Py` WebSocket 服务的安全边界；直接发送未包装 Python 的第三方客户端不受此限制。
+这是官方 GUI 的应用层保护，不是 `/Py` 服务的安全边界；直接发送任意 Python 的第三方
+客户端不受这些调用约定限制。结果队列按页面 ID 隔离，`poll()` 仅交接已生成的 JSON 数据，
+因此尚未获准的连接也能领取自己的初始化结果或拒绝消息。
 
-### sync（状态同步）
+### 请求、执行和结果交接
 
-由 `sync_reg.serialize()` 生成。`sync_reg` 是 `SyncRegistry` 实例，注册了 `cheat`
-（`CheatOption`）、`placer`（`Placer`）和 `weather`（`WeatherControl`）三个对象。序列化通过
-`Serializable.to_dict()` 自动完成——包括简单属性和脚本单例的 `@property`。响应顶层的
-`modVersion` 来自 `pgvz.version.MOD_VERSION`，用于页眉修改器版本显示；`gameVersion`
-从 `pgvz` 包导入 `__game_version__`，用于页眉游戏版本显示。
+网络线程只调用 `gui_dispatcher.submit(json_str)` 和 `poll(client_id)`。
+`submit()` 验证请求外壳后入队，立即返回 `queued`；所有会话、状态和业务调用都在
+`run_pending()` 中执行。请求格式如下：
 
-**发送**（手机端连接并申请 GUI 会话，同时拉取状态）：
-
+```json
+{"_clientId":"client-id","id":"client-id:1","kind":"action","name":"placeZombie","args":{"row":0,"col":2,"zombieType":"Normal","mindCtrl":false}}
 ```
-sync_reg.connect('<clientId>')
+
+| kind | 附加数据 | 主线程处理 |
+|---|---|---|
+| `connect` | PC 携带 `state`；手机省略 | 申请会话，可选恢复选项，返回状态快照或会话拒绝 |
+| `apply` | `state` | 验证会话并应用开关、放置器或天气状态 |
+| `snapshot` | 无 | 验证会话并读取完整状态 |
+| `action` | `name`、`args` | 按白名单转换参数，同步调用业务方法 |
+| `heartbeat` | 无 | 续租，返回 `heartbeat` 或 `sessionRejected` |
+| `release` | 无 | 释放会话并清理该页面未领取的结果，不等待完成回包 |
+
+动作映射及参数类型定义在 `GuiDispatcher._actions`。分发器只做协议适配，游戏字段访问
+留在 `CheatActions`、`Placer` 和框架 API 中。参数名必须匹配，布尔值、整数和枚举名称经过
+类型转换后才调用 `handler(*values)`；没有装饰器绕过或第二次排队。
+
+```json
+{"action":"queued","id":"client-id:1"}
 ```
 
-**返回**：
+`queued` 只表示入队，界面仍显示“已发送，等待结果”。存在待完成请求时，网页以 100 毫秒
+间隔调用 `poll()`；同一时间最多有一次结果轮询在途。首次连接也用这一机制，不能等到
+`connected` 为真后才开始轮询。结果格式如下，`value` 为可 JSON 序列化的返回值：
+
+```json
+{"action":"results","results":[{"id":"client-id:1","kind":"action","name":"placeZombie","ok":true,"value":null}]}
+```
+
+执行异常保留请求 ID、kind 和 name，并返回 `ok: false`、`errortype` 和 `error`。
+初始连接失败会取消尚未发送的操作并停止等待。读取后结果移出队列；页面正常退出时的
+`release` 也会清理结果。断线或会话被拒绝时前端取消等待，重连不重放旧操作。
+
+队列使用一个普通 `threading.Lock`。网络线程追加请求或取走结果时、主线程交换请求队列
+或提交结果时短暂持锁；会话检查、参数转换、游戏调用和状态序列化期间均不持锁。
+
+### 状态快照和选项应用
+
+`SyncRegistry` 注册 `cheat`（`CheatOption`）、`placer`（`Placer`）和 `weather`
+（`WeatherControl`）。`Serializable.to_dict()` 读取简单属性及 `@property`，`from_dict()`
+应用属性并调用相应 setter。这些操作都在主线程完成，包括 `noCooldown` 对游戏字段的读写
+和脚本开关的启停。
+
+`connect` 和 `snapshot` 请求的 `value` 是以下消息；连接模块据此更新界面：
 
 ```json
 {
   "action": "sync",
-  "modVersion": "x.y.z",
-  "gameVersion": "1.3.2",
+  "modVersion": "1.15.1",
+  "gameVersion": "1.3.4",
   "state": {
-    "cheat": {
-      "wontLose": false,
-      "freePlant": false,
-      "drawPlantHp": true,
-      "autoCollect": true,
-      "infSun": false,
-      "skillNoCooling": false,
-      "noCooldown": false,
-      "autoRestock": false,
-      "mushroomAwake": false,
-      ...
-    },
-    "placer": {
-      "seedType": "Peashooter",
-      "zombieType": "Normal",
-      "easyPlaceMode": "plant",
-      "easyPlaceEnabled": true,
-      ...
-    },
-    "weather": {
-      "enabled": false,
-      "rain": false,
-      "storm": false
-    }
+    "cheat": {"freePlant": false, "autoCollect": true, "noCooldown": false},
+    "placer": {"seedType": "Peashooter", "easyPlaceEnabled": true},
+    "weather": {"enabled": false, "rain": false, "storm": false}
   }
 }
 ```
 
-GUI 收到后分别读取 `cheat`、`placer` 和 `weather` 对象更新状态。
+天气的五档前端选项映射为 `enabled`、`rain` 和 `storm`；`enabled` 为 false 时使用关卡
+默认天气。界面通过 `applyState({ cheat: { [key]: value } })` 或
+`applyState({ placer: { [key]: value } })` 提交修改，分发器加入会话 ID 后交给同步注册表。
 
-### apply（Web → Python 控制）
+### 布阵码
 
-正常连接后的状态修改统一走 `sync_reg.apply(json_str)`；PC 端的初始完整状态作为 `sync_reg.connect(...)` 的第二个参数传入，由 `connect()` 在取得会话后调用 `apply()`：
+`sendAction('getLineup')` 在主线程调用 `cheat_actions.GetLineup()`，返回布阵码字符串。
+`sendAction('applyLineup', { code })` 调用 `cheat_actions.LineUpOnBoard(code)`。
+前端不访问 `Board`，也不构造包含用户输入的 Python 表达式。
 
-**单个复选框切换**：
+### 统一的主线程入口
 
-```javascript
-send(`sync_reg.apply('${JSON.stringify({_clientId: clientId, cheat: {[key]: value}})}')`);
-```
+`hook.py` 挂钩 `Sexy.SexyAppBase.DoUpdateFrames()`，先调用
+`gui_dispatcher.run_pending()`，再原样调用 `orig(app)` 并返回原结果。此入口在 Board 更新
+及全局快慢速分帧之前，因此主菜单、选卡界面、TAS 暂停或 Board 速度为零时都能处理请求。
+不要将请求队列放到 `Board.UpdateGame()` 驱动的普通脚本中：`Board.Update()` 会在
+`mManualPaused` 或 `mAccelerationNumerator == 0` 时提前返回，无法处理暂停中的请求。
 
-**PC 端连接时同步全部状态**：
-
-```javascript
-const state = JSON.stringify({
-  _clientId: clientId,          // 每个页面实例生成的唯一 ID
-  cheat: cheatOption,           // Vue reactive 对象
-  placer: { seedType: ..., ... }
-});
-send(`sync_reg.connect('${clientId}', '${state}')`, true);
-```
-
-Python 端 `SyncRegistry.apply()` 解析 JSON 后，遍历各对象调用 `Serializable.from_dict()`。`from_dict` 通过 `setattr` 写入——普通属性直接赋值，有 setter 的 `@property` 自动走 setter（如 `cheat_option.autoCollect = True` 会调用 `auto_collector.On()`）。
-
-天气控制也走同一条路径。网页的五档单选项会映射到 `weather.enabled`、`weather.rain` 和
-`weather.storm`；`enabled` 为 `false` 时使用关卡默认天气，为 `true` 时另外两个字段分别控制
-降雨和雷暴。
-
-官方 GUI 的每次 `apply()` 都携带 `_clientId`。存在活动会话时，后端会拒绝客户端 ID 不匹配或缺失的任何修改；即使当前没有活动会话，也会额外拒绝不带 `_clientId`、且同时包含 `cheat` 和 `placer` 的旧版完整同步，防止残留旧页面在游戏重连后用默认值覆盖状态。
-
-### lineup（布阵码）
-
-由 `pgvz/lineup.py:LineUp.from_board(...).to_str()` 生成。
-
-**发送**：
-
-```
-'{"action":"lineup","code":"' + pgvz.lineup.LineUp.from_board(board).to_str() + '"}'
-```
-
-**返回**：
-
-```json
-{
-  "action": "lineup",
-  "code": "base64-encoded-lineup-string"
-}
-```
+入口选择依据本地 PGvZ 1.3.1 源码的 `SexyAppBase.UpdateApp()` →
+`LawnApp.DoUpdateFrames()` → `SexyAppBase.DoUpdateFrames()` → `LawnApp.UpdateFrames()`
+调用链。`LawnApp.DoUpdateFrames()` 只是一个很短的转发，可能被内联；基类实现包含加载
+收尾步骤。原有框架更新钩子及脚本调度规则保持不变。
 
 ## 状态同步策略
 
 ### PC 端：推送模式
 
-GUI 会将修改选项和放置器中的布尔开关保存到 `localStorage` 的 `pgvz-gui-checkbox-state` 项。下次打开时，PC 端先从 `localStorage` 恢复；没有已保存值的选项使用代码中的默认值。连接建立后，`syncCheatOptions()` 将页面实例的 `_clientId`、当前 `cheatOption`（Vue reactive 对象）和 `placer` 状态传给 `sync_reg.connect(...)`，在申请 GUI 会话的同时写入游戏。因此即使游戏是刚启动的新进程，也会恢复上次网页中勾选的状态。
+GUI 会将修改选项和放置器中的布尔开关保存到 `localStorage` 的 `pgvz-gui-checkbox-state` 项。下次打开时，PC 端先从 `localStorage` 恢复；没有已保存值的选项使用代码中的默认值。连接建立后，连接模块通过 `getInitialState()` 获取 `cheatOption` 和 `placer` 状态，并作为 `connect` 请求的 `state` 交给分发器，由主线程申请会话并恢复选项。因此即使游戏是刚启动的新进程，也会恢复上次网页中勾选的状态。
 
 用户勾选复选框时，`watch(cheatOption)` 检测变化，通过 `setCheatOption(key, value)` 发送：
 
 ```javascript
-send(`sync_reg.apply('${JSON.stringify({_clientId: clientId, cheat: {[key]: value}})}')`);
+applyState({ cheat: { [key]: value } });
 ```
 
 ### 手机端：拉取模式
 
-手机浏览器可能被系统杀死后台页面，导致 GUI 内存状态丢失。手机端不读取或写入上述 `localStorage` 项，并始终将游戏内状态视为权威状态。网页不需要预先判断游戏进程是否运行：WebSocket 连接成功本身就表示游戏的 `/Py` 服务正在运行；连接建立后，GUI 通过 `sync_reg.connect(clientId)` 拉取当前游戏内的完整状态。若游戏尚未运行，网页保持重连，直到连接成功后再同步。
+手机浏览器可能被系统杀死后台页面，导致 GUI 内存状态丢失。手机端不读取或写入上述 `localStorage` 项，并始终将游戏内状态视为权威状态。网页不需要预先判断游戏进程是否运行：WebSocket 连接成功本身就表示游戏的 `/Py` 服务正在运行；连接建立后，GUI 通过不带 `state` 的 `connect` 请求拉取游戏内的完整状态。若游戏尚未运行，网页保持重连，直到连接成功后再同步。
 
 ## 如何新增一个修改选项
 
@@ -269,9 +271,23 @@ def xxx(self, value):
 用户勾选复选框
   → Vue watch 检测 cheatOption.xxx 变化
   → setCheatOption('xxx', true)
-  → send("sync_reg.apply('" + JSON.stringify({_clientId: clientId, cheat: {xxx: true}}) + "')")
+  → applyState({cheat: {xxx: true}})
+  → PGvZProtocol.requestCode(clientId, id, "apply", {state}) 编码固定接口调用
   → WebSocket → IronPython 执行
-  → sync_reg.apply('{"_clientId":"...","cheat":{"xxx":true}}')
+  → gui_dispatcher.submit(...) 将 apply 请求入队
+  → hook.py 主线程入口 → SyncRegistry.apply(...)
   → json.loads → obj.from_dict → setattr(cheat_option, 'xxx', True)
   → 下一帧 hook 函数读取 cheat_option.xxx，执行对应逻辑
 ```
+
+## 如何新增一个一次性动作
+
+1. 在 `CheatActions` 或 `Placer` 中实现同步方法，在 `GuiDispatcher._actions` 登记动作名、
+   后端方法及有序参数转换器。业务方法不处理网络、会话、排队或 JSON 包装。
+2. 页面用 `sendAction('actionName', { argument: value })` 发送数据，不拼接 Python。
+   如需返回数据，业务方法返回可以 JSON 序列化的值，连接模块读取结果的 `value`。
+3. 挂钩操作只写在 `hook.py`；业务方法由现有入口在主线程直接调用，不添加 `@main_thread`，
+   不通过 `__wrapped__` 绕过调度。主线程脚本可直接调用 `cheat_actions` 或 `placer`。
+
+回归检查：`python -m unittest discover -s tests` 和 `node --test tests/test_gui.js`。
+后者使用浏览器和 Vue 的最小模拟，验证协议与模块连接，不替代游戏内的 Hook 和 GUI 实测。

@@ -90,6 +90,7 @@ class Serializable:
 
 
 class SyncRegistry:
+    """同步状态与 GUI 会话。除初始化注册外，运行时方法均由主线程分发器调用。"""
     def __init__(self):
         self._objects = {}
         self._active_client_id = None
@@ -136,12 +137,18 @@ class SyncRegistry:
             )
             return self._session_result(False)
 
+        previous = self._active_client_id, self._active_client_seen_at
         self._active_client_id = client_id
         self._active_client_seen_at = time.time()
 
-        if json_str is not None:
-            self.apply(json_str)
-        return self.serialize()
+        try:
+            if json_str is not None:
+                self.apply(json_str)
+            return self.serialize()
+        except Exception:
+            # 初始化失败的页面没有开始心跳，不应占用一份新的 GUI 租约。
+            self._active_client_id, self._active_client_seen_at = previous
+            raise
 
     def heartbeat(self, client_id):
         if client_id == self._active_client_id:

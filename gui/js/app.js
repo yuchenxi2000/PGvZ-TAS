@@ -141,11 +141,11 @@ const app = createApp({
 
         let applyingRemoteState = false;
         const {
-            clientId, connected, sessionRejected, legacyGameVersionWarning,
+            connected, sessionRejected, legacyGameVersionWarning,
             gameVersion, modVersion, connectionState,
-            send, connect, releaseSession,
+            send, sendAction, applyState, connect, releaseSession,
         } = PGvZConnection.create({
-            isMobile, t, setResult, syncCheatOptions, applySyncState, lineupCode,
+            isMobile, t, setResult, getInitialState, applySyncState, lineupCode,
         });
         const statusText = computed(() => t(`status.${connectionState.value}`));
 
@@ -161,7 +161,11 @@ const app = createApp({
         }
 
         function setCheatOption(key, value) {
-            send(`sync_reg.apply('${JSON.stringify({ _clientId: clientId, cheat: { [key]: value } })}')`);
+            applyState({ cheat: { [key]: value } });
+        }
+
+        function setPlacerOption(key, value) {
+            applyState({ placer: { [key]: value } });
         }
 
         function setWeather(value) {
@@ -172,7 +176,7 @@ const app = createApp({
                 storm: { enabled: true, rain: false, storm: true },
                 rainStorm: { enabled: true, rain: true, storm: true },
             };
-            send(`sync_reg.apply('${JSON.stringify({ _clientId: clientId, weather: states[value] })}')`);
+            applyState({ weather: states[value] });
         }
 
         function saveCheckboxState() {
@@ -188,7 +192,7 @@ const app = createApp({
             });
         }
 
-        function syncCheatOptions(withBootstrap = false) {
+        function getInitialState() {
             const placerUpdates = {
                 seedType: selectedSeedType.value,
                 zombieType: selectedZombieType.value,
@@ -200,11 +204,7 @@ const app = createApp({
                 easyPlaceMode: easyPlaceMode.value,
                 easyPlaceEnabled: easyPlaceEnabled.value,
             };
-            const state = JSON.stringify({ _clientId: clientId, cheat: cheatOption, placer: placerUpdates });
-            const syncCode = withBootstrap
-                ? `sync_reg.connect('${clientId}', '${state}')`
-                : `sync_reg.apply('${state}')`;
-            send(withBootstrap ? `${PGvZProtocol.BOOTSTRAP_CODE}\n${syncCode}` : syncCode, withBootstrap);
+            return { cheat: { ...cheatOption }, placer: placerUpdates };
         }
 
         watch(
@@ -268,49 +268,27 @@ const app = createApp({
         }
 
         function sendLineupCode() {
-            send(`cheat_option.LineUpOnBoard('${lineupCode.value.trim()}')`);
+            sendAction('applyLineup', { code: lineupCode.value.trim() });
         }
 
         function getLineupCode() {
-            send(`'{"action":"lineup","code":"' + pgvz.lineup.LineUp.from_board(Sexy.GlobalStaticVars.gLawnApp.mBoard).to_str() + '"}'`);
+            sendAction('getLineup');
         }
 
         function AddGridItem() {
-            if (selectedGridItem.value === 'ScaryPot') {
-                let numSun;
-                let potType;
-                switch (selectedScaryPotType.value) {
-                    case 'None':
-                        numSun = 0;
-                        potType = 'none_of(Lawn.ScaryPotType)';
-                        break;
-                    case 'Sun1':
-                        numSun = 1;
-                        potType = 'Lawn.ScaryPotType.Sun';
-                        break;
-                    case 'Sun2':
-                        numSun = 2;
-                        potType = 'Lawn.ScaryPotType.Sun';
-                        break;
-                    case 'Sun3':
-                        numSun = 3;
-                        potType = 'Lawn.ScaryPotType.Sun';
-                        break;
-                    default:
-                        numSun = 0;
-                        potType = `Lawn.ScaryPotType.${selectedScaryPotType.value}`;
-                        break;
-                }
-                send(`placer.AddScaryPotOnBoard(${selectedRow.value}, ${selectedCol.value}, ${potType}, Lawn.GridItemState.${selectedScaryPotAppearance.value}, Lawn.ZombieType.${selectedZombieType.value}, Lawn.SeedType.${selectedSeedType.value}, ${numSun})`);
-            } else {
-                send(`placer.AddGridItemOnBoard(${selectedRow.value}, ${selectedCol.value}, Lawn.GridItemType.${selectedGridItem.value})`);
-            }
+            sendAction('placeGridItem', {
+                row: selectedRow.value,
+                col: selectedCol.value,
+                gridItemType: selectedGridItem.value,
+                potType: selectedScaryPotType.value,
+                appearance: selectedScaryPotAppearance.value,
+                zombieType: selectedZombieType.value,
+                seedType: selectedSeedType.value,
+            });
         }
 
         function setZombies(useNaturalSpawn) {
-            const zombies = selectedSetZbType.value.map(v => `Lawn.ZombieType.${v}`).join(', ');
-            const forceArg = useNaturalSpawn ? '' : ', False';
-            send(`cheat_option.CheatSetZombies([${zombies}]${forceArg})`);
+            sendAction('setZombies', { types: [...selectedSetZbType.value], natural: useNaturalSpawn });
         }
 
         function onSelectLineUp(newVal) {
@@ -390,10 +368,9 @@ const app = createApp({
             scenes,
             currentLineupList,
             dataLabel,
-            send,
+            sendAction,
+            setPlacerOption,
             setWeather,
-            syncCheatOptions,
-            pyBool: PGvZProtocol.pyBool,
             sendCustomCode,
             sendLineupCode,
             getLineupCode,

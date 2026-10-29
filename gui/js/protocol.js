@@ -19,14 +19,30 @@ window.PGvZProtocol = (() => {
         "'{\"action\":\"gameVersion\",\"version\":\"' + Lawn.LawnApp.AppVersionNumber + '\"}'",
     ].join('\n');
 
-    function pyBool(value) {
-        return value ? 'True' : 'False';
+    function pythonString(value) {
+        return "'" + String(value)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/\r/g, '\\r')
+            .replace(/\n/g, '\\n')
+            .replace(/\t/g, '\\t') + "'";
+    }
+
+    function requestCode(clientId, id, kind, details = {}) {
+        const request = { ...details, _clientId: clientId, id, kind };
+        return `gui_dispatcher.submit(${pythonString(JSON.stringify(request))})`;
+    }
+
+    function pollCode(clientId) {
+        return `gui_dispatcher.poll(${pythonString(clientId)})`;
     }
 
     function unwrapReprString(value) {
         if (typeof value !== 'string') return value;
         if ((value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))) {
-            return value.slice(1, -1);
+            const escapes = { '\\': '\\', "'": "'", '"': '"', n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', v: '\v', a: '\x07' };
+            return value.slice(1, -1).replace(/\\(\\|'|"|[nrtbfva]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8})/g,
+                (_, escape) => escape in escapes ? escapes[escape] : String.fromCodePoint(parseInt(escape.slice(1), 16)));
         }
         return value;
     }
@@ -54,6 +70,7 @@ window.PGvZProtocol = (() => {
         GAME_VERSION_PROBE_CODE,
         isLegacyGameVersion,
         parseResultMessage,
-        pyBool,
+        requestCode,
+        pollCode,
     };
 })();

@@ -33,7 +33,7 @@
 ## 网页快捷操作
 
 修改器的“快捷操作”提供“切换全屏”按钮，通过
-`cheat_option.ToggleFullscreen()` 在游戏主线程调用 `GetLawnApp().ToggleFullscreen()`。
+`cheat_actions.ToggleFullscreen()` 是同步方法，由 GUI 分发器在游戏主线程调用 `GetLawnApp().ToggleFullscreen()`。
 此操作不依赖 Board，可用于主菜单或关卡内；不依赖旧主菜单按钮及其图标资源。
 
 ## 源码导航

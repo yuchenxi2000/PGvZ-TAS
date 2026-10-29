@@ -5,8 +5,10 @@ by yuchenxi2000
 """
 from pgvz.version import MOD_VERSION, SUPPORTED_GAME_VERSIONS
 from .cheat import cheat_option, weather
+from .cheat_actions import cheat_actions
 from .placer import placer
 from .sync import sync_reg
+from .dispatcher import gui_dispatcher
 from . import hook
 
 sync_reg.register('cheat', cheat_option)
@@ -17,7 +19,7 @@ __version__ = MOD_VERSION
 __supported_game_versions__ = SUPPORTED_GAME_VERSIONS
 
 __all__ = [
-    "cheat_option", "placer", "weather", "sync_reg",
+    "cheat_option", "cheat_actions", "placer", "weather", "sync_reg", "gui_dispatcher",
     "MOD_VERSION", "SUPPORTED_GAME_VERSIONS",
     "__version__", "__supported_game_versions__",
 ]

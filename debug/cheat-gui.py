@@ -109,13 +109,14 @@ _pgvz_files = (
 _pgvztool_files = (
     'pgvztool/__init__.py',
     'pgvztool/cheat.py',
+    'pgvztool/cheat_actions.py',
+    'pgvztool/dispatcher.py',
     'pgvztool/hook.py',
     'pgvztool/keybinds.py',
     'pgvztool/overlay.py',
     'pgvztool/placer.py',
     'pgvztool/sync.py',
     'pgvztool/tas.py',
-    'pgvztool/util.py',
 )
 _gui_files = [
     'gui/index.html',

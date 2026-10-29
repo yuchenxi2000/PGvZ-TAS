@@ -26,7 +26,7 @@
 是否为终轮。非终轮进入换轮流程；最终由 `LawnApp.CheckForGameEnd()` 增加
 `mSurvivalStage` 并调用 `Board.InitSurvivalStage()`，在原 Board 上重新选卡。
 
-修改器的两个操作都通过 `@main_thread` 在游戏主线程执行，并共用原来的清理僵尸、
+修改器的两个操作位于 `CheatActions`，由 GUI 分发器在游戏主线程同步执行，并共用原来的清理僵尸、
 关闭暂停对话框和调用 `FadeOutLevel()` 的逻辑：
 
 - “直接过关”：有限生存先设置终轮 stage，自定义生存取 `mStages - 1`，内置有限生存取 4；无尽生存保留原 stage，由游戏进入下一轮。

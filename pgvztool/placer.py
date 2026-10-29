@@ -1,12 +1,11 @@
 """
 场地放置 — 植物、僵尸、场地物品、掉落物的放置与移除
-同时提供轻松放置功能（游戏内点击场地直接放置）
+同时提供轻松放置功能（游戏内点击场地直接放置）。方法同步执行，须在主线程调用。
 """
 import Lawn
 import Sexy
 from enum import Enum
 from pgvz import *
-from .util import main_thread
 from .sync import Serializable
 
 def IterPortals(board: Lawn.Board):
@@ -129,7 +128,7 @@ class Placer(Serializable):
             return True
         return False
 
-    # ===== 以下为网页直接调用的放置/移除方法 =====
+    # ===== 同步放置/移除 API，供主线程脚本、游戏钩子及 GUI 分发器调用 =====
 
     def ConvertRange(self, row: int, col: int):
         NRow = 6 if GetBoard().StageHas6Rows() else 5
@@ -148,7 +147,6 @@ class Placer(Serializable):
             col_range = range(col, col + 1)
         return row_range, col_range
 
-    @main_thread
     def PlantOnBoard(self, row: int, col: int, seedtype: Lawn.SeedType, isImitater: bool):
         board = GetBoard()
         if board is None:
@@ -163,7 +161,6 @@ class Placer(Serializable):
                 else:
                     board.AddPlant(col1, row1, seedtype, SeedTypeNone)
 
-    @main_thread
     def RemovePlantOnBoard(self):
         for plant in IterAlivePlants():
             plant.Die()
@@ -197,7 +194,6 @@ class Placer(Serializable):
                 zombieFollower.mPosY = zombieFollower.GetPosYBasedOnRow(row)
                 zombieFollower.mMindControlled = mind_ctrl
 
-    @main_thread
     def ZombieOnBoard(self, row: int, col: int, zombietype: Lawn.ZombieType, mind_ctrl: bool = False):
         board = GetBoard()
         if board is None:
@@ -208,7 +204,6 @@ class Placer(Serializable):
                 xi = board.GridToPixelX(col1, row1)
                 self._ZombieOnBoard(row1, col1, xi, zombietype, mind_ctrl)
 
-    @main_thread
     def RemoveZombieOnBoard(self, enemy_only: bool = False):
         board = GetBoard()
         if board is None:
@@ -218,7 +213,6 @@ class Placer(Serializable):
             if zombie.mHasHead and not zombie.IsDeadOrDying() and (not enemy_only or not zombie.mMindControlled):
                 zombie.DieNoLoot(False)
 
-    @main_thread
     def PlaceIceOnBoard(self, row: int, col: int):
         board = GetBoard()
         if board is None:
@@ -229,7 +223,6 @@ class Placer(Serializable):
             board.mIceMinX[row1] = xi
             board.mIceTimer[row1] = 2147483647
 
-    @main_thread
     def RemoveIceOnBoard(self, row: int, col: int):
         board = GetBoard()
         if board is None:
@@ -248,7 +241,6 @@ class Placer(Serializable):
         else:
             seedpacket.SetPacketType(seedtype, SeedTypeNone)
 
-    @main_thread
     def AddGridItemOnBoard(self, row: int, col: int, gridItemType: Lawn.GridItemType):
         lawnApp = GetLawnApp()
         board = lawnApp.mBoard
@@ -290,7 +282,25 @@ class Placer(Serializable):
                     newGridItem.OpenPortal()
                     board.mGridItems.Add(newGridItem)
 
-    @main_thread
+    def PlaceGridItem(self, row, col, item_type, pot_type, appearance, zombie_type, seed_type):
+        if item_type != Lawn.GridItemType.ScaryPot:
+            return self.AddGridItemOnBoard(row, col, item_type)
+        sun_counts = {'Sun1': 1, 'Sun2': 2, 'Sun3': 3}
+        num_sun = sun_counts.get(pot_type, 0)
+        pot_types = {
+            'None': none_of(Lawn.ScaryPotType),
+            'Seed': Lawn.ScaryPotType.Seed,
+            'Zombie': Lawn.ScaryPotType.Zombie,
+        }
+        if num_sun:
+            native_type = Lawn.ScaryPotType.Sun
+        elif pot_type in pot_types:
+            native_type = pot_types[pot_type]
+        else:
+            raise ValueError('unknown scary pot type: {}'.format(pot_type))
+        return self.AddScaryPotOnBoard(row, col, native_type, appearance,
+                                      zombie_type, seed_type, num_sun)
+
     def AddScaryPotOnBoard(self, row: int, col: int, theScaryPotType: Lawn.ScaryPotType, appearance: Lawn.GridItemState, theZombieType: Lawn.ZombieType, theSeedType: Lawn.SeedType, numSun: int):
         board = GetBoard()
         if board is None:
@@ -311,7 +321,6 @@ class Placer(Serializable):
                 if theScaryPotType == Lawn.ScaryPotType.Sun:
                     newGridItem.mSunCount = numSun
 
-    @main_thread
     def AddLadderSmart(self):
         board = GetBoard()
         if board is None:
@@ -325,7 +334,6 @@ class Placer(Serializable):
                     if plantPumpkin is not None and board.GetLadderAt(col1, row1) is None:  # 没南瓜，或已经有梯子不要搭梯
                         board.AddALadder(col1, row1)
 
-    @main_thread
     def RemoveGridItemOnBoard(self, row: int, col: int, gridItemType: Lawn.GridItemType):
         lawnApp = GetLawnApp()
         board = lawnApp.mBoard
@@ -341,7 +349,6 @@ class Placer(Serializable):
             if griditem.mGridItemType == gridItemType and griditem.mGridX in col_range and griditem.mGridY in row_range:
                 griditem.GridItemDie()
 
-    @main_thread
     def RemoveCoinOnBoard(self, cointype: Lawn.CoinType):
         board = GetBoard()
         if board is None:
@@ -350,7 +357,6 @@ class Placer(Serializable):
             if coin.mType == cointype:
                 coin.Die()
 
-    @main_thread
     def AddCoinOnBoard(self, x: int, y: int, cointype: Lawn.CoinType, seedtype: Lawn.SeedType, reverse: bool):
         board = GetBoard()
         if board is None:
@@ -362,7 +368,6 @@ class Placer(Serializable):
             coin.mPottedPlantSpec.mSeedType = seedtype
             coin.mPottedPlantSpec.mFacing = Lawn.PottedPlant.FacingDirection.Left if reverse else Lawn.PottedPlant.FacingDirection.Right
 
-    @main_thread
     def RemoveTalisman(self):
         board = GetBoard()
         if board is None:
@@ -374,7 +379,6 @@ class Placer(Serializable):
             plant.SetSealing(False)
             plant.mInTalismanCounter = 0
     
-    @main_thread
     def OpenScaryPotterOnBoard(self):
         board = GetBoard()
         if board is None:
@@ -401,6 +405,12 @@ class Placer(Serializable):
         for row in range(NRow):
             self._AddLawnMower(row, Sexy.Constants.BOARD_EXTRA_ROOM - 21 + 40)
     
+    def InfiniteLawnMowers(self):
+        board = GetBoard()
+        if board is None:
+            raise RuntimeError('this action requires an active Board')
+        board.mBonusLawnMowersRemaining = 2147483647
+
     def StartLawnMower(self):
         board = GetBoard()
         if board is None:

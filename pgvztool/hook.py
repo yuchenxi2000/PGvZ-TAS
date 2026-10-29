@@ -13,11 +13,19 @@ from .cheat import cheat_option, weather
 from .placer import placer
 from .tas import tas_manager
 from .keybinds import KeybindHandler
+from .dispatcher import gui_dispatcher
 from .overlay import (
     DrawPlantHpAll, DrawPlantCooldowns, DrawZombieHpAll, DrawCraterCooldowns,
     DrawEasyPlaceUI, DrawSeedPacketNumbers, DrawWaveInfo, DrawSquirrel,
     DrawTasButtons, DrawTasFrameCounter,
 )
+
+# 在 Board 暂停、尚无 Board 或全局慢速跳过逻辑更新时，也处理网页动作。
+# 选择包含加载收尾逻辑的基类实现，避免较短的 LawnApp.DoUpdateFrames 被内联。
+@LawnMod.MonoModUtils.HookTo(Sexy.SexyAppBase.DoUpdateFrames)
+def SexyAppBase__DoUpdateFrames(orig, app: Sexy.SexyAppBase):
+    gui_dispatcher.run_pending()
+    return orig(app)
 
 # 关闭assertion，不然启动带命令行的游戏（Lawn.Console.exe）在输出过多时会卡死
 @LawnMod.MonoModUtils.HookTo(Sexy.Debug.ASSERT)
