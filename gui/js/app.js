@@ -197,6 +197,8 @@ const app = createApp({
                 seedType: selectedSeedType.value,
                 zombieType: selectedZombieType.value,
                 gridItemType: selectedGridItem.value,
+                scaryPotType: selectedScaryPotType.value,
+                scaryPotAppearance: selectedScaryPotAppearance.value,
                 coinType: selectedCoin.value,
                 mindCtrl: mindCtrl.value,
                 potReverse: potLeft.value,
@@ -238,6 +240,8 @@ const app = createApp({
                 if (p.seedType) selectedSeedType.value = p.seedType;
                 if (p.zombieType) selectedZombieType.value = p.zombieType;
                 if (p.gridItemType) selectedGridItem.value = p.gridItemType;
+                if (p.scaryPotType) selectedScaryPotType.value = p.scaryPotType;
+                if (p.scaryPotAppearance) selectedScaryPotAppearance.value = p.scaryPotAppearance;
                 if (p.coinType) selectedCoin.value = p.coinType;
                 if (p.mindCtrl !== undefined) mindCtrl.value = p.mindCtrl;
                 if (p.potReverse !== undefined) potLeft.value = p.potReverse;

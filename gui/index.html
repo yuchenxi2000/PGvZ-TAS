@@ -203,13 +203,13 @@
                                 </div>
                                 <label class="field">
                                     <span>{{ t('fields.scaryPotType') }}</span>
-                                    <el-select v-model="selectedScaryPotType" filterable :placeholder="t('placeholders.scaryPotType')">
+                                    <el-select v-model="selectedScaryPotType" filterable :placeholder="t('placeholders.scaryPotType')" @change="val => setPlacerOption('scaryPotType', val)">
                                         <el-option v-for="item in scaryPotType" :key="item.value" :label="dataLabel(item)" :value="item.value" />
                                     </el-select>
                                 </label>
                                 <label class="field">
                                     <span>{{ t('fields.scaryPotAppearance') }}</span>
-                                    <el-select v-model="selectedScaryPotAppearance" filterable :placeholder="t('placeholders.scaryPotAppearance')">
+                                    <el-select v-model="selectedScaryPotAppearance" filterable :placeholder="t('placeholders.scaryPotAppearance')" @change="val => setPlacerOption('scaryPotAppearance', val)">
                                         <el-option v-for="item in scaryPotAppearance" :key="item.value" :label="dataLabel(item)" :value="item.value" />
                                     </el-select>
                                 </label>

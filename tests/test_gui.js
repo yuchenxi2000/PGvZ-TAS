@@ -120,7 +120,11 @@ test('PC restores its saved options; mobile connects without pushing them', () =
         assert.equal(request.kind, 'connect');
         assert.equal(request._clientId, 'client-1');
         assert.equal('state' in request, !mobile);
-        if (!mobile) assert.equal(request.state.cheat.freePlant, true);
+        if (!mobile) {
+            assert.equal(request.state.cheat.freePlant, true);
+            assert.equal(request.state.placer.scaryPotType, 'Seed');
+            assert.equal(request.state.placer.scaryPotAppearance, 'ScaryPotQuestion');
+        }
         assert.equal(gui.model.connected.value, false);
         ws.message({ action: 'queued', id: request.id });
         gui.runTimer(100);
@@ -150,15 +154,39 @@ test('remote synchronization updates UI without echoing its changes', () => {
     const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
     const count = ws.sent.length;
     ws.message({ action: 'results', results: [{ ...request, ok: true, value: { action: 'sync', state: {
-        cheat: { freePlant: true }, placer: { seedType: 'Sunflower', imitater: true },
+        cheat: { freePlant: true }, placer: {
+            seedType: 'Sunflower', imitater: true,
+            scaryPotType: 'Sun3', scaryPotAppearance: 'ScaryPotZombie',
+        },
         weather: { enabled: true, rain: true, storm: false },
     } } }] });
     gui.flush();
     assert.equal(gui.model.cheatOption.freePlant, true);
     assert.equal(gui.model.selectedSeedType.value, 'Sunflower');
+    assert.equal(gui.model.selectedScaryPotType.value, 'Sun3');
+    assert.equal(gui.model.selectedScaryPotAppearance.value, 'ScaryPotZombie');
     assert.equal(gui.model.weather.value, 'rain');
     assert.equal(ws.sent.length, count + 1);
     assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
+});
+
+test('vase selectors send their options to the easy placer', () => {
+    const gui = loadGui();
+    const ws = gui.bootstrap();
+    for (const [model, field, value] of [
+        ['selectedScaryPotType', 'scaryPotType', 'Sun2'],
+        ['selectedScaryPotAppearance', 'scaryPotAppearance', 'ScaryPotLeaf'],
+    ]) {
+        const tag = [...html.matchAll(/<el-select\b(?:"[^"]*"|[^">])*>/g)]
+            .map(match => match[0]).find(tag => tag.includes(`v-model="${model}"`));
+        const handler = tag.match(/@change="([^"]+)"/)[1];
+        vm.runInNewContext(`(${handler})(value)`, {
+            setPlacerOption: gui.model.setPlacerOption, value,
+        });
+        const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+        assert.equal(request.kind, 'apply');
+        assert.deepEqual(request.state, { placer: { [field]: value } });
+    }
 });
 
 test('actions wait for actual completion and poll only while results are pending', () => {

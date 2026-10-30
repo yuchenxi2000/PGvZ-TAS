@@ -62,6 +62,8 @@ class Placer(Serializable):
         self.seedType = Lawn.SeedType.Peashooter
         self.zombieType = Lawn.ZombieType.Normal
         self.gridItemType = Lawn.GridItemType.Ladder
+        self.scaryPotType = 'Seed'
+        self.scaryPotAppearance = Lawn.GridItemState.ScaryPotQuestion
         self.coinType = Lawn.CoinType.Silver
         self.mindCtrl = False
         self.potReverse = False
@@ -107,7 +109,8 @@ class Placer(Serializable):
             self._ZombieOnBoard(row, col, x, self.zombieType, mind_ctrl=self.mindCtrl, easy_place=True)
             return True
         elif self.easyPlaceMode == 'griditem':
-            self.AddGridItemOnBoard(row, col, self.gridItemType)
+            self.PlaceGridItem(row, col, self.gridItemType, self.scaryPotType,
+                               self.scaryPotAppearance, self.zombieType, self.seedType)
             return True
         elif self.easyPlaceMode == 'coin':
             self.AddCoinOnBoard(x, y, self.coinType, self.seedType, self.potReverse)
