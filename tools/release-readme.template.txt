@@ -41,8 +41,9 @@ PGvZTool v{{MOD_VERSION}} for PGvZ v{{GAME_VERSION}}
 1. 必须先启动游戏，再打开网页控制台。
 2. 如果安装时游戏已经打开，请重启游戏后再使用。
 3. 网页左上角显示“已连接到游戏服务器”后，按钮才会执行到游戏里。
-4. 基础、场地、关卡、出怪与布阵、自定义代码都在网页上方标签页里。
-5. 自定义代码会发送到游戏内 IronPython 环境执行，适合临时运行脚本或调试命令。
+4. 点击网页上方的“基础”“场地”“关卡”“出怪与布阵”“调试”标签，可切换到对应的功能组。
+5. 点击网页右上角的语言选项，可在中文和英文之间切换。
+6. 遇到安装或使用问题，可参看下方“常见问题排查”和“使用调试入口”，尝试按指示排查和修复。
 
 ===== 场地放置 =====
 
@@ -54,10 +55,10 @@ PGvZTool v{{MOD_VERSION}} for PGvZ v{{GAME_VERSION}}
 
 1. 在“场地”页启用轻松放置。
 2. 选择轻松放置模式：植物、僵尸、场地物品、掉落物、割草机、传送门等。
-3. 进入关卡后点击游戏里铲子旁边的 Taco 图标。
+3. 进入关卡后点击游戏里铲子旁边的卷饼图标。
 4. PC：左键放置，右键退出轻松放置。
-5. 安卓：再次点击 Taco 图标退出轻松放置。
-6. 传送门模式可以移动传送门位置。
+5. 安卓：再次点击卷饼图标退出轻松放置。
+6. 传送门模式可以移动传送门关卡中的传送门位置，左键选取要移动的门，在空格子上左键放下。
 
 ===== TAS 工具 =====
 
@@ -81,6 +82,14 @@ pause = Enter
 修改后需重启游戏，并打开网页连接修改器后才能生效。
 已适配中文等常见非英文输入法下的字母和数字快捷键，桌面版还会自动关闭输入法选词框。
 完整配置说明：https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/keybinds.md
+
+===== 自定义代码 =====
+
+“调试”页可发送自定义 Python 代码，在游戏内的 IronPython 环境中执行，用于运行脚本或调试命令。
+使用该功能需了解基本的 Python 语法。建议结合脚本编写文档、本项目源码及所用游戏版本的反编译代码，编写并核对操作。
+
+脚本编写文档：https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/scripting.md
+项目源码：https://github.com/yuchenxi2000/PGvZ-TAS
 
 ===== 常见问题排查 =====
 
@@ -111,6 +120,7 @@ pause = Enter
    安装或替换入口和 Python 包后必须完全重启游戏，只刷新网页不会重新加载 Python 文件。
    确认 pgvz 和 pgvztool 来自同一发布包。完全退出游戏，删除这两个旧目录后重新复制；如果网页执行结果显示包导入异常，也应先重新复制它们。
    仍然无效时，按下方“使用调试入口”操作，重点查看 pgvz 和 pgvztool 文件检查结果。若文件检查为 OK，请保留网页“执行结果”中的完整异常信息。
+   如果只有某个功能无法使用，而其他功能正常，请先确认游戏和修改器均为最新版本；若均为最新版本且问题仍存在，请到本项目 GitHub 提交 issue（https://github.com/yuchenxi2000/PGvZ-TAS/issues）。旧版本修改器的 bug 不会修复。
 
 5. 安卓上启动黑屏或闪退
    如果同时安装了很多模组，游戏初始化时可能加载太慢。可以先移除其他模组，只保留本修改器再试。
@@ -232,8 +242,9 @@ Option 2: manual install
 1. Start the game before opening the web console.
 2. If the game was already running during installation, restart it.
 3. Buttons only affect the game after the page shows that it is connected to the game server.
-4. The top tabs contain Basics, Board, Stage, Spawns & Lineup, and Custom Code.
-5. Custom Code is executed in the game's IronPython environment.
+4. Click the Basics, Board, Stage, Spawns & Lineup, or Debug tab at the top of the page to switch between feature groups.
+5. Use the language selector in the upper-right corner to switch between Chinese and English.
+6. If you encounter installation or usage problems, see Troubleshooting and Using the Debug Entry below and follow the instructions to diagnose and resolve them.
 
 ===== Board Placement =====
 
@@ -248,7 +259,7 @@ Option 2: manual install
 3. Enter a level and click the Taco icon next to the shovel in-game.
 4. PC: left-click to place, right-click to exit.
 5. Android: tap the Taco icon again to exit.
-6. Portal mode can move portals.
+6. Portal mode lets you move portals in portal levels. Left-click a portal to select it, then left-click an empty grid cell to place it there.
 
 ===== TAS Tool =====
 
@@ -272,6 +283,14 @@ pause = Enter
 Restart the game after editing the file, then open and connect the web console to load the keybinds.
 Letter and number shortcuts support common non-English input methods. On desktop, IME candidate windows are also dismissed automatically.
 Full configuration guide: https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/keybinds.md
+
+===== Custom Code =====
+
+Use the Debug tab to run custom Python scripts or debugging commands in the game's IronPython environment.
+This feature requires a basic understanding of Python syntax. Refer to the scripting guide, this project's source code, and the decompiled code for your game version when writing and checking your commands.
+
+Scripting guide (Chinese): https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/scripting.md
+Project source: https://github.com/yuchenxi2000/PGvZ-TAS
 
 ===== Troubleshooting =====
 
@@ -302,6 +321,7 @@ Full configuration guide: https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/doc
    Fully restart the game after installing or replacing the entry and Python packages. Refreshing the page does not reload Python files in the game.
    Make sure pgvz and pgvztool came from the same release package. Fully exit the game, delete both old directories, and copy them again. If the page reports a package-import error, recopy these directories first.
    If buttons still do nothing, follow “Using the Debug Entry” below and inspect the pgvz and pgvztool file checks. If the check says OK, preserve the complete error shown in the page's execution result.
+   If one feature does not work while others work normally, first make sure both the game and the mod are up to date. If the problem persists with the latest versions, open an issue on this project's GitHub: https://github.com/yuchenxi2000/PGvZ-TAS/issues. Bugs in older mod versions will not be fixed.
 
 5. Android black screen or crash on startup
    Too many mods can slow down initialization. Try removing other mods and keeping only this tool.

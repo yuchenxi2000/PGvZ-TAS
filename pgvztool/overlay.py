@@ -50,10 +50,22 @@ def DrawPlantHpAll(board: Lawn.Board, g: Sexy.Graphics):
     for gridX in range(NCol):
         for gridY in range(NRow):
             plant = board.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.EatingOrder)
+            if plant is None:
+                # 只有咖啡豆时 EatingOrder 为空，但咖啡豆仍能被啃食。
+                plant = board.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.OnlyFlying)
             if plant is not None:
-                DrawPlantHp(plant, g, 10, 60, color1, color2)
+                if plant.mSeedType != Lawn.SeedType.Cobcannon:
+                    DrawPlantHp(plant, g, 10, 60, color1, color2)
+                elif gridX == plant.mPlantCol:
+                    # 两格查询返回同一门炮，只在左格画；右格有南瓜时也使用上层血条。
+                    if board.GetTopPlantAt(gridX + 1, gridY, Lawn.TopPlant.OnlyPumpkin) is not None:
+                        DrawPlantHp(plant, g, 10, 50, color3, color4)
+                    else:
+                        DrawPlantHp(plant, g, 10, 60, color1, color2)
                 plant2 = board.GetTopPlantAt(gridX, gridY, Lawn.TopPlant.CatapultOrder)
-                if plant2 is not None and plant is not plant2:
+                if (plant2 is not None and plant is not plant2
+                        and (plant2.mSeedType != Lawn.SeedType.Cobcannon
+                             or gridX == plant2.mPlantCol)):
                     DrawPlantHp(plant2, g, 10, 50, color3, color4)
     g.SetColorizeImages(False)
 
