@@ -376,7 +376,7 @@ def Plant__FindTargetZombie(orig, plant: Lawn.Plant, theRow: int, thePlantWeapon
         return None
     return orig(plant, theRow, thePlantWeapon)
 
-# 玉米炮无冷却, 僵尸无敌修改大嘴花，大嘴花无冷却，土豆雷无冷却
+# 玉米炮、大嘴花、土豆雷无冷却，僵尸无敌时大嘴花咬空，植物无敌时莴苣挡车后存活
 @LawnMod.MonoModUtils.HookTo(Lawn.Plant.Update)
 def Plant__Update(orig, plant: Lawn.Plant):
     if plant.mState == Lawn.PlantState.CobcannonArming and cheat_option.cobNoCooling:
@@ -386,6 +386,11 @@ def Plant__Update(orig, plant: Lawn.Plant):
     elif plant.mState == Lawn.PlantState.ChomperDigesting and cheat_option.chomperNoCooling:
         plant.mStateCountdown = 0
     elif plant.mSeedType == Lawn.SeedType.Potatomine and cheat_option.potatoNoCooling:
+        plant.mStateCountdown = 0
+    elif plant.mState == Lawn.PlantState.UmbrellaDeathTriggered and cheat_option.plantNoDie:
+        plant.mState = Lawn.PlantState.UmbrellaTriggered
+    elif plant.mState == Lawn.PlantState.UmbrellaDeathReflecting and cheat_option.plantNoDie:
+        plant.mState = Lawn.PlantState.UmbrellaReflecting
         plant.mStateCountdown = 0
     orig(plant)
 
