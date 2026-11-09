@@ -99,12 +99,15 @@ ready = app is not None and app.mLoadingThreadStarted
 
 ### 游戏版本警告
 
-启动就绪后，GUI 先通过 `import Lawn` 读取 `Lawn.LawnApp.AppVersionNumber`，用于旧版本警告，再发送
-`BOOTSTRAP_CODE` 导入 `pgvz` 和 `pgvztool`。若 `PGvZ x.y.z` 中的版本低于 1.3.0，网页额外
-显示警告，提示用户升级游戏或下载旧版本修改器。此检查不会阻止
-后续引导；即使版本过旧，网页仍会继续尝试加载修改器。
-保留加载前探测，确保包导入失败时仍能提示旧版本；页眉游戏版本由后续 `sync` 消息中的
-`gameVersion` 提供，直接使用 `pgvz.__game_version__` 的版本字符串（如 `"1.3.2"`）。
+启动就绪后，GUI 通过 `Lawn.LawnApp.AppVersionNumber` 获取游戏版本，并单独执行
+`mods/pgvz/version.py` 读取 `MOD_VERSION` 和 `SUPPORTED_GAME_VERSIONS`。版本文件只声明
+常量，在独立的命名空间执行时不会触发 `pgvz/__init__.py`。探测返回 `gameVersion` 消息，
+包含实际游戏版本 `version`、修改器版本 `modVersion` 和支持列表 `supportedVersions`。
+
+网页页眉的两个版本号均来自探测。实际游戏版本不在列表中时，网页显示警告并列出受支持
+的版本。高于最高支持版本时提示下载新版修改器，其余不匹配情况提示更新游戏。随后网页
+继续尝试导入 `pgvz` 和 `pgvztool`。即使包导入失败，已获取的版本和警告仍会显示。探测
+缺少某个版本号时，页眉对应项显示占位符，网页继续引导。
 
 ### JSON 编码和 Python 字符串
 

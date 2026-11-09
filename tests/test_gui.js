@@ -8,6 +8,7 @@ const { test } = require('node:test');
 const root = path.resolve(__dirname, '..');
 const storageKey = 'pgvz-gui-checkbox-state';
 const html = fs.readFileSync(path.join(root, 'gui/index.html'), 'utf8');
+const gameVersionProbe = { action: 'gameVersion', version: '1.3.4', modVersion: '1.16.0', supportedVersions: ['1.3.3', '1.3.4'] };
 
 function reprString(value) {
     return "'" + value.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n') + "'";
@@ -73,7 +74,7 @@ function loadGui({ mobile = false, saved = {} } = {}) {
         const ws = sockets.at(-1);
         ws.open();
         ws.message({ action: 'bootstrapReady', ready: true });
-        ws.message({ action: 'gameVersion', version: 'PGvZ 1.3.4' });
+        ws.message(gameVersionProbe);
         const request = JSON.parse(decodeCall(ws.sent.at(-1).split('\n').at(-1)).args[0]);
         ws.message({ action: 'queued', id: request.id });
         runTimer(100);
@@ -104,6 +105,47 @@ test('business UI only uses action and state APIs', () => {
     assert.doesNotMatch(html, /\bsend\(/);
 });
 
+test('header versions and exact support-list warning survive an import error', () => {
+    const gui = loadGui();
+    const advice = {
+        mod: { en: 'Please download a newer version of the mod.', zh: '请下载新版修改器。' },
+        game: { en: 'Please update the game.', zh: '请更新游戏。' },
+    };
+    for (const [version, supportedVersions, update] of [
+        ['1.2.6', gameVersionProbe.supportedVersions, 'game'],
+        ['1.3.10', gameVersionProbe.supportedVersions, 'mod'],
+        ['1.4.0', ['1.3.10', '1.3.4'], 'mod'],
+        ['1.3.9', ['1.3.10', '1.3.4'], 'game'],
+        ['1.3.4-beta', gameVersionProbe.supportedVersions, 'game'],
+        ['1.3.4', gameVersionProbe.supportedVersions, null],
+        ['1.3.5', [], null],
+        ['', gameVersionProbe.supportedVersions, null],
+    ]) {
+        const ws = gui.sockets.at(-1);
+        ws.open();
+        ws.message({ action: 'bootstrapReady', ready: true });
+        assert.equal(ws.sent.at(-1), gui.context.PGvZProtocol.GAME_VERSION_PROBE_CODE);
+        ws.message({ ...gameVersionProbe, version, supportedVersions });
+        assert.match(ws.sent.at(-1), /from pgvz import \*/);
+        ws.onmessage({ data: JSON.stringify({ statuscode: 1, errortype: 'ImportError', error: 'missing game API' }) });
+        assert.equal(gui.model.connected.value, false);
+        assert.equal(gui.model.gameVersion.value, version);
+        assert.equal(gui.model.modVersion.value, gameVersionProbe.modVersion);
+        assert.equal(gui.model.unsupportedGameVersion.value, Boolean(update));
+        const versions = supportedVersions.join(', ');
+        gui.model.setLanguage('en');
+        assert.equal(gui.model.unsupportedGameVersionDetail.value,
+            update ? `This mod supports game versions ${versions}. ${advice[update].en}` : '');
+        gui.model.setLanguage('zh');
+        assert.equal(gui.model.unsupportedGameVersionDetail.value,
+            update ? `此修改器支持的游戏版本为 ${versions}。${advice[update].zh}` : '');
+        ws.close();
+        assert.equal(gui.model.modVersion.value, '');
+        assert.equal(gui.model.unsupportedGameVersion.value, false);
+        gui.runTimer(3000);
+    }
+});
+
 test('PC restores its saved options; mobile connects without pushing them', () => {
     const saved = { cheat: { freePlant: true, autoCollect: false }, placer: { imitater: true } };
     for (const mobile of [false, true]) {
@@ -113,7 +155,7 @@ test('PC restores its saved options; mobile connects without pushing them', () =
         ws.message({ action: 'bootstrapReady', ready: false });
         gui.runTimer(100);
         ws.message({ action: 'bootstrapReady', ready: true });
-        ws.message({ action: 'gameVersion', version: 'PGvZ 1.3.4' });
+        ws.message(gameVersionProbe);
         const call = decodeCall(ws.sent.at(-1).split('\n').at(-1));
         assert.equal(call.name, 'submit');
         const request = JSON.parse(call.args[0]);
@@ -129,8 +171,12 @@ test('PC restores its saved options; mobile connects without pushing them', () =
         ws.message({ action: 'queued', id: request.id });
         gui.runTimer(100);
         assert.equal(decodeCall(ws.sent.at(-1)).name, 'poll');
-        ws.message({ action: 'results', results: [{ ...request, ok: true, value: { action: 'sync', state: {} } }] });
+        ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
+            action: 'sync', gameVersion: '1.3.0', modVersion: '1.15.1', state: {},
+        } }] });
         assert.equal(gui.model.connected.value, true);
+        assert.equal(gui.model.gameVersion.value, gameVersionProbe.version);
+        assert.equal(gui.model.modVersion.value, gameVersionProbe.modVersion);
         assert.equal(gui.model.cheatOption.freePlant, !mobile);
     }
 });
@@ -288,7 +334,7 @@ test('failed initial synchronization clears queued commands and stops polling', 
     ws.open();
     gui.model.sendAction('winLevel');
     ws.message({ action: 'bootstrapReady', ready: true });
-    ws.message({ action: 'gameVersion', version: 'PGvZ 1.3.4' });
+    ws.message(gameVersionProbe);
     const connect = JSON.parse(decodeCall(ws.sent.at(-1).split('\n').at(-1)).args[0]);
     ws.message({ action: 'queued', id: connect.id });
     gui.runTimer(100);

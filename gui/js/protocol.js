@@ -15,8 +15,29 @@ window.PGvZProtocol = (() => {
     ].join('\n');
 
     const GAME_VERSION_PROBE_CODE = [
-        'import Lawn',
-        "'{\"action\":\"gameVersion\",\"version\":\"' + Lawn.LawnApp.AppVersionNumber + '\"}'",
+        'def _pgvz_gui_probe_game_version():',
+        '    import json',
+        '    version = ""',
+        '    mod_version = ""',
+        '    supported = []',
+        '    try:',
+        '        import Lawn',
+        '        version = Lawn.LawnApp.AppVersionNumber.split()[1]',
+        '    except (ImportError, AttributeError, IndexError):',
+        '        pass',
+        // 直接执行纯版本声明文件，避免触发 pgvz/__init__.py。
+        '    try:',
+        '        path = "mods/pgvz/version.py"',
+        '        metadata = {}',
+        '        with open(path, "rb") as source:',
+        '            exec(compile(source.read(), path, "exec"), metadata)',
+        '        mod_version = metadata.get("MOD_VERSION", "")',
+        '        supported = metadata.get("SUPPORTED_GAME_VERSIONS", [])',
+        '    except (OSError, ValueError, SyntaxError):',
+        '        pass',
+        '    return json.dumps({"action": "gameVersion", "version": version,',
+        '                       "modVersion": mod_version, "supportedVersions": supported})',
+        '_pgvz_gui_probe_game_version()',
     ].join('\n');
 
     function pythonString(value) {
@@ -64,19 +85,10 @@ window.PGvZProtocol = (() => {
         }
     }
 
-    function isLegacyGameVersion(versionLabel) {
-        const match = String(versionLabel || '').match(/(\d+)\.(\d+)\.(\d+)/);
-        if (!match) return false;
-        const major = Number(match[1]);
-        const minor = Number(match[2]);
-        return major < 1 || (major === 1 && minor < 3);
-    }
-
     return {
         BOOTSTRAP_READY_PROBE_CODE,
         BOOTSTRAP_CODE,
         GAME_VERSION_PROBE_CODE,
-        isLegacyGameVersion,
         parseResultMessage,
         requestCode,
         pollCode,

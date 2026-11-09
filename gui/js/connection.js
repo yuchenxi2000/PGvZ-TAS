@@ -3,7 +3,7 @@ window.PGvZConnection = (() => {
     const REQUEST_TIMEOUT_MS = 30000;
     const POLL_TIMEOUT_MS = 5000;
     function create({ isMobile, t, setResult, getInitialState, applySyncState, lineupCode }) {
-        const { ref } = Vue;
+        const { computed, ref } = Vue;
         const wsParams = new URLSearchParams(location.search);
         const SERVER_URL = wsParams.get('ws') || 'ws://localhost:8080/Py';
         const clientId = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
@@ -11,8 +11,10 @@ window.PGvZConnection = (() => {
             : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
         const connected = ref(false);
         const sessionRejected = ref(false);
-        const legacyGameVersionWarning = ref(false);
         const gameVersion = ref('');
+        const supportedGameVersions = ref([]);
+        const unsupportedGameVersion = computed(() => Boolean(gameVersion.value)
+            && supportedGameVersions.value.length > 0 && !supportedGameVersions.value.includes(gameVersion.value));
         const modVersion = ref('');
         const connectionState = ref('disconnected');
 
@@ -180,8 +182,6 @@ window.PGvZConnection = (() => {
                 showSessionRejected();
             } else if (message.action === 'sync' && message.state) {
                 setResult(true, 'messages.syncOk');
-                modVersion.value = String(message.modVersion || '');
-                gameVersion.value = String(message.gameVersion || '');
                 applySyncState(message.state);
                 markConnected();
                 startHeartbeat();
@@ -288,6 +288,7 @@ window.PGvZConnection = (() => {
                 bootstrapStarted = false;
                 connected.value = false;
                 gameVersion.value = '';
+                supportedGameVersions.value = [];
                 modVersion.value = '';
                 connectionState.value = 'connecting';
                 requestBootstrapReady();
@@ -306,7 +307,9 @@ window.PGvZConnection = (() => {
                                 retryBootstrapReady();
                             }
                         } else if (message && message.action === 'gameVersion') {
-                            legacyGameVersionWarning.value = PGvZProtocol.isLegacyGameVersion(message.version);
+                            gameVersion.value = String(message.version || '');
+                            modVersion.value = String(message.modVersion || '');
+                            supportedGameVersions.value = Array.isArray(message.supportedVersions) ? message.supportedVersions : [];
                             startBootstrap();
                         } else if (message && message.action === 'queued') {
                             scheduleResultPoll();
@@ -359,7 +362,7 @@ window.PGvZConnection = (() => {
         }
 
         return {
-            clientId, connected, sessionRejected, legacyGameVersionWarning,
+            clientId, connected, sessionRejected, unsupportedGameVersion, supportedGameVersions,
             gameVersion, modVersion, connectionState,
             send, sendAction, applyState, refreshState, connect, releaseSession,
         };

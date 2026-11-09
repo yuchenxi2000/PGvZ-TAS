@@ -6,6 +6,10 @@ const i18n = PGvZI18n.createI18n(initialLanguage);
 
 const { readCheckboxState, writeCheckboxState, savedBoolean } = PGvZOptions;
 
+function gameVersionParts(version) {
+    return /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(version)?.slice(1).map(Number);
+}
+
 const SwitchRow = {
     props: {
         label: { type: String, required: true },
@@ -141,13 +145,28 @@ const app = createApp({
 
         let applyingRemoteState = false;
         const {
-            connected, sessionRejected, legacyGameVersionWarning,
+            connected, sessionRejected, unsupportedGameVersion, supportedGameVersions,
             gameVersion, modVersion, connectionState,
             send, sendAction, applyState, connect, releaseSession,
         } = PGvZConnection.create({
             isMobile, t, setResult, getInitialState, applySyncState, lineupCode,
         });
         const statusText = computed(() => t(`status.${connectionState.value}`));
+        const unsupportedGameVersionDetail = computed(() => {
+            if (!unsupportedGameVersion.value) return '';
+            const versions = supportedGameVersions.value;
+            const current = gameVersionParts(gameVersion.value);
+            const newerThanSupported = current && versions.every(version => {
+                const supported = gameVersionParts(version);
+                if (!supported) return false;
+                const difference = current[0] - supported[0] || current[1] - supported[1] || current[2] - supported[2];
+                return difference > 0;
+            });
+            const advice = newerThanSupported ? 'downloadNewerMod' : 'updateGame';
+            return t('messages.unsupportedGameVersionDetail')
+                .replace('{versions}', versions.join(', '))
+                .replace('{advice}', t(`messages.${advice}`));
+        });
 
         function dataLabel(item) {
             if (language.value === 'zh') return item.label;
@@ -312,7 +331,8 @@ const app = createApp({
             optionLabel,
             connected,
             sessionRejected,
-            legacyGameVersionWarning,
+            unsupportedGameVersion,
+            unsupportedGameVersionDetail,
             gameVersion,
             modVersion,
             statusText,

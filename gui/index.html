@@ -37,9 +37,9 @@
                 :closable="false"
             ></el-alert>
             <el-alert
-                v-if="legacyGameVersionWarning"
-                :title="t('messages.legacyGameVersionTitle')"
-                :description="t('messages.legacyGameVersionDetail')"
+                v-if="unsupportedGameVersion"
+                :title="t('messages.unsupportedGameVersionTitle')"
+                :description="unsupportedGameVersionDetail"
                 type="warning"
                 show-icon
                 :closable="false"
