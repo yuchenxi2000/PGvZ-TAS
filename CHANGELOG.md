@@ -1,5 +1,12 @@
 # 更新日志
 
+## [unreleased]
+
+### 新增
+
+- 新增仙人掌伸长与射击节奏文档，记录对空、屋顶高差和“我是僵尸”模式下的攻击间隔，并补充与原版 PvZ 的射速差异。
+- 补充叶子保护伞能弹开僵王博士扔的车的特性。
+
 ## [1.16.0] - 2026-10-31
 
 ### 新增
@@ -419,6 +426,7 @@
 - 修复安卓部分区域无法自动收集、移除天尸诅咒不完整，以及过长命令结果挤出网页界面的问题。
 - 进入月夜无尽前检查屋顶无尽存档，避免未经提示直接覆盖。
 
+[unreleased]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.16.0...HEAD
 [1.16.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.16.0
 [1.15.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.15.1
 [1.15.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.15.0
