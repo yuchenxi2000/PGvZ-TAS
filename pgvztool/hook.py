@@ -60,6 +60,26 @@ def SeedChooserScreen__SeedNotAllowedToPick(orig, seedChooser: Lawn.SeedChooserS
         return False
     return orig(seedChooser, seedType)
 
+# 选卡和开场放置共用此判定；库存和选中状态由原版处理。
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.CanPlaceRake)
+def Board__CanPlaceRake(orig, board: Lawn.Board):
+    if cheat_option.unlockRake:
+        return True
+    return orig(board)
+
+# 僵王等关卡在选卡前已布置场地，确认选卡后需要补放萝丝。
+@LawnMod.MonoModUtils.HookTo(Lawn.SeedChooserScreen.CloseSeedChooser)
+def SeedChooserScreen__CloseSeedChooser(orig, seed_chooser: Lawn.SeedChooserScreen):
+    orig(seed_chooser)
+    if not cheat_option.unlockRake:
+        return
+
+    board = seed_chooser.mBoard
+    cutscene = board.mCutScene
+    if (board.mDoPlaceRose and cutscene.mPlacedLawnItems
+            and not cutscene.IsSurvivalRepick() and board.GetRake() is None):
+        board.PlaceRake()
+
 # 房主无敌
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.ZombiesWon)
 def Board__ZombiesWon(orig, board: Lawn.Board, zombie: Lawn.Zombie):

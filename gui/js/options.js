@@ -33,6 +33,7 @@ window.PGvZOptions = (() => {
                 'skipLevelIntro',
                 'freePlant',
                 'unlockBannedSeeds',
+                'unlockRake',
                 'noCooldown',
                 'plantAnyWhere',
                 'infSun',

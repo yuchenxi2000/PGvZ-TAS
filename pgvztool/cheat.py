@@ -21,6 +21,7 @@ class CheatOption(Serializable):
         self.wontLose = False
         self.freePlant = False
         self._unlockBannedSeeds = False
+        self.unlockRake = False
         self.plantAnyWhere = False
         self.plantNoDie = False
         self.zombieNoDie = False
