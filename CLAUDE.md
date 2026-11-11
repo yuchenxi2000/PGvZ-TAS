@@ -15,6 +15,7 @@ The mod has its own version number and supports only the latest game versions de
 ### Documentation and reverse engineering
 
 - Before decompiling the game, search `docs/` and `typings/`; the relevant behavior may already be documented.
+- Use the [documentation index](docs/README.md). Store mod user guides in `docs/mod/user-guide/`, implementation details in `docs/mod/internals/`, and game mechanics in `docs/game-mechanics/{plants,zombies,levels,other}/` according to the main topic. Keep document links synchronized when moving files.
 - Record durable discoveries about game internals in a focused Chinese document under `docs/`, one topic per file. Keep this file limited to agent workflow, constraints, and navigation.
 - Use the locally configured decompiled game source when implementation depends on current game internals. If its location is unavailable, ask the user.
 
@@ -30,15 +31,15 @@ The mod has its own version number and supports only the latest game versions de
 | `typings/` | Editor-only game and .NET type stubs |
 | `tests/` | CPython unit tests for framework logic that can run outside the game |
 
-The game scans only top-level `mods/*.py` files. Package directories are not auto-loaded. `cheat-gui.py` starts the HTTP server during game startup; `pgvz` and `pgvztool` are imported later by the WebSocket bootstrap in `gui/js/protocol.js` when a GUI connects. See [installation and loading](docs/install.md) and the [GUI protocol](docs/cheat-gui-protocol.md).
+The game scans only top-level `mods/*.py` files. Package directories are not auto-loaded. `cheat-gui.py` starts the HTTP server during game startup; `pgvz` and `pgvztool` are imported later by the WebSocket bootstrap in `gui/js/protocol.js` when a GUI connects. See [installation and loading](docs/mod/user-guide/install.md) and the [GUI protocol](docs/mod/internals/cheat-gui-protocol.md).
 
 ## Implementation constraints
 
-- Runtime code must remain compatible with IronPython. Use `none_of(EnumType)` for C# enum members named `None`, quote modern annotations such as `'list[int]'`, and access game objects on the main game thread. See [IronPython and hooking notes](docs/scripting.md#5-ironpython-与-net-注意事项).
+- Runtime code must remain compatible with IronPython. Use `none_of(EnumType)` for C# enum members named `None`, quote modern annotations such as `'list[int]'`, and access game objects on the main game thread. See [IronPython and hooking notes](docs/mod/user-guide/scripting.md#5-ironpython-与-net-注意事项).
 - `debug/cheat-gui.py` hard-codes the expected installation files in `_pgvz_files`, `_pgvztool_files`, and `_gui_files`. Whenever files are added, removed, renamed, or moved under those directories, update the corresponding list; verify all three lists against the actual directory structure before committing.
-- Put cheat-mod `@HookTo` functions in `pgvztool/hook.py`. The framework driver hooks in `pgvz/__init__.py` are the intentional exception. Before changing a hook, inspect the current decompiled caller and the [hooking guide](docs/scripting.md#6-挂钩游戏方法); small methods may be inlined.
-- Before changing overlays or coordinate conversions, read [the rendering and coordinate-system document](docs/rendering.md).
-- Before changing WebSocket messages, client sessions, synchronization, persistence, or cheat toggles, read [the GUI protocol](docs/cheat-gui-protocol.md). Keep all user-facing option labels in both Chinese and English.
-- Before changing script scheduling or time operations, read [the scripting guide](docs/scripting.md) and, where relevant, [the zombie-spawning timing document](docs/zombie-spawning.md).
-- Before changing global or Board-local speed control, read [the speed-control document](docs/speed-control.md).
-- Before changing TAS save/undo/redo behavior, read [the TAS document](docs/tas.md).
+- Put cheat-mod `@HookTo` functions in `pgvztool/hook.py`. The framework driver hooks in `pgvz/__init__.py` are the intentional exception. Before changing a hook, inspect the current decompiled caller and the [hooking guide](docs/mod/user-guide/scripting.md#6-挂钩游戏方法); small methods may be inlined.
+- Before changing overlays or coordinate conversions, read [the rendering and coordinate-system document](docs/game-mechanics/other/rendering.md).
+- Before changing WebSocket messages, client sessions, synchronization, persistence, or cheat toggles, read [the GUI protocol](docs/mod/internals/cheat-gui-protocol.md). Keep all user-facing option labels in both Chinese and English.
+- Before changing script scheduling or time operations, read [the scripting guide](docs/mod/user-guide/scripting.md) and, where relevant, [the zombie-spawning timing document](docs/game-mechanics/levels/zombie-spawning.md).
+- Before changing global or Board-local speed control, read [the speed-control document](docs/game-mechanics/other/speed-control.md).
+- Before changing TAS save/undo/redo behavior, read [the TAS document](docs/mod/internals/tas.md).

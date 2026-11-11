@@ -304,7 +304,7 @@ Zombie.CheckIfPreyCaught（状态、攻击节拍、魅惑等前置条件）
 
 这些前置排除作用于遍历候选，最终返回的是同格优先级查询结果。
 该方法没有直接复用 `CanTargetPlant`，不能把近战种类免疫直接套给所有弹丸。
-完整子弹更新和碰撞流程见 [子弹机制](projectiles.md)。
+完整子弹更新和碰撞流程见 [子弹机制](../other/projectiles.md)。
 
 ## 7. 铲子与鼠标选取为何不是只看 `DiggingOrder`
 

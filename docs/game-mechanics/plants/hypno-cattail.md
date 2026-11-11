@@ -10,7 +10,7 @@
 
 `Zombie.ApplyMindControl()` 返回 `void`，只有在目标未被魅惑、未死亡或进入死亡过程，且类型不属于 `Boss`、`RobotTitan`、`RedeyeRobotTitan`、`Gargantuar`、`RedeyeGargantuar`、`Zamboni`、`Catapult`、`Bungee` 或带雪橇的 `Bobsled` 小队时，才会调用 `StartMindControlled()`。条件不满足时它直接结束，并不会告知 `Projectile.DoImpact` 魅惑失败。
 
-因此，随机判定命中但目标无法魅惑时，子弹已经造成一次伤害，却因 `DoImpact` 的提前返回没有执行 `Die()`。追踪弹仍保留原目标；只要下一游戏逻辑帧它仍与目标重叠，且目标仍满足 `EffectedByDamage`，`Projectile.UpdateNormalMotion → CheckForCollision → DoImpact` 就会再次造成伤害。原版也可能发生，但后续某次随机判定未命中会销毁子弹；“魅惑香蒲必能魅惑”开启后，每次判定都命中，这条销毁路径不会触发，因而更容易持续出现帧伤。目标脱离碰撞范围、失去受伤资格或子弹离开场地时，重复命中会停止。启用[所有僵尸可被魅惑](zombie-mind-control.md)后，原本免疫魅惑的存活目标也会进入魅惑状态，避免因类型免疫而反复命中。
+因此，随机判定命中但目标无法魅惑时，子弹已经造成一次伤害，却因 `DoImpact` 的提前返回没有执行 `Die()`。追踪弹仍保留原目标；只要下一游戏逻辑帧它仍与目标重叠，且目标仍满足 `EffectedByDamage`，`Projectile.UpdateNormalMotion → CheckForCollision → DoImpact` 就会再次造成伤害。原版也可能发生，但后续某次随机判定未命中会销毁子弹；“魅惑香蒲必能魅惑”开启后，每次判定都命中，这条销毁路径不会触发，因而更容易持续出现帧伤。目标脱离碰撞范围、失去受伤资格或子弹离开场地时，重复命中会停止。启用[所有僵尸可被魅惑](../zombies/zombie-mind-control.md)后，原本免疫魅惑的存活目标也会进入魅惑状态，避免因类型免疫而反复命中。
 
 `HypnoCattailSpike` 的默认伤害为每次命中 20；创意关卡的 `CSOverrideProjectileProperty` 可以覆盖这个数值，护盾、头盔等受伤规则也会影响实际扣血。“帧伤”指每个发生重叠碰撞的**游戏逻辑帧**重复调用伤害，不保证每个显示帧都扣除 20 点生命。
 

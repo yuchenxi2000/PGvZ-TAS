@@ -17,7 +17,7 @@
 | Redo | 读档前进 |
 | Adv | 逐帧（取消暂停，跑 1 帧后自动暂停） |
 
-四个按钮的默认快捷键依次为 `u` / `i` / `o` / `p`，可通过 `keybinds.txt` 中的 `tas_save` / `tas_undo` / `tas_redo` / `tas_advance` 重新绑定，详见 [keybinds.md](keybinds.md)。
+四个按钮的默认快捷键依次为 `u` / `i` / `o` / `p`，可通过 `keybinds.txt` 中的 `tas_save` / `tas_undo` / `tas_redo` / `tas_advance` 重新绑定，详见 [keybinds.md](../user-guide/keybinds.md)。
 
 下方显示 `Frame: {mMainCounter}`，方便定位时间点。
 

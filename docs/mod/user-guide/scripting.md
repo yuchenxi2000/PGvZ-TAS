@@ -5,14 +5,14 @@
 [面向 PyVZ、AvZ 用户的快速上手](#七面向-pyvzavz-用户的快速上手)。
 
 PGvZ-TAS 只支持项目声明的最新游戏版本。PGvZ 与原版 PvZ 的关系和已知机制差异见
-[PGvZ 与 PvZ 的异同](pgvz-vs-pvz.md)。
+[PGvZ 与 PvZ 的异同](../../game-mechanics/other/pgvz-vs-pvz.md)。
 
 本文的 API 参考仅覆盖 `from pgvz import *` 引入的公开接口。游戏内部的 C# API 不在
 本文中逐项列出；需要使用内部能力时，请参考[进阶教程](#八进阶教程)。
 
 ## 阅读导航
 
-- 了解适用的游戏机制：[PGvZ 与 PvZ 的异同](pgvz-vs-pvz.md)
+- 了解适用的游戏机制：[PGvZ 与 PvZ 的异同](../../game-mechanics/other/pgvz-vs-pvz.md)
 - 第一次编写脚本：[快速开始](#一快速开始) → [脚本如何运行](#二脚本如何运行) →
   [脚本运行](#四脚本运行)
 - 查询框架接口：[公开 API 说明](#三公开-api-说明)
@@ -104,8 +104,8 @@ script_demo = script_manager.Register(
 - `Prejudge(t, wave)` 和 `Until(t)` 的 `t` 都以目标波实际刷新点为 0；负数表示刷新前，
   正数表示刷新后。
 
-坐标系统的完整说明见[坐标与绘制](rendering.md)。波次刷新点的来源和支持范围见
-[僵尸波次刷新机制](zombie-spawning.md)。
+坐标系统的完整说明见[坐标与绘制](../../game-mechanics/other/rendering.md)。波次刷新点的来源和支持范围见
+[僵尸波次刷新机制](../../game-mechanics/levels/zombie-spawning.md)。
 
 ## 二、脚本如何运行
 
@@ -202,7 +202,7 @@ helper_script = script_manager.RunInThread(HelperScript)
 
 离开战斗界面后，生成器会按运行模式卸载或重置。倍速时脚本仍按每个游戏逻辑帧运行，
 而不是只按画面刷新频率运行。全局快慢速和 Board 分数速度的执行层级、分帧算法及叠加
-关系见[游戏速度控制机制](speed-control.md)。
+关系见[游戏速度控制机制](../../game-mechanics/other/speed-control.md)。
 
 ### 4. 同时加载多个脚本
 
@@ -274,7 +274,7 @@ current_ratio = GetBoardSpeedExact() # 返回实际分子和分母。
 不在关卡内调用 Board 速度 API 会抛出 `RuntimeError`。非法类型、超出速度范围、无效误差
 或可能使游戏的 C# `int` 计算溢出的分数也会抛出异常。Board 精确 getter 会原样返回字段；
 如果分母为零，浮点 getter 会抛出 `ValueError`。完整算法、两套速度的作用层级和叠加关系
-见[游戏速度控制机制](speed-control.md)。
+见[游戏速度控制机制](../../game-mechanics/other/speed-control.md)。
 
 相关常量为 `MIN_GAME_SPEED`、`MAX_GAME_SPEED` 和 `DEFAULT_BOARD_SPEED_ERROR`。
 
@@ -340,7 +340,7 @@ yield from SelectCards(
 
 当前实现通过运行时观察游戏的标准僵尸刷新流程记录刷新点，支持 20 波以上关卡和实际
 旗帜波，但不支持由挑战逻辑完全接管刷新的关卡。完整范围见
-[僵尸波次刷新机制](zombie-spawning.md)。
+[僵尸波次刷新机制](../../game-mechanics/levels/zombie-spawning.md)。
 
 #### `Until(t)`
 
@@ -414,7 +414,7 @@ cob_manager.Fire([(2, 8.8), (5, 8.8)])
 该函数会重建波次列表，应在关卡正式刷新僵尸以前调用。设置 PGvZ 新增僵尸时，应使用
 当前游戏提供的对应枚举值。
 
-原生种类限制、随机数内联问题及修改器接入方式见[自然出怪的种类抽取](zombie-wave-selection.md)。
+原生种类限制、随机数内联问题及修改器接入方式见[自然出怪的种类抽取](../../game-mechanics/levels/zombie-wave-selection.md)。
 
 ### 7. 坐标与鼠标辅助
 
@@ -426,7 +426,7 @@ cob_manager.Fire([(2, 8.8), (5, 8.8)])
 | `MouseDragGrid(board, grid_from, grid_to)` | 在两个零基格子之间模拟鼠标拖动。 |
 
 屏幕坐标、场地坐标和格子坐标不是同一套坐标，涉及摄像机或绘制时请先阅读
-[坐标与绘制](rendering.md)。
+[坐标与绘制](../../game-mechanics/other/rendering.md)。
 
 ### 8. 场上对象与阵型辅助
 
@@ -589,7 +589,7 @@ Sexy.Debug.Log('script reached wave 10')
 
 仓库的 `typings/` 包含游戏程序集的 `.pyi` 类型存根。把该目录加入 VS Code Pylance 等
 类型检查器的搜索路径后，可以获得类型补全和参数提示。存根只用于编辑器，不需要复制到
-游戏运行环境。更多说明见 [`typings/README.md`](../typings/README.md)。
+游戏运行环境。更多说明见 [`typings/README.md`](../../../typings/README.md)。
 
 IronPython 对现代类型注解的支持有限。涉及 `list[int]`、`tuple[int, int]` 或联合类型时，
 建议把整个注解写成字符串，或者干脆省略运行脚本中的注解：
@@ -637,7 +637,7 @@ def FindTargets() -> 'list[Lawn.Zombie]':
 | `whackazombie.py` | 逐帧脚本 | 锤僵尸；展示每帧筛选目标和关卡专用操作。 |
 | `slotmachine.py` | 逐帧脚本＋钩子 | 自动拉老虎机，并演示修改关卡内部行为。 |
 
-使用方法和各脚本的导出对象见[示例脚本说明](../scripts/README.md)。
+使用方法和各脚本的导出对象见[示例脚本说明](../../../scripts/README.md)。
 
 建议按以下顺序阅读：
 
@@ -651,7 +651,7 @@ def FindTargets() -> 'list[Lawn.Zombie]':
 ## 七、面向 PyVZ、AvZ 用户的快速上手
 
 PGvZ-TAS 的许多术语和接口形状与原版框架相近。游戏内容的异同统一见
-[PGvZ 与 PvZ 的异同](pgvz-vs-pvz.md)；框架接口可先用下表建立对应关系：
+[PGvZ 与 PvZ 的异同](../../game-mechanics/other/pgvz-vs-pvz.md)；框架接口可先用下表建立对应关系：
 
 | 熟悉的概念 | PGvZ-TAS 对应方式 |
 |---|---|
@@ -709,7 +709,7 @@ board.MouseUp(x, y, -1)
 
 1. 先只移植注册、选卡和一波最简单操作；
 2. 为脚本涉及的 PGvZ 新增内容补充相应枚举和处理分支；
-3. 根据[已知游戏差异](pgvz-vs-pvz.md)调整受影响的操作，并用日志验证关键时机；
+3. 根据[已知游戏差异](../../game-mechanics/other/pgvz-vs-pvz.md)调整受影响的操作，并用日志验证关键时机；
 4. 把每波流程整理成 `Prejudge` → `Until`/`DelayA`；
 5. 最后加入场面分支、收尾判断和辅助逐帧任务；
 6. 分别测试正常进入、中途退出重进、倍速和关底切换。
@@ -780,7 +780,7 @@ def MainScript():
 - 生存模式在合适时机调用 `SurvivalBackupGame`；
 - 普通关卡尽量在关卡结束后退出，生存模式尽量回到选卡界面后退出。
 
-详细限制和恢复策略见[僵尸波次刷新机制与时间操作实现](zombie-spawning.md)。
+详细限制和恢复策略见[僵尸波次刷新机制与时间操作实现](../../game-mechanics/levels/zombie-spawning.md)。
 
 ### 4. 使用类型存根和反编译结果
 
@@ -836,16 +836,16 @@ def MainScript():
 ### PGvZ-TAS 项目内资料
 
 - [安装与加载机制](install.md)
-- [示例脚本说明](../scripts/README.md)
-- [PGvZ 与 PvZ 的异同](pgvz-vs-pvz.md)
-- [游戏速度控制机制](speed-control.md)
-- [关卡入场动画与自动跳过](level-intro.md)
-- [僵尸波次刷新机制与时间操作实现](zombie-spawning.md)
-- [僵王火球与冰球机制](boss-balls.md)
-- [普通子弹机制](projectiles.md)
-- [坐标系统与绘制](rendering.md)
-- [TAS 功能](tas.md)
-- [类型存根说明](../typings/README.md)
+- [示例脚本说明](../../../scripts/README.md)
+- [PGvZ 与 PvZ 的异同](../../game-mechanics/other/pgvz-vs-pvz.md)
+- [游戏速度控制机制](../../game-mechanics/other/speed-control.md)
+- [关卡入场动画与自动跳过](../../game-mechanics/levels/level-intro.md)
+- [僵尸波次刷新机制与时间操作实现](../../game-mechanics/levels/zombie-spawning.md)
+- [僵王火球与冰球机制](../../game-mechanics/zombies/boss-balls.md)
+- [普通子弹机制](../../game-mechanics/other/projectiles.md)
+- [坐标系统与绘制](../../game-mechanics/other/rendering.md)
+- [TAS 功能](../internals/tas.md)
+- [类型存根说明](../../../typings/README.md)
 
 ### 原版 PvZ 自动操作框架
 

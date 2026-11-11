@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>植物娘修改器</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.14.3/dist/index.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.14.8/dist/index.min.css">
     <link rel="stylesheet" href="./styles.css">
 </head>
 
@@ -269,13 +269,13 @@
                                     <div class="radio-control">
                                         <span>{{ t('fields.weather') }}</span>
                                         <el-radio-group v-model="weather" @change="setWeather">
-                                            <el-radio-button v-for="item in weatherOptions" :key="item.value" :label="item.value">{{ item.label }}</el-radio-button>
+                                            <el-radio-button v-for="item in weatherOptions" :key="item.value" :value="item.value">{{ item.label }}</el-radio-button>
                                         </el-radio-group>
                                     </div>
                                     <div class="radio-control">
                                         <span>{{ t('fields.speed') }}</span>
                                         <el-radio-group v-model="speed" @change="value => sendAction('setSpeed', { value })">
-                                            <el-radio-button v-for="item in speedOptions" :key="item" :label="item">{{ item }}</el-radio-button>
+                                            <el-radio-button v-for="item in speedOptions" :key="item" :value="item">{{ item }}</el-radio-button>
                                         </el-radio-group>
                                     </div>
                                 </div>
@@ -313,7 +313,7 @@
                         <el-card shadow="never" class="tool-card">
                             <template #header>{{ t('sections.zombieSpawn') }}</template>
                             <el-checkbox-group v-model="selectedSetZbType" class="check-grid">
-                                <el-checkbox v-for="item in setZombieTypes" :key="item.value" :label="item.value">
+                                <el-checkbox v-for="item in setZombieTypes" :key="item.value" :value="item.value">
                                     {{ dataLabel(item) }}
                                 </el-checkbox>
                             </el-checkbox-group>
@@ -327,7 +327,7 @@
                             <template #header>{{ t('sections.lineup') }}</template>
                             <div class="form-stack">
                                 <el-radio-group v-model="selectedScene" @change="selectedLineUp = ''">
-                                    <el-radio-button v-for="scene in scenes" :key="scene.value" :label="scene.value">
+                                    <el-radio-button v-for="scene in scenes" :key="scene.value" :value="scene.value">
                                         {{ scene.label }}
                                     </el-radio-button>
                                 </el-radio-group>
@@ -371,8 +371,8 @@
         </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/vue@3.5.40/dist/vue.global.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/element-plus@2.14.3/dist/index.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.5.45/dist/vue.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/element-plus@2.14.8/dist/index.full.min.js"></script>
     <script src="./js/i18n.js"></script>
     <script src="./js/data.js"></script>
     <script src="./js/protocol.js"></script>

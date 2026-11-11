@@ -2,7 +2,7 @@
 
 本目录下是一些示例PGvZ-TAS脚本
 
-框架入门、公开 API、运行与调试方法见[脚本编写指南](../docs/scripting.md)。
+框架入门、公开 API、运行与调试方法见[脚本编写指南](../docs/mod/user-guide/scripting.md)。
 
 ## 使用方法
 

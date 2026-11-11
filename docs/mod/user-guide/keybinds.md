@@ -59,7 +59,7 @@
 
 以下按键**不能产生字符**，无法绑定：Shift, Ctrl, Alt, F1~F12, 方向键, Backspace, Delete, Esc。
 
-字母、数字、Space、Tab、Enter 和常见美式键位标点通过游戏已有的 `KeyDown` 事件识别。标点键位可能随键盘布局变化；实现细节见 [键盘输入与输入法](keyboard-input.md)。
+字母、数字、Space、Tab、Enter 和常见美式键位标点通过游戏已有的 `KeyDown` 事件识别。标点键位可能随键盘布局变化；实现细节见 [键盘输入与输入法](../internals/keyboard-input.md)。
 
 ## 示例
 

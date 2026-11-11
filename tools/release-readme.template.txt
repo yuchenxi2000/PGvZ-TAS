@@ -81,14 +81,14 @@ pause = Enter
 
 修改后需重启游戏，并打开网页连接修改器后才能生效。
 已适配中文等常见非英文输入法下的字母和数字快捷键，桌面版还会自动关闭输入法选词框。
-完整配置说明：https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/keybinds.md
+完整配置说明：https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/mod/user-guide/keybinds.md
 
 ===== 自定义代码 =====
 
 “调试”页可发送自定义 Python 代码，在游戏内的 IronPython 环境中执行，用于运行脚本或调试命令。
 使用该功能需了解基本的 Python 语法。建议结合脚本编写文档、本项目源码及所用游戏版本的反编译代码，编写并核对操作。
 
-脚本编写文档：https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/scripting.md
+脚本编写文档：https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/mod/user-guide/scripting.md
 项目源码：https://github.com/yuchenxi2000/PGvZ-TAS
 
 ===== 常见问题排查 =====
@@ -282,14 +282,14 @@ pause = Enter
 
 Restart the game after editing the file, then open and connect the web console to load the keybinds.
 Letter and number shortcuts support common non-English input methods. On desktop, IME candidate windows are also dismissed automatically.
-Full configuration guide: https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/keybinds.md
+Full configuration guide: https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/mod/user-guide/keybinds.md
 
 ===== Custom Code =====
 
 Use the Debug tab to run custom Python scripts or debugging commands in the game's IronPython environment.
 This feature requires a basic understanding of Python syntax. Refer to the scripting guide, this project's source code, and the decompiled code for your game version when writing and checking your commands.
 
-Scripting guide (Chinese): https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/scripting.md
+Scripting guide (Chinese): https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/mod/user-guide/scripting.md
 Project source: https://github.com/yuchenxi2000/PGvZ-TAS
 
 ===== Troubleshooting =====

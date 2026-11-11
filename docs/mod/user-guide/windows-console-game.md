@@ -34,7 +34,7 @@
 
 ## 三、使用仓库工具生成
 
-工具位于 [`tools/make-console-game.ps1`](../tools/make-console-game.ps1)。生成的文件必须
+工具位于 [`tools/make-console-game.ps1`](../../../tools/make-console-game.ps1)。生成的文件必须
 和 `Lawn.exe`、`Content/` 等游戏文件放在同一目录。
 
 1. 完全退出游戏。

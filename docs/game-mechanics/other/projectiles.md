@@ -1,6 +1,6 @@
 # 普通子弹机制
 
-本文依据 PGvZ 1.2.6 的反编译代码，记录普通子弹（`Projectile`）的存储、创建、运动、碰撞、绘制和回收机制。这里的 `ProjectileType.Fireball` 是火炬树桩转化出的火豌豆，不是[僵王火球](boss-balls.md)。
+本文依据 PGvZ 1.2.6 的反编译代码，记录普通子弹（`Projectile`）的存储、创建、运动、碰撞、绘制和回收机制。这里的 `ProjectileType.Fireball` 是火炬树桩转化出的火豌豆，不是[僵王火球](../zombies/boss-balls.md)。
 
 ## 存储与生命周期
 
@@ -72,7 +72,7 @@ projectile = board.AddProjectile(x, y, render_order, row, projectile_type)
 | `Basketball` | 投石车僵尸设置向左的 `Lobbed` 弹道 |
 | `ZombiePea` | 普通豌豆头僵尸设置 `Backwards`，向左攻击植物 |
 | `ZombiePeaMindControl` | 被魅惑的豌豆头僵尸使用，向右攻击普通僵尸 |
-| `CattailSpike`、`HypnoCattailSpike` | 香蒲发射后改为 `Homing`，设置初速度和目标僵尸；初始化对应拖尾。共享拖尾容器的原版容量问题见[拖尾容器容量耗尽崩溃修复](trail-holder-capacity-crash.md) |
+| `CattailSpike`、`HypnoCattailSpike` | 香蒲发射后改为 `Homing`，设置初速度和目标僵尸；初始化对应拖尾。共享拖尾容器的原版容量问题见[拖尾容器容量耗尽崩溃修复](../../mod/internals/trail-holder-capacity-crash.md) |
 | `EndoflameSpike` | 火红莲发射后改为 `EndoflameHoming`，设置目标并初始化附属 reanimation |
 | `Talisman`、`TalismanMove`、`TalismanSeal` | 保持直线运动；通用碰撞检查明确跳过这三类 |
 | `Cobbig` | 使用由起点、最高点和指定落点共同控制的特殊 `Lobbed` 弹道 |
