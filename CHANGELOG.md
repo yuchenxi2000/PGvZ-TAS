@@ -1,6 +1,6 @@
 # 更新日志
 
-## [unreleased]
+## [1.16.1] - 2026-11-12
 
 ### 新增
 
@@ -444,7 +444,7 @@
 - 修复安卓部分区域无法自动收集、移除天尸诅咒不完整，以及过长命令结果挤出网页界面的问题。
 - 进入月夜无尽前检查屋顶无尽存档，避免未经提示直接覆盖。
 
-[unreleased]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.16.0...HEAD
+[1.16.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.16.1
 [1.16.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.16.0
 [1.15.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.15.1
 [1.15.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.15.0
