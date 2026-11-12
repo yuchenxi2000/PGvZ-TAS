@@ -574,6 +574,7 @@ def GridItem__UpdateScaryPot(orig, griditem: Lawn.GridItem):
 # 挂载较大的鼠标调用者，避免 ScaryPotterMalletPot 被运行时内联后钩子失效。
 # 直接开罐可以使 ChallengeState 保持 Normal，因此下一次 MouseHitTest
 # 仍能命中罐子，也不会留下无人回收的锤子动画。
+# 修复普通关卡无法砸开罐子的问题
 @LawnMod.MonoModUtils.HookTo(Lawn.Challenge.MouseDown)
 def Challenge__MouseDown(orig, challenge: Lawn.Challenge, x: int, y: int, theClickCount: int, theHitResult: Lawn.HitResult):
     if (
@@ -588,7 +589,38 @@ def Challenge__MouseDown(orig, challenge: Lawn.Challenge, x: int, y: int, theCli
     ):
         challenge.ScaryPotterOpenPot(theHitResult.mObject)
         return True
-    return orig(challenge, x, y, theClickCount, theHitResult)
+    handled = orig(challenge, x, y, theClickCount, theHitResult)
+    if handled or challenge.mApp.IsScaryPotterLevel():
+        return handled
+
+    # 普通关卡的 MouseHitTest 不返回罐子；保留原生命中对象和小游戏操作的优先级。
+    board = challenge.mBoard
+    if (
+        challenge.mApp.mGameScene != Lawn.GameScenes.Playing
+        or theClickCount < 0
+        or theHitResult.mObjectType != none_of(Lawn.GameObjectType)
+        or not board.CanInteractWithBoardButtons()
+        or board.mCursorObject.mCursorType not in (Lawn.CursorType.Normal, Lawn.CursorType.Shovel)
+        or challenge.mApp.mGameMode in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom)
+    ):
+        return handled
+
+    # Challenge.MouseDown 的坐标已经过 Camera 转换，只需还原分辨率缩放。
+    px, py = int(x * Sexy.Constants.IS), int(y * Sexy.Constants.IS)
+    pot = board.GetScaryPotAt(board.PixelToGridX(px, py), board.PixelToGridY(px, py))
+    if pot is None:
+        return handled
+    # 其他小游戏也使用 Challenge 的状态和动画字段，普通关卡直接开罐。
+    challenge.ScaryPotterOpenPot(pot)
+    return True
+
+
+# 原生开罐会调用此判定并生成关卡奖励，普通关卡不应按剩余罐子数量判胜。
+@LawnMod.MonoModUtils.HookTo(Lawn.Challenge.ScaryPotterIsCompleted)
+def Challenge__ScaryPotterIsCompleted(orig, challenge: Lawn.Challenge):
+    if not challenge.mApp.IsScaryPotterLevel():
+        return False
+    return orig(challenge)
 
 # 三线射手不浪费子弹
 
