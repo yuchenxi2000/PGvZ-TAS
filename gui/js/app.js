@@ -132,6 +132,10 @@ const app = createApp({
 
         const { switchGroups, optionConfig, cheatOption } = PGvZOptions.createCheatOptions(savedCheatState);
 
+        watch(() => cheatOption.noSunLimit, enabled => {
+            if (!enabled && sunValue.value > 9990) sunValue.value = 9990;
+        });
+
         const scenes = computed(() => [
             { label: t('scene.day'), value: 'day' },
             { label: t('scene.night'), value: 'night' },

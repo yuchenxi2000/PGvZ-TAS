@@ -54,7 +54,7 @@
                                 <div class="form-stack">
                                     <div class="resource-row">
                                         <div class="resource-value">
-                                            <el-input-number v-model="sunValue" :min="0" :max="9990" size="small" />
+                                            <el-input-number v-model="sunValue" :min="0" :max="cheatOption.noSunLimit ? 2147483647 : 9990" :precision="0" size="small" />
                                         </div>
                                         <div class="resource-action">
                                             <el-button type="primary" @click="sendAction('setSun', { value: sunValue })">
@@ -111,6 +111,11 @@
                                                 {{ t('actions.setFinishedAdventure') }}
                                             </el-button>
                                         </div>
+                                    </div>
+                                    <div class="option-check-grid">
+                                        <el-checkbox v-for="key in switchGroups.resources" :key="key" v-model="cheatOption[key]">
+                                            {{ optionLabel(key) }}
+                                        </el-checkbox>
                                     </div>
                                 </div>
                             </el-card>

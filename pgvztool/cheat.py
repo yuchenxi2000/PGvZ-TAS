@@ -20,6 +20,7 @@ class CheatOption(Serializable):
     def __init__(self) -> None:
         self.wontLose = False
         self.freePlant = False
+        self._noSunLimit = False
         self._unlockBannedSeeds = False
         self.unlockRake = False
         self.plantAnyWhere = False
@@ -68,6 +69,18 @@ class CheatOption(Serializable):
         self.showCraterCooldown = False
         self.drawSquirrel = False
         self.tasEnabled = True
+
+    @property
+    def noSunLimit(self):
+        return self._noSunLimit
+
+    @noSunLimit.setter
+    def noSunLimit(self, value):
+        self._noSunLimit = value
+        if not value:
+            board = GetBoard()
+            if board is not None and board.mSunMoney > 9990:
+                board.mSunMoney = 9990
 
     # ===== 脚本单例状态（通过 property 暴露给 sync） =====
 

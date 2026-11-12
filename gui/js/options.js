@@ -27,6 +27,7 @@ window.PGvZOptions = (() => {
 
     function createCheatOptions(savedCheatState) {
         const switchGroups = {
+            resources: ['noSunLimit'],
             common: [
                 'autoCollect',
                 'runBackground',

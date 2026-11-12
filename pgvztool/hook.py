@@ -38,6 +38,17 @@ def LawnApp__LostFocus(orig, lawnapp: Lawn.LawnApp):
     Sexy.Main.RunWhenLocked = cheat_option.runBackground
     orig(lawnapp)
 
+# 去掉收集阳光时的上限。AddSunMoney(int) 已实测会被内联，改挂收集结算入口。
+@LawnMod.MonoModUtils.HookTo(Lawn.Coin.ScoreCoin)
+def Coin__ScoreCoin(orig, coin: Lawn.Coin):
+    if not cheat_option.noSunLimit or not coin.IsSun():
+        return orig(coin)
+
+    board = coin.mBoard
+    total = int(board.mSunMoney) + int(coin.GetSunValue())
+    orig(coin)
+    board.mSunMoney = min(total, 2147483647)
+
 # 免费用卡
 # 第二个hook为了让无尽里紫卡阳光仍为0
 @LawnMod.MonoModUtils.HookTo(Lawn.Plant.GetCost)

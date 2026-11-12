@@ -193,6 +193,40 @@ test('state updates do not interpolate enum members or Python booleans', () => {
     assert.equal(JSON.parse(decodeCall(ws.sent.at(-1)).args[0]).state.cheat.freePlant, true);
 });
 
+test('sun limit toggle persists, synchronizes, and controls the sun input range', () => {
+    const gui = loadGui();
+    const ws = gui.bootstrap();
+    const tag = [...html.matchAll(/<el-input-number\b(?:"[^"]*"|[^">])*>/g)]
+        .map(match => match[0]).find(tag => tag.includes('v-model="sunValue"'));
+    const maxExpression = tag.match(/:max="([^"]+)"/)[1];
+    const maxSun = () => vm.runInNewContext(maxExpression, { cheatOption: gui.model.cheatOption });
+    assert.equal(maxSun(), 9990);
+    gui.model.cheatOption.noSunLimit = true;
+    gui.flush();
+    assert.equal(maxSun(), 2147483647);
+    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    assert.deepEqual(request.state, { cheat: { noSunLimit: true } });
+    assert.equal(JSON.parse(gui.storage.get(storageKey)).cheat.noSunLimit, true);
+
+    const restored = loadGui({ saved: JSON.parse(gui.storage.get(storageKey)) });
+    assert.equal(restored.model.cheatOption.noSunLimit, true);
+    assert.equal(gui.model.optionLabel('noSunLimit'), 'Remove Sun Limit');
+    gui.model.setLanguage('zh');
+    assert.equal(gui.model.optionLabel('noSunLimit'), '去掉阳光上限');
+
+    gui.model.sunValue.value = 20000;
+    gui.model.cheatOption.noSunLimit = false;
+    gui.flush();
+    assert.equal(maxSun(), 9990);
+    assert.equal(gui.model.sunValue.value, 9990);
+    gui.model.sunValue.value = 5000;
+    gui.model.cheatOption.noSunLimit = true;
+    gui.flush();
+    gui.model.cheatOption.noSunLimit = false;
+    gui.flush();
+    assert.equal(gui.model.sunValue.value, 5000);
+});
+
 test('remote synchronization updates UI without echoing its changes', () => {
     const gui = loadGui({ mobile: true });
     const ws = gui.bootstrap();
@@ -200,7 +234,7 @@ test('remote synchronization updates UI without echoing its changes', () => {
     const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
     const count = ws.sent.length;
     ws.message({ action: 'results', results: [{ ...request, ok: true, value: { action: 'sync', state: {
-        cheat: { freePlant: true }, placer: {
+        cheat: { freePlant: true, noSunLimit: true }, placer: {
             seedType: 'Sunflower', imitater: true,
             scaryPotType: 'Sun3', scaryPotAppearance: 'ScaryPotZombie',
         },
@@ -208,11 +242,25 @@ test('remote synchronization updates UI without echoing its changes', () => {
     } } }] });
     gui.flush();
     assert.equal(gui.model.cheatOption.freePlant, true);
+    assert.equal(gui.model.cheatOption.noSunLimit, true);
     assert.equal(gui.model.selectedSeedType.value, 'Sunflower');
     assert.equal(gui.model.selectedScaryPotType.value, 'Sun3');
     assert.equal(gui.model.selectedScaryPotAppearance.value, 'ScaryPotZombie');
     assert.equal(gui.model.weather.value, 'rain');
     assert.equal(ws.sent.length, count + 1);
+    assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
+
+    gui.model.sunValue.value = 20000;
+    gui.connection.refreshState();
+    const disable = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    const beforeDisable = ws.sent.length;
+    ws.message({ action: 'results', results: [{ ...disable, ok: true, value: {
+        action: 'sync', state: { cheat: { noSunLimit: false } },
+    } }] });
+    gui.flush();
+    assert.equal(gui.model.cheatOption.noSunLimit, false);
+    assert.equal(gui.model.sunValue.value, 9990);
+    assert.equal(ws.sent.length, beforeDisable + 1);
     assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
 });
 
