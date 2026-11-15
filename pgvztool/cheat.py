@@ -46,6 +46,8 @@ class CheatOption(Serializable):
         self.fullAreaGloomshroom = False
         self.fullAreaUmbrella = False
         self.planternAlwaysTransform = False
+        self.marigoldAlwaysThreeDiamonds = False
+        self.disableTachieCensor = True
         self.hypnoCattailAlwaysHypnotize = False
         self.allZombiesHypnotizable = False
         self.enableGlove = False

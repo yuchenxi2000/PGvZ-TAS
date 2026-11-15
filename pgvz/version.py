@@ -1,13 +1,9 @@
 PROJECT_NAME = "PGvZ-TAS"
 TOOL_NAME = "PGvZTool"
-MOD_VERSION = "1.16.1"
+MOD_VERSION = "1.17.0"
 
 SUPPORTED_GAME_VERSIONS = (
-    "1.3.0",
-    "1.3.1",
-    "1.3.2",
-    "1.3.3",
-    "1.3.4",
+    "1.4.3",
 )
 
 PROJECT_VERSION = MOD_VERSION

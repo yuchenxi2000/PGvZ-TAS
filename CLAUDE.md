@@ -8,9 +8,9 @@ Tool-Assisted Superplay framework and cheat mod for "PlantGirls vs. Zombies" (PG
 
 The mod has its own version number and supports only the latest game versions declared in `pgvz/version.py`; do not add backward-compatibility paths for older game versions.
 
-- Record every unreleased change in the top `[unreleased]` section of `CHANGELOG.md`. If that section does not exist, add it before the newest released version section.
-- Keep the reference links at the end of `CHANGELOG.md` synchronized with its sections. The `[unreleased]` link must compare the latest release tag with `HEAD`, and every released version section must have its corresponding release link.
-- Do not update the mod version for ordinary unreleased changes. When publishing a new version, rename the current `[unreleased]` section to `[<version>] - <date>`, update `MOD_VERSION` in `pgvz/version.py` to the same version, update the `[unreleased]` comparison base to the new tag, and add the new version's release link at the end of `CHANGELOG.md`.
+- Record every unreleased change in the top `[unreleased]` section of `CHANGELOG.md`. Create that section before the newest released version section only when recording the first change for the next version; do not keep an empty placeholder after a release.
+- Keep the reference links at the end of `CHANGELOG.md` synchronized with its sections. Include an `[unreleased]` link only while that section exists, comparing the latest release tag with `HEAD`. Every released version section must have its corresponding release link.
+- Do not update the mod version for ordinary unreleased changes. When publishing a new version, rename the current `[unreleased]` section to `[<version>] - <date>`, update `MOD_VERSION` in `pgvz/version.py` to the same version, and replace the `[unreleased]` comparison link with the new version's release link. Leave neither an `[unreleased]` section nor its link in the release commit. Recreate both when recording a subsequent change for the next version.
 
 ### Documentation and reverse engineering
 

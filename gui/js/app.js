@@ -130,7 +130,7 @@ const app = createApp({
         const easyPlaceMode = ref('plant');
         const easyPlaceEnabled = ref(savedBoolean(savedPlacerState, 'easyPlaceEnabled', true));
 
-        const { switchGroups, optionConfig, cheatOption } = PGvZOptions.createCheatOptions(savedCheatState);
+        const { switchGroups, optionConfig, cheatOption } = PGvZOptions.createCheatOptions(savedCheatState, isMobile);
 
         watch(() => cheatOption.noSunLimit, enabled => {
             if (!enabled && sunValue.value > 9990) sunValue.value = 9990;

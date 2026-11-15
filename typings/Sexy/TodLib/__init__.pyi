@@ -1015,7 +1015,56 @@ class ReanimationType(typing.SupportsInt):
     Zorrose : ReanimationType # 147
     ZombiePropeller : ReanimationType # 148
     HypnoCattail : ReanimationType # 149
-    NumReanims : ReanimationType # 150
+    PeashooterOriginal : ReanimationType # 150
+    WallnutOriginal : ReanimationType # 151
+    LilypadOriginal : ReanimationType # 152
+    SunflowerOriginal : ReanimationType # 153
+    CherrybombOriginal : ReanimationType # 154
+    SquashOriginal : ReanimationType # 155
+    DoomshroomOriginal : ReanimationType # 156
+    SnowpeaOriginal : ReanimationType # 157
+    RepeaterOriginal : ReanimationType # 158
+    SunshroomOriginal : ReanimationType # 159
+    TallnutOriginal : ReanimationType # 160
+    FumeshroomOriginal : ReanimationType # 161
+    PuffshroomOriginal : ReanimationType # 162
+    HypnoshroomOriginal : ReanimationType # 163
+    ChomperOriginal : ReanimationType # 164
+    PotatomineOriginal : ReanimationType # 165
+    SpikeweedOriginal : ReanimationType # 166
+    SpikerockOriginal : ReanimationType # 167
+    ThreepeaterOriginal : ReanimationType # 168
+    MarigoldOriginal : ReanimationType # 169
+    IceshroomOriginal : ReanimationType # 170
+    JalapenoOriginal : ReanimationType # 171
+    ScrareyshroomOriginal : ReanimationType # 172
+    PumpkinOriginal : ReanimationType # 173
+    PlanternOriginal : ReanimationType # 174
+    TorchwoodOriginal : ReanimationType # 175
+    SplitpeaOriginal : ReanimationType # 176
+    SeashroomOriginal : ReanimationType # 177
+    BloverOriginal : ReanimationType # 178
+    FlowerPotOriginal : ReanimationType # 179
+    CactusOriginal : ReanimationType # 180
+    TanglekelpOriginal : ReanimationType # 181
+    StarfruitOriginal : ReanimationType # 182
+    GraveBusterOriginal : ReanimationType # 183
+    MagnetshroomOriginal : ReanimationType # 184
+    CabbagepultOriginal : ReanimationType # 185
+    KernelpultOriginal : ReanimationType # 186
+    MelonpultOriginal : ReanimationType # 187
+    CoffeebeanOriginal : ReanimationType # 188
+    UmbrellaleafOriginal : ReanimationType # 189
+    GatlingpeaOriginal : ReanimationType # 190
+    CattailOriginal : ReanimationType # 191
+    GloomshroomOriginal : ReanimationType # 192
+    CobcannonOriginal : ReanimationType # 193
+    GarlicOriginal : ReanimationType # 194
+    GoldMagnetOriginal : ReanimationType # 195
+    WinterMelonOriginal : ReanimationType # 196
+    TwinSunflowerOriginal : ReanimationType # 197
+    ImitaterOriginal : ReanimationType # 198
+    NumReanims : ReanimationType # 199
     None_ : ReanimationType # -1
 
 

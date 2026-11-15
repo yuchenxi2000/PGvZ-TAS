@@ -822,6 +822,21 @@ def MainScript():
 具体写法可参考 `pgvz/__init__.py` 和 `pgvztool/hook.py`。挂钩属于高风险能力，异常、错误
 签名或跳过必要的 `orig` 都可能直接使游戏崩溃。
 
+直接调用 `MonoMod.RuntimeDetour.Hook` 挂钩反射取得的方法时，需要注意 IronPython 委托
+的底层 `callback.Method` 可能含隐藏闭包参数。例如
+`Func<SomeType, bool>` 的底层方法可为 `bool _Scripting_(object[], SomeType)`，
+因此 `Hook(method, callback)` 可能报参数数量不匹配，即使 Python 回调参数已经正确。
+此时可显式调用三个参数的重载，以委托的公开 `Invoke` 签名作为目标：
+
+```python
+callback = System.Func[SomeType, System.Boolean](replacement)
+invoke = callback.GetType().GetMethod('Invoke')
+hook = MonoMod.RuntimeDetour.Hook(method, invoke, callback)
+```
+
+需要保留 `hook` 和 `callback` 引用。项目的 `MonoModUtils.As/HookTo` 通过 C# 委托包装
+处理回调；不要仅根据 CPython 模拟测试的参数数量断言原生挂钩已注册成功。
+
 ### 7. 性能与状态安全
 
 - 每帧脚本和钩子应尽快返回，避免在一帧内进行大量无界搜索。

@@ -4,9 +4,20 @@
 """
 import Lawn
 import Sexy
+import clr
+from System.Reflection import BindingFlags
 from enum import Enum
 from pgvz import *
 from .sync import Serializable
+
+
+# 原生格子放大接口为 internal；反射调用原方法，沿用游戏的坐标、动画与退出逻辑。
+_board_type = clr.GetClrType(Lawn.Board)
+_focus_flags = BindingFlags.Instance | BindingFlags.NonPublic
+_grid_focus_can_select = _board_type.GetProperty('CanSelectGridFocus', _focus_flags)
+_grid_focus_active = _board_type.GetProperty('IsGridFocusActive', _focus_flags)
+_grid_focus_select = _board_type.GetMethod('SelectGridFocus', _focus_flags)
+_grid_focus_magnifier = clr.GetClrType(Lawn.CursorObject).GetField('mMagnifier', _focus_flags)
 
 def IterPortals(board: Lawn.Board):
     for i in range(board.mGridItems.Count):
@@ -92,6 +103,20 @@ class Placer(Serializable):
             and board.CanInteractWithBoardButtons() \
             and board.mCursorObject.mCursorType in (Lawn.CursorType.Normal, Lawn.CursorType.Hammer) \
             and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro)
+
+    def is_grid_focus_active(self, board: Lawn.Board):
+        return _grid_focus_active.GetValue(board, None)
+
+    def is_grid_focus_selecting(self, board: Lawn.Board):
+        return _grid_focus_magnifier.GetValue(board.mCursorObject)
+
+    def begin_grid_focus(self, board: Lawn.Board):
+        if not _grid_focus_can_select.GetValue(board, None):
+            return False
+        # 与原生修改器一样一次选格；显式退出放置态，再交给游戏管理光标。
+        self.active = False
+        _grid_focus_select.Invoke(board, None)
+        return True
 
     def try_place(self, board: Lawn.Board, x: int, y: int):
         """轻松放置：根据当前模式放置"""

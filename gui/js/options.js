@@ -25,12 +25,13 @@ window.PGvZOptions = (() => {
         return state && typeof state[key] === 'boolean' ? state[key] : fallback;
     }
 
-    function createCheatOptions(savedCheatState) {
+    function createCheatOptions(savedCheatState, isMobile = false) {
         const switchGroups = {
             resources: ['noSunLimit'],
             common: [
                 'autoCollect',
                 'runBackground',
+                'disableTachieCensor',
                 'skipLevelIntro',
                 'freePlant',
                 'unlockBannedSeeds',
@@ -72,6 +73,7 @@ window.PGvZOptions = (() => {
                 'fullAreaGloomshroom',
                 'fullAreaUmbrella',
                 'planternAlwaysTransform',
+                'marigoldAlwaysThreeDiamonds',
                 'hypnoCattailAlwaysHypnotize',
                 'allZombiesHypnotizable',
                 'scaryPotterNoDelay',
@@ -94,12 +96,18 @@ window.PGvZOptions = (() => {
         };
 
         const optionConfig = [...new Set(Object.values(switchGroups).flat())];
+        // 只过滤显示分组，保留完整选项模型供两端同步。
+        const hiddenOption = isMobile ? 'runBackground' : 'disableTachieCensor';
+        Object.keys(switchGroups).forEach(group => {
+            switchGroups[group] = switchGroups[group].filter(item => item !== hiddenOption);
+        });
         const cheatOption = Vue.reactive({});
         optionConfig.forEach(item => {
             cheatOption[item] = savedBoolean(savedCheatState, item, false);
         });
         cheatOption.autoCollect = savedBoolean(savedCheatState, 'autoCollect', true);
         cheatOption.runBackground = savedBoolean(savedCheatState, 'runBackground', true);
+        cheatOption.disableTachieCensor = savedBoolean(savedCheatState, 'disableTachieCensor', true);
         cheatOption.tasEnabled = savedBoolean(savedCheatState, 'tasEnabled', true);
         return { switchGroups, optionConfig, cheatOption };
     }

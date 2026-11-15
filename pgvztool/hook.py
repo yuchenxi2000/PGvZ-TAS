@@ -38,6 +38,35 @@ def LawnApp__LostFocus(orig, lawnapp: Lawn.LawnApp):
     Sexy.Main.RunWhenLocked = cheat_option.runBackground
     orig(lawnapp)
 
+# 图鉴创建立绘时判断是否叠加遮挡补丁，切换后重新打开立绘生效。
+@LawnMod.MonoModUtils.HookTo(Lawn.LawnApp.ShouldCensorTachie)
+def LawnApp__ShouldCensorTachie(orig, app: Lawn.LawnApp):
+    if cheat_option.disableTachieCensor:
+        return False
+    return orig(app)
+
+# 在原生生产状态机前后更改待掉落结果，避免依赖可能被内联的随机数方法。
+# 原生方法仍负责生产计时、末波规则和实际掉落；新生产使用钻石动画与语音。
+@LawnMod.MonoModUtils.HookTo(Lawn.Plant.UpdateProductionPlant)
+def Plant__UpdateProductionPlant(orig, plant: Lawn.Plant):
+    if not cheat_option.marigoldAlwaysThreeDiamonds or plant.mSeedType != Lawn.SeedType.Marigold:
+        return orig(plant)
+    was_producing = plant.mState == Lawn.PlantState.MarigoldProducing
+    if was_producing:
+        plant.mGravebusterDrop = Lawn.DropLootType.ThreeDiamonds
+    result = orig(plant)
+    if not was_producing and plant.mState == Lawn.PlantState.MarigoldProducing:
+        was_diamonds = plant.mGravebusterDrop == Lawn.DropLootType.ThreeDiamonds
+        plant.mGravebusterDrop = Lawn.DropLootType.ThreeDiamonds
+        reanim = plant.mApp.ReanimationTryToGet(plant.mBodyReanimID)
+        if reanim is not None:
+            anim_time = reanim.mAnimTime
+            reanim.PlayReanim('anim_producing3', Sexy.TodLib.ReanimLoopType.PlayOnceAndHold, 0, 0.0)
+            reanim.mAnimTime = anim_time
+        if not was_diamonds:
+            Lawn.PlantVoice.Play(plant.mSeedType, plant.mImitaterType, Lawn.PlantVoice.VoiceType.Diamond)
+    return result
+
 # 去掉收集阳光时的上限。AddSunMoney(int) 已实测会被内联，改挂收集结算入口。
 @LawnMod.MonoModUtils.HookTo(Lawn.Coin.ScoreCoin)
 def Coin__ScoreCoin(orig, coin: Lawn.Coin):
@@ -498,22 +527,6 @@ def NewGridItemZenTool(plant: Lawn.Plant):
     gridItem.mPosY = plant.mY + 40
     return gridItem
 
-# BUG FIX: 修复禅境花园里的金盏花没有应用盆栽存档中花色的问题
-@LawnMod.MonoModUtils.HookTo(Lawn.ZenGarden.PlacePottedPlant)
-def ZenGarden__PlacePottedPlant(orig, zenGarden: Lawn.ZenGarden, pottedPlantIndex: int):
-    plant = orig(zenGarden, pottedPlantIndex)
-    if plant is None or plant.mSeedType != Lawn.SeedType.Marigold:
-        return plant
-
-    pottedPlant = zenGarden.PottedPlantFromIndex(pottedPlantIndex)
-    variation = pottedPlant.mDrawVariation
-    variationValue = int(variation)
-    if int(Lawn.DrawVariation.MarigoldWhite) <= variationValue <= int(Lawn.DrawVariation.MarigoldLightGreen):
-        reanimation = zenGarden.mApp.ReanimationTryToGet(plant.mBodyReanimID)
-        if reanimation is not None:
-            zenGarden.mApp.mReanimatorCache.UpdateReanimationforVariation(reanimation, variation)
-    return plant
-
 # 全屏留声机、花肥、杀虫剂
 @LawnMod.MonoModUtils.HookTo(Lawn.ZenGarden.MouseDownWithFeedingTool)
 def ZenGarden__MouseDownWithFeedingTool(orig, zenGarden: Lawn.ZenGarden, x: int, y: int, theCursorType: Lawn.CursorType, isTouch: bool):
@@ -725,6 +738,9 @@ def Board__MouseDownWithTool(orig, board: Lawn.Board, x: int, y: int, clickCnt: 
 # 轻松放置：点击处理
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.MouseDownInternal)
 def Board__MouseDownInternal(orig, board: Lawn.Board, x: int, y: int, theClickCount: int, isTouch: bool):
+    # 原生放大选择、放大中及恢复动画期间均由游戏消费点击（包括右键）。
+    if placer.is_grid_focus_active(board) or placer.is_grid_focus_selecting(board):
+        return orig(board, x, y, theClickCount, isTouch)
     if placer.active and theClickCount < 0:
         placer.active = False
         return
@@ -732,6 +748,11 @@ def Board__MouseDownInternal(orig, board: Lawn.Board, x: int, y: int, theClickCo
         placer.toggle()
         return
     if placer.active and theClickCount >= 0:
+        if placer.easyPlaceMode == 'zoom':
+            if placer.begin_grid_focus(board):
+                # 原生入口接收屏幕坐标，由 HandleGridFocusClick 自己换算一次。
+                return orig(board, x, y, theClickCount, isTouch)
+            return
         # 没有这一行手机会出问题
         x, y = board.mCamera.ScreenToBoardReplace(x, y)  # type: ignore
         if placer.try_place(board, x, y):

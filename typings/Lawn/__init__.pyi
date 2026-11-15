@@ -692,7 +692,7 @@ class Board(Widget, AlmanacListener, ButtonListener):
     def AddALadder(self, theGridX: int, theGridY: int) -> GridItem: ...
     def AddBossRenderItem(self, theRenderList: Array_1[RenderItem], theCurRenderItem: clr.Reference[int], theBossZombie: Zombie) -> None: ...
     def AddCoin(self, theX: int, theY: int, theCoinType: CoinType, theCoinMotion: CoinMotion) -> Coin: ...
-    def AddCoinForDropLootType(self, theX: int, theY: int, theDropLootType: DropLootType) -> None: ...
+    def AddCoinForDropLootType(self, theX: int, theY: int, theDropLootType: DropLootType, theCoinMotionOverride: CoinMotion = ...) -> None: ...
     def AddGraveStones(self, theGridX: int, theCount: int) -> None: ...
     def AddPlant(self, theGridX: int, theGridY: int, theSeedType: SeedType, theImitaterType: SeedType) -> Plant: ...
     def AddProjectile(self, theX: int, theY: int, aRenderOrder: int, theRow: int, projectileType: ProjectileType) -> Projectile: ...
@@ -809,6 +809,8 @@ class Board(Widget, AlmanacListener, ButtonListener):
     def GetPumpkinAt(self, theGridX: int, theGridY: int) -> Plant: ...
     def GetRake(self) -> GridItem: ...
     def GetScaryPotAt(self, theGridX: int, theGridY: int) -> GridItem: ...
+    def GetSeedBankExtraWidth(self) -> int: ...
+    def GetSeedPacketPositionX(self, theIndex: int) -> int: ...
     def GetSeedPacketPositionY(self, theIndex: int) -> int: ...
     def GetSeedTypeInCursor(self) -> SeedType: ...
     def GetShovelButtonRect(self) -> TRect: ...
@@ -1406,6 +1408,23 @@ class Challenge(StoreListener):
     def CanTargetZombieWithPortals(self, thePlant: Plant, theZombie: Zombie) -> bool: ...
     def CheckForCompleteArtChallenge(self, theGridX: int, theGridY: int) -> None: ...
     def ClearCursor(self) -> None: ...
+    def CornRouletteActAI(self) -> bool: ...
+    def CornRouletteCountItem(self, theItem: SeedType, getPlayer: bool) -> int: ...
+    def CornRouletteDealDamage(self, theDamage: int, damagePlayer: bool) -> None: ...
+    def CornRouletteDraw(self, g: Graphics) -> None: ...
+    def CornRouletteDrawBackdrop(self, g: Graphics) -> None: ...
+    def CornRouletteGetItem(self, theItem: SeedType, getPlayer: bool) -> SeedPacket: ...
+    def CornRouletteHasItem(self, theItem: SeedType, testPlayer: bool) -> bool: ...
+    def CornRouletteItemUsable(self, theSeedType: SeedType, byPlayer: bool) -> bool: ...
+    def CornRouletteLoadProjectiles(self, theKernelPult: Plant, firstShow: bool, playerTurn: bool) -> None: ...
+    def CornRouletteMakeChoice(self, choiceSelf: bool) -> None: ...
+    def CornRoulettePickNextShoot(self, theKernelPult: Plant, firstShow: bool, byPlayer: bool) -> bool: ...
+    def CornRouletteRecoverItemes(self, itemNum: int, toPlayer: bool) -> None: ...
+    def CornRouletteRoundSetup(self) -> None: ...
+    def CornRouletteStart(self) -> None: ...
+    def CornRouletteUpdate(self) -> None: ...
+    def CornRouletteUseItem(self, theSeedType: SeedType, byPlayer: bool) -> None: ...
+    def CornRouletteUsePacket(self, theSeedPacket: SeedPacket) -> None: ...
     def DrawArtChallenge(self, g: Graphics) -> None: ...
     def DrawBackdrop(self, g: Graphics) -> None: ...
     def DrawBeghouled(self, g: Graphics) -> None: ...
@@ -1454,6 +1473,7 @@ class Challenge(StoreListener):
     def LoadBeghouledBoardState(self, theBoardState: BeghouledBoardState) -> None: ...
     def LoadFromFile(self, b: Buffer) -> bool: ...
     def MouseDown(self, x: int, y: int, theClickCount: int, theHitResult: HitResult) -> bool: ...
+    def MouseDownCornRoulette(self, x: int, y: int, theClickCount: int) -> bool: ...
     def MouseDownWhackAZombie(self, x: int, y: int) -> None: ...
     def MouseDownWithZenTool(self, x: int, y: int, theCursorType: CursorType, isTouch: bool) -> bool: ...
     def MouseMove(self, x: int, y: int) -> bool: ...
@@ -1737,6 +1757,14 @@ class ChallengeState(typing.SupportsInt):
     TreeWaitingToBabble : ChallengeState # 13
     TreeBabbling : ChallengeState # 14
     ZenPlantInteracting : ChallengeState # 15
+    CornRouletteDisplayBagPlayer : ChallengeState # 16
+    CornRouletteDisplayBagZombie : ChallengeState # 17
+    CornRouletteTurnPlayer : ChallengeState # 18
+    CornRouletteTurnZombie : ChallengeState # 19
+    CornRouletteWaitForResultPlayer : ChallengeState # 20
+    CornRouletteWaitForResultZombie : ChallengeState # 21
+    CornRouletteScorePlayer : ChallengeState # 22
+    CornRouletteScoreZombie : ChallengeState # 23
 
 
 class ChosenSeed:
@@ -1814,11 +1842,11 @@ class Coin(GameObject):
     @staticmethod
     def CoinFreeTextures() -> None: ...
     def CoinGetsBouncyArrow(self) -> bool: ...
-    def CoinInitialize(self, theX: int, theY: int, theCoinType: CoinType, theCoinMotion: CoinMotion) -> None: ...
+    def CoinInitialize(self, theX: int, theY: int, theCoinType: CoinType, theCoinMotion: CoinMotion, thePottedPlant: PottedPlant = ...) -> None: ...
     def Collect(self) -> None: ...
     def Die(self) -> None: ...
     def Dispose(self) -> None: ...
-    def Draw(self, g: Graphics) -> None: ...
+    def Draw(self, g: Graphics, theIcon: bool = ...) -> None: ...
     def DroppedUsableSeed(self) -> None: ...
     def FanOutCoins(self, theCoinType: CoinType, theNumCoins: int) -> None: ...
     @staticmethod
@@ -2813,6 +2841,7 @@ class DropLootType(typing.SupportsInt):
     PresentMinigames : DropLootType # 9
     PresentPuzzleMode : DropLootType # 10
     ThreeSun : DropLootType # 11
+    ThreeDiamonds : DropLootType # 12
 
 
 class DynamicTachieWidget(Widget):
@@ -3093,12 +3122,16 @@ class GameConstants:
     CONVEYOR_PACKET_MIN_OFFSET : int
     CONVEYOR_PACKET_OFFSET_Y : int
     CONVEYOR_SPEED : int
+    CORN_ROULETTE_BTN_LEFT : int
+    CORN_ROULETTE_BTN_RIGHT : int
+    CORN_ROULETTE_BTN_Y : int
     CRATER_TIME : int
     CRAVE_DAVE_BLINK_RATE : int
     DOG_WALKING_DISTANCE : int
     DOLPHIN_JUMP_TIME : int
     DRUMS_FADE_OUT_TIME : int
     DRUMS_FOG_FADE_OUT_TIME : int
+    ENABLE_CLASSIC_SEED_CHOOSER : bool
     FINAL_LEVEL : int
     FLAG_RAISE_TIME : int
     FOG_BLOW_RETURN_TIME : int
@@ -3335,8 +3368,8 @@ class GameMode(typing.SupportsInt):
     ChallengeSquirrel : GameMode # 48
     TreeOfWisdom : GameMode # 49
     QuickplayCount : GameMode # 50
-    ScaryPotterStart : GameMode # 50
     ScaryPotter1 : GameMode # 50
+    ScaryPotterStart : GameMode # 50
     ScaryPotter2 : GameMode # 51
     ScaryPotter3 : GameMode # 52
     ScaryPotter4 : GameMode # 53
@@ -3411,8 +3444,8 @@ class GameMode(typing.SupportsInt):
     Quickplay49 : GameMode # 120
     Quickplay50 : GameMode # 121
     ChallengeZombiquarium : GameMode # 122
-    ChallengeAttackOnTitans : GameMode # 123
     ExtraChallengeStart : GameMode # 123
+    ChallengeAttackOnTitans : GameMode # 123
     ChallengeAttackOnTitans2 : GameMode # 124
     ChallengeAttackOnTitans3 : GameMode # 125
     MarvelousPeople : GameMode # 126
@@ -3440,7 +3473,9 @@ class GameMode(typing.SupportsInt):
     ChallengeFusion : GameMode # 148
     ChallengeStageRandom : GameMode # 149
     OccupyHighGround : GameMode # 150
-    GameModeCount : GameMode # 151
+    CornRoulette : GameMode # 151
+    CornRouletteEndless : GameMode # 152
+    GameModeCount : GameMode # 153
     CreativeLevel : GameMode # 40000
     OnlineLevel : GameMode # 50000
 
@@ -3498,6 +3533,7 @@ class GameObjectType(typing.SupportsInt):
     ScaryPot : GameObjectType # 20
     Stinky : GameObjectType # 21
     TreeOfWisdom : GameObjectType # 22
+    CornRouletteButton : GameObjectType # 23
 
 
 class GameScenes(typing.SupportsInt):
@@ -3517,6 +3553,7 @@ class GameScenes(typing.SupportsInt):
     Credit : GameScenes # 6
     Challenge : GameScenes # 7
     Leaderboard : GameScenes # 8
+    Mailbox : GameScenes # 9
 
 
 class GameSelector(Widget, QuickPlayWidgetListener, MiniGamesWidgetListener, AlmanacListener, StoreListener, ButtonListener):
@@ -3528,6 +3565,7 @@ class GameSelector(Widget, QuickPlayWidgetListener, MiniGamesWidgetListener, Alm
     mAdventureHardButton : ToggleButton
     mAlmanacButton : DialogButton
     mApp : LawnApp
+    mArtGalleryButton : DialogButton
     mChallengePageLimboButton : DialogButton
     mChallengePageSurvivalButton : DialogButton
     mClip : bool
@@ -3560,9 +3598,12 @@ class GameSelector(Widget, QuickPlayWidgetListener, MiniGamesWidgetListener, Alm
     mLastWMUpdateCount : int
     mLeafCounter : int
     mLeftLength : int
+    mLeftPageBackButton : DialogButton
+    mLeftPageButton : DialogButton
     mLevel : int
     mLexText : str
     mLoading : bool
+    mMailboxButton : DialogButton
     mMiniGamesButton : DialogButton
     mMiniGamesScrollWidget : ScrollWidget
     mMiniGamesWidget : MiniGamesWidget
@@ -3639,6 +3680,7 @@ class GameSelector(Widget, QuickPlayWidgetListener, MiniGamesWidgetListener, Alm
     def ClickedAdventure(self) -> None: ...
     def Dispose(self) -> None: ...
     def Draw(self, g: Graphics) -> None: ...
+    def DrawLeftMenuArea(self, g: Graphics) -> None: ...
     def DrawMainMenuArea(self, g: Graphics) -> None: ...
     def DrawOverlay(self, g: Graphics) -> None: ...
     def DrawScreen2(self, g: Graphics) -> None: ...
@@ -3668,6 +3710,7 @@ class GameSelector(Widget, QuickPlayWidgetListener, MiniGamesWidgetListener, Alm
     def SlideOutQuickPlayWidget(self) -> None: ...
     def SlideTo(self, theX: int, theY: int) -> None: ...
     def SwitchToCreativeLevel(self) -> None: ...
+    def SwitchToLeftPage(self, isInstant: bool = ...) -> None: ...
     def SwitchToMain(self) -> None: ...
     def SwitchToMiniGames(self) -> None: ...
     def SwitchToMoreGames(self, isInstant: bool = ...) -> None: ...
@@ -3719,6 +3762,7 @@ class GameSelector(Widget, QuickPlayWidgetListener, MiniGamesWidgetListener, Alm
         MiniGame : GameSelector.GameSelectorScene # 3
         Survival : GameSelector.GameSelectorScene # 4
         CreativeLevel : GameSelector.GameSelectorScene # 5
+        LeftPage : GameSelector.GameSelectorScene # 6
 
 
 
@@ -3763,6 +3807,9 @@ class GameSelectorButtons(typing.SupportsInt):
     OnlineLevels : GameSelectorButtons # 130
     AdventureHard : GameSelectorButtons # 131
     LocalLevels : GameSelectorButtons # 132
+    LeftPage : GameSelectorButtons # 133
+    ArtGallery : GameSelectorButtons # 134
+    Mailbox : GameSelectorButtons # 135
 
 
 class GameType(typing.SupportsInt):
@@ -4217,6 +4264,7 @@ class GridItemState(typing.SupportsInt):
     RakeTriggered : GridItemState # 28
     BrainSquished : GridItemState # 29
     TalismanDisappearing : GridItemState # 30
+    CornRouletteMarked : GridItemState # 31
 
 
 class GridItemType(typing.SupportsInt):
@@ -4315,6 +4363,8 @@ class InGameButtons(typing.SupportsInt):
     StoreButton : InGameButtons # 1
     AccelerateButton : InGameButtons # 2
     PauseButton : InGameButtons # 3
+    CornRouletteSelfButton : InGameButtons # 4
+    CornRouletteOtherButton : InGameButtons # 5
 
 
 class Label(Widget):
@@ -4510,6 +4560,7 @@ class LawnApp(SexyAppBase):
     def AdvanceCrazyDaveText(self) -> bool: ...
     def AppEnteredBackground(self) -> None: ...
     def Apply500pMode(self, enable: bool) -> None: ...
+    def ApplyInterfaceLayout(self, useMobileInterface: bool, useClassicSeedChooser: bool) -> None: ...
     def ButtonDepress(self, theId: int) -> None: ...
     def ButtonPress(self, theId: int) -> None: ...
     def CanDoDaisyMode(self) -> bool: ...
@@ -4625,6 +4676,7 @@ class LawnApp(SexyAppBase):
     def IsChallengeWithoutSeedBank(self) -> bool: ...
     def IsColumnLevel(self) -> bool: ...
     def IsContinuousChallenge(self) -> bool: ...
+    def IsCornRouletteLevel(self) -> bool: ...
     def IsDRMConnected(self) -> bool: ...
     def IsEndlessIZombie(self, theGameMode: GameMode) -> bool: ...
     def IsEndlessScaryPotter(self, theGameMode: GameMode) -> bool: ...
@@ -4714,6 +4766,7 @@ class LawnApp(SexyAppBase):
     def SetMusicVolume(self, theVolume: float) -> None: ...
     def SetSfxVolume(self, theVolume: float) -> None: ...
     def ShouldAutorotateToInterfaceOrientation(self, theOrientation: UI_ORIENTATION) -> bool: ...
+    def ShouldCensorTachie(self) -> bool: ...
     def ShouldInit500p(self) -> bool: ...
     def ShowAwardScreen(self, theAwardType: AwardType, theShowAchievements: bool) -> None: ...
     def ShowChallengeScreen(self, thePage: ChallengePage) -> None: ...
@@ -6753,6 +6806,8 @@ class PlantState(typing.SupportsInt):
     GatlingIdle1 : PlantState # 75
     PlanternHenshinBegin : PlantState # 76
     PlanternHenshinOver : PlantState # 77
+    IceshroomCornRouletteWaiting : PlantState # 78
+    MarigoldProducing : PlantState # 79
 
 
 class PlantSubClass(typing.SupportsInt):
@@ -6795,33 +6850,34 @@ class PlantVoice(abc.ABC):
         SkillCancel : PlantVoice.VoiceType # 9
         Mending : PlantVoice.VoiceType # 10
         Die : PlantVoice.VoiceType # 11
-        NumVoiceTypes : PlantVoice.VoiceType # 12
-        Special_Title_En : PlantVoice.VoiceType # 13
-        Special_Title_Cn : PlantVoice.VoiceType # 14
-        Special_Title_Jp : PlantVoice.VoiceType # 15
-        Special_Garlic_Mending : PlantVoice.VoiceType # 16
-        Special_Ninja_Appear : PlantVoice.VoiceType # 17
-        Special_Ninja_Die : PlantVoice.VoiceType # 18
-        Special_Squash_Attack : PlantVoice.VoiceType # 19
-        Special_Squash_Water : PlantVoice.VoiceType # 20
-        Special_Squash_Caidan : PlantVoice.VoiceType # 21
-        Special_Talisman_Wuguiyuncai : PlantVoice.VoiceType # 22
-        Special_Talisman_Tianshuihengliu : PlantVoice.VoiceType # 23
-        Special_Talisman_Fengyin : PlantVoice.VoiceType # 24
-        Special_Zorrose_Attack1 : PlantVoice.VoiceType # 25
-        Special_Zorrose_Attack2 : PlantVoice.VoiceType # 26
-        Special_Zorrose_Enable : PlantVoice.VoiceType # 27
-        Special_Zorrose_Disable : PlantVoice.VoiceType # 28
-        Special_Gatlingpea_Attack1 : PlantVoice.VoiceType # 29
-        Special_Gatlingpea_Attack2 : PlantVoice.VoiceType # 30
-        Special_Fumeshroom_Touch_Enter_1 : PlantVoice.VoiceType # 31
-        Special_Fumeshroom_Touch_Enter_2 : PlantVoice.VoiceType # 32
-        Special_Fumeshroom_Touch1 : PlantVoice.VoiceType # 33
-        Special_Fumeshroom_Touch2_1 : PlantVoice.VoiceType # 34
-        Special_Fumeshroom_Touch2_2 : PlantVoice.VoiceType # 35
-        Special_Fumeshroom_Touch3_1 : PlantVoice.VoiceType # 36
-        Special_Fumeshroom_Touch3_2 : PlantVoice.VoiceType # 37
-        NumSpecialTypes : PlantVoice.VoiceType # 38
+        Diamond : PlantVoice.VoiceType # 12
+        NumVoiceTypes : PlantVoice.VoiceType # 13
+        Special_Title_En : PlantVoice.VoiceType # 14
+        Special_Title_Cn : PlantVoice.VoiceType # 15
+        Special_Title_Jp : PlantVoice.VoiceType # 16
+        Special_Garlic_Mending : PlantVoice.VoiceType # 17
+        Special_Ninja_Appear : PlantVoice.VoiceType # 18
+        Special_Ninja_Die : PlantVoice.VoiceType # 19
+        Special_Squash_Attack : PlantVoice.VoiceType # 20
+        Special_Squash_Water : PlantVoice.VoiceType # 21
+        Special_Squash_Caidan : PlantVoice.VoiceType # 22
+        Special_Talisman_Wuguiyuncai : PlantVoice.VoiceType # 23
+        Special_Talisman_Tianshuihengliu : PlantVoice.VoiceType # 24
+        Special_Talisman_Fengyin : PlantVoice.VoiceType # 25
+        Special_Zorrose_Attack1 : PlantVoice.VoiceType # 26
+        Special_Zorrose_Attack2 : PlantVoice.VoiceType # 27
+        Special_Zorrose_Enable : PlantVoice.VoiceType # 28
+        Special_Zorrose_Disable : PlantVoice.VoiceType # 29
+        Special_Gatlingpea_Attack1 : PlantVoice.VoiceType # 30
+        Special_Gatlingpea_Attack2 : PlantVoice.VoiceType # 31
+        Special_Fumeshroom_Touch_Enter_1 : PlantVoice.VoiceType # 32
+        Special_Fumeshroom_Touch_Enter_2 : PlantVoice.VoiceType # 33
+        Special_Fumeshroom_Touch1 : PlantVoice.VoiceType # 34
+        Special_Fumeshroom_Touch2_1 : PlantVoice.VoiceType # 35
+        Special_Fumeshroom_Touch2_2 : PlantVoice.VoiceType # 36
+        Special_Fumeshroom_Touch3_1 : PlantVoice.VoiceType # 37
+        Special_Fumeshroom_Touch3_2 : PlantVoice.VoiceType # 38
+        NumSpecialTypes : PlantVoice.VoiceType # 39
 
 
 
@@ -6866,6 +6922,7 @@ class PlayerInfo:
     mHasUnlockedSurvivalMode : bool
     mHasUsedCheatKeys : bool
     mHasWokenStinky : bool
+    mHighestAppVersionNumber : str
     mId : int
     mIsDaveTalkingZenTutorial : bool
     mIsInZenTutorial : bool
@@ -6911,6 +6968,12 @@ class PlayerInfo:
     def FirstRun(self) -> bool: ...
     @FirstRun.setter
     def FirstRun(self, value: bool) -> bool: ...
+    @property
+    def mClassicSeedChooser(self) -> bool: ...
+    @mClassicSeedChooser.setter
+    def mClassicSeedChooser(self, value: bool) -> bool: ...
+    @property
+    def mClassicSeedChooser_Save(self) -> clr.Reference[bool]: ...
     def AddCoins(self, theAmount: int) -> None: ...
     def DeleteUserFiles(self) -> None: ...
     def DeleteUserFilesAfterUnlock(self) -> None: ...
@@ -6923,7 +6986,7 @@ class PlayerInfo:
     def LoadDetailsOld(self) -> bool: ...
     def Reset(self) -> None: ...
     def ResetChallengeRecord(self, theGameMode: GameMode) -> None: ...
-    def SaveDetails(self) -> None: ...
+    def SaveDetails(self) -> bool: ...
     def SetLevel(self, theLevel: int) -> None: ...
     def SetOnlineChallengeRecord(self, levelId: str, record: int) -> None: ...
     def UnlockFirstMiniGames(self) -> None: ...
@@ -7509,8 +7572,8 @@ class SaveFileVersion(typing.SupportsInt):
     Initial : SaveFileVersion # 0
     CardGroup : SaveFileVersion # 1
     Board_Widescreen : SaveFileVersion # 1
-    Agave : SaveFileVersion # 2
     RecordAppVersionNumber : SaveFileVersion # 2
+    Agave : SaveFileVersion # 2
     SpineAnimFirstStage : SaveFileVersion # 3
     Projectile_FromPlant : SaveFileVersion # 4
     Endoflame : SaveFileVersion # 5
@@ -7526,6 +7589,9 @@ class SaveFileVersion(typing.SupportsInt):
     AdventureModeHard : SaveFileVersion # 15
     OnlineLevelRecords : SaveFileVersion # 16
     CoinAutoCollect : SaveFileVersion # 17
+    OptionClassicSeedChooser : SaveFileVersion # 18
+    ClassicConveyorOffset : SaveFileVersion # 19
+    MailboxState : SaveFileVersion # 20
 
 
 class ScaryPotType(typing.SupportsInt):
@@ -7571,11 +7637,14 @@ class SeedBank(GameObject):
     def LoadFromFile(self, b: Buffer) -> bool: ...
     def MouseHitTest(self, x: int, y: int, theHitResult: clr.Reference[HitResult]) -> bool: ...
     def Move(self, x: int, y: int) -> None: ...
+    def MoveToHidden(self) -> None: ...
+    def MoveToShown(self) -> None: ...
     def RefreshAllPackets(self) -> None: ...
     def RemoveSeed(self, theIndex: int) -> None: ...
     def SaveToFile(self, b: Buffer) -> bool: ...
     def UpdateConveyorBelt(self) -> None: ...
     def UpdateHeight(self) -> None: ...
+    def UpdateSlideIn(self, theShowSeedBank: bool) -> None: ...
 
 
 class SeedChooserScreen(Widget, SeedPacketsWidgetListener, LawnMessageBoxListener, AlmanacListener, StoreListener):
@@ -7728,6 +7797,7 @@ class SeedPacket(GameObject):
     mApp : LawnApp
     mBoard : Board
     mBuzzedCounter : int
+    mClassicOffsetX : int
     mHeight : int
     mImitaterType : SeedType
     mIndex : int
@@ -7756,6 +7826,8 @@ class SeedPacket(GameObject):
     def Discard(self) -> None: ...
     def Draw(self, g: Graphics) -> None: ...
     def DrawBackground(self, g: Graphics) -> None: ...
+    @staticmethod
+    def DrawClassicSeedPacket(g: Graphics, x: float, y: float, theSeedType: SeedType, theImitaterType: SeedType, thePercentDark: float, theGrayness: int, theDrawCost: bool, theUseCurrentCost: bool) -> None: ...
     def DrawOverlay(self, g: Graphics) -> None: ...
     @staticmethod
     def DrawSmallSeedPacket(g: Graphics, x: float, y: float, theSeedType: SeedType, theImitaterType: SeedType, thePercentDark: float, theGrayness: int, theDrawCost: bool, theUseCurrentCost: bool, theDrawBackground: bool, theDrawCostBackground: bool, canShowName: bool = ...) -> None: ...
@@ -7908,21 +7980,25 @@ class SeedType(typing.SupportsInt):
     SlotMachineDiamond : SeedType # 69
     ZombiquariumSnorkel : SeedType # 70
     ZombiquariumTrophy : SeedType # 71
-    ZombieNormal : SeedType # 72
-    ZombieTrafficCone : SeedType # 73
-    ZombiePolevaulter : SeedType # 74
-    ZombiePail : SeedType # 75
-    ZombieLadder : SeedType # 76
-    ZombieDigger : SeedType # 77
-    ZombieBungee : SeedType # 78
-    ZombieFootball : SeedType # 79
-    ZombieBalloon : SeedType # 80
-    ZombieScreenDoor : SeedType # 81
-    Zomboni : SeedType # 82
-    ZombiePogo : SeedType # 83
-    ZombieDancer : SeedType # 84
-    ZombieGargantuar : SeedType # 85
-    ZombieImp : SeedType # 86
+    CornRouletteWatercan : SeedType # 72
+    CornRouletteChocolate : SeedType # 73
+    CornRouletteFertilizer : SeedType # 74
+    CornRouletteMagnifier : SeedType # 75
+    ZombieNormal : SeedType # 76
+    ZombieTrafficCone : SeedType # 77
+    ZombiePolevaulter : SeedType # 78
+    ZombiePail : SeedType # 79
+    ZombieLadder : SeedType # 80
+    ZombieDigger : SeedType # 81
+    ZombieBungee : SeedType # 82
+    ZombieFootball : SeedType # 83
+    ZombieBalloon : SeedType # 84
+    ZombieScreenDoor : SeedType # 85
+    Zomboni : SeedType # 86
+    ZombiePogo : SeedType # 87
+    ZombieDancer : SeedType # 88
+    ZombieGargantuar : SeedType # 89
+    ZombieImp : SeedType # 90
     ZombieCardFlag : SeedType # 536870912
     MindControlledCardFlag : SeedType # 1073741824
     None_ : SeedType # -1
@@ -8373,6 +8449,8 @@ class TachieWidget(Widget):
     mMouseInsets : Insets
     mMouseVisible : bool
     mParent : WidgetContainer
+    mPatchImage : Image
+    mPatchOffset : TPoint
     mPrevScale : float
     mPrevTransX : float
     mPriority : int
@@ -8989,7 +9067,7 @@ class ZenGarden(ButtonListener, StoreListener):
     def InteractionFocusOnPlant(self, thePlant: Plant, theScale: float, cd: int) -> None: ...
     def IsStinkyHighOnChocolate(self) -> bool: ...
     def IsStinkySleeping(self) -> bool: ...
-    def IsZenGardenFull(self, theIncludeDroppedPresents: bool) -> bool: ...
+    def IsZenGardenFull(self, theIncludeDroppedPresents: bool, theRequiredSpace: int = ...) -> bool: ...
     def JumptoNextGarden(self, theTree: bool, theNext: int) -> None: ...
     def LeaveGarden(self) -> None: ...
     def LeavePlantInteraction(self, thePlant: Plant) -> None: ...
@@ -9749,6 +9827,7 @@ class ZombiePhase(typing.SupportsInt):
     TalismanLeaving : ZombiePhase # 99
     PropellerBlownAway : ZombiePhase # 100
     PropellerTeeter : ZombiePhase # 101
+    CornRoulette : ZombiePhase # 102
 
 
 class ZombiePicker:

@@ -8,6 +8,7 @@ import shutil
 import sys
 import urllib.request
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -41,14 +42,19 @@ ELEMENT_PLUS_CSS_URL_PATTERN = re.compile(
 )
 
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Build PGvZTool with pinned, locally bundled web dependencies."
     )
     parser.add_argument(
         "--mod-version",
         default="",
-        help="override MOD_VERSION from pgvz/version.py",
+        help="override the packaged MOD_VERSION (nightly base when --nightly is used)",
+    )
+    parser.add_argument(
+        "--nightly",
+        action="store_true",
+        help="append -nightly.YYYYMMDDTHHMMSSZ (UTC); never overwrite a nightly build",
     )
     parser.add_argument(
         "--game-version",
@@ -61,7 +67,14 @@ def parse_args():
         default=DEFAULT_OUTPUT_ROOT,
         help="release output directory (default: %(default)s)",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def nightly_version(base_version):
+    if re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", base_version) is None:
+        raise ValueError("Nightly base version must be MAJOR.MINOR.PATCH: {!r}".format(base_version))
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return "{}-nightly.{}".format(base_version, stamp)
 
 
 def read_python_constants(path, names):
@@ -291,16 +304,30 @@ def write_release_readme(
     path.write_text(content, encoding="utf-8")
 
 
-def create_zip(stage_root, zip_path):
+def set_packaged_mod_version(path, mod_version):
+    content = path.read_text(encoding="utf-8")
+    content = replace_once(
+        content,
+        re.compile(r"^MOD_VERSION\s*=.*$", re.MULTILINE),
+        'MOD_VERSION = "{}"'.format(mod_version),
+        "packaged MOD_VERSION",
+    )
+    path.write_text(content, encoding="utf-8")
+
+
+def create_zip(stage_root, zip_path, overwrite=True):
     if zip_path.is_symlink():
         raise ValueError("Refusing to replace symlinked ZIP path: {}".format(zip_path))
     if zip_path.exists():
+        if not overwrite:
+            raise FileExistsError("Refusing to overwrite nightly ZIP: {}".format(zip_path))
         if not zip_path.is_file():
             raise ValueError("Release ZIP path is not a file: {}".format(zip_path))
         zip_path.unlink()
 
     with zipfile.ZipFile(
-        str(zip_path), mode="w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+        str(zip_path), mode="w" if overwrite else "x",
+        compression=zipfile.ZIP_DEFLATED, compresslevel=9
     ) as archive:
         for source_path in sorted(path for path in stage_root.rglob("*") if path.is_file()):
             archive.write(str(source_path), str(source_path.relative_to(stage_root)))
@@ -312,6 +339,8 @@ def build_release(args):
         {"MOD_VERSION", "SUPPORTED_GAME_VERSIONS"},
     )
     mod_version = args.mod_version or version_values["MOD_VERSION"]
+    if args.nightly:
+        mod_version = nightly_version(mod_version)
     game_version = args.game_version or format_supported_game_versions(
         version_values["SUPPORTED_GAME_VERSIONS"]
     )
@@ -327,7 +356,13 @@ def build_release(args):
     zip_path = output_root / (package_name + ".zip")
 
     output_root.mkdir(parents=True, exist_ok=True)
-    ensure_clean_directory(stage_root)
+    if args.nightly:
+        if zip_path.exists() or zip_path.is_symlink():
+            raise FileExistsError("Refusing to overwrite nightly ZIP: {}".format(zip_path))
+        # Exclusive creation also protects concurrent builds with the same timestamp.
+        stage_root.mkdir()
+    else:
+        ensure_clean_directory(stage_root)
 
     for file_name in REQUIRED_FILES:
         source = REPO_ROOT / file_name
@@ -341,6 +376,8 @@ def build_release(args):
             stage_root / directory_name,
         )
 
+    if mod_version != version_values["MOD_VERSION"]:
+        set_packaged_mod_version(stage_root / "pgvz" / "version.py", mod_version)
     copy_gui(REPO_ROOT / "gui", stage_root / "gui")
     set_release_gui_assets(stage_root / "gui", vue_version, element_plus_version)
     write_release_readme(
@@ -350,13 +387,14 @@ def build_release(args):
         vue_version,
         element_plus_version,
     )
-    create_zip(stage_root, zip_path)
+    create_zip(stage_root, zip_path, overwrite=not args.nightly)
 
     print("\nRelease package created:")
     print("  Directory: {}".format(stage_root))
     print("  Zip:       {}".format(zip_path))
     print("  Vue:       {}".format(vue_version))
     print("  Element+:  {}".format(element_plus_version))
+    return zip_path
 
 
 def main():

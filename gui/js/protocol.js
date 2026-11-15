@@ -5,13 +5,17 @@ window.PGvZProtocol = (() => {
     ].join('\n');
 
     const BOOTSTRAP_CODE = [
-        'from pgvz import *',
-        'from pgvztool import *',
-        'import Lawn',
-        'import Sexy',
-        'import Sexy.TodLib',
-        'import LawnMod',
-        'import pgvz.lineup',
+        'try:',
+        '    from pgvz import *',
+        '    from pgvztool import *',
+        '    import Lawn',
+        '    import Sexy',
+        '    import Sexy.TodLib',
+        '    import LawnMod',
+        '    import pgvz.lineup',
+        'except Exception:',
+        '    import traceback',
+        '    raise RuntimeError(traceback.format_exc())',
     ].join('\n');
 
     const GAME_VERSION_PROBE_CODE = [

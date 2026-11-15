@@ -70,7 +70,7 @@ function loadGui({ mobile = false, saved = {} } = {}) {
         if (!interval) timers.delete(entry[0]);
         entry[1].fn();
     }
-    function bootstrap() {
+    function bootstrap(state = {}) {
         const ws = sockets.at(-1);
         ws.open();
         ws.message({ action: 'bootstrapReady', ready: true });
@@ -79,7 +79,7 @@ function loadGui({ mobile = false, saved = {} } = {}) {
         ws.message({ action: 'queued', id: request.id });
         runTimer(100);
         ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
-            action: 'sync', modVersion: '1.15.1', gameVersion: '1.3.4', state: {},
+            action: 'sync', modVersion: '1.15.1', gameVersion: '1.3.4', state,
         } }] });
         flush();
         return ws;
@@ -147,7 +147,9 @@ test('header versions and exact support-list warning survive an import error', (
 });
 
 test('PC restores its saved options; mobile connects without pushing them', () => {
-    const saved = { cheat: { freePlant: true, autoCollect: false }, placer: { imitater: true } };
+    const saved = { cheat: {
+        freePlant: true, autoCollect: false, disableTachieCensor: true, marigoldAlwaysThreeDiamonds: true,
+    }, placer: { imitater: true } };
     for (const mobile of [false, true]) {
         const gui = loadGui({ mobile, saved });
         const ws = gui.sockets[0];
@@ -164,6 +166,8 @@ test('PC restores its saved options; mobile connects without pushing them', () =
         assert.equal('state' in request, !mobile);
         if (!mobile) {
             assert.equal(request.state.cheat.freePlant, true);
+            assert.equal(request.state.cheat.disableTachieCensor, true);
+            assert.equal(request.state.cheat.marigoldAlwaysThreeDiamonds, true);
             assert.equal(request.state.placer.scaryPotType, 'Seed');
             assert.equal(request.state.placer.scaryPotAppearance, 'ScaryPotQuestion');
         }
@@ -234,7 +238,9 @@ test('remote synchronization updates UI without echoing its changes', () => {
     const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
     const count = ws.sent.length;
     ws.message({ action: 'results', results: [{ ...request, ok: true, value: { action: 'sync', state: {
-        cheat: { freePlant: true, noSunLimit: true }, placer: {
+        cheat: {
+            freePlant: true, noSunLimit: true, disableTachieCensor: true, marigoldAlwaysThreeDiamonds: true,
+        }, placer: {
             seedType: 'Sunflower', imitater: true,
             scaryPotType: 'Sun3', scaryPotAppearance: 'ScaryPotZombie',
         },
@@ -243,6 +249,8 @@ test('remote synchronization updates UI without echoing its changes', () => {
     gui.flush();
     assert.equal(gui.model.cheatOption.freePlant, true);
     assert.equal(gui.model.cheatOption.noSunLimit, true);
+    assert.equal(gui.model.cheatOption.disableTachieCensor, true);
+    assert.equal(gui.model.cheatOption.marigoldAlwaysThreeDiamonds, true);
     assert.equal(gui.model.selectedSeedType.value, 'Sunflower');
     assert.equal(gui.model.selectedScaryPotType.value, 'Sun3');
     assert.equal(gui.model.selectedScaryPotAppearance.value, 'ScaryPotZombie');
@@ -281,6 +289,25 @@ test('vase selectors send their options to the easy placer', () => {
         assert.equal(request.kind, 'apply');
         assert.deepEqual(request.state, { placer: { [field]: value } });
     }
+});
+
+test('easy-place zoom mode has bilingual labels and uses existing state synchronization', () => {
+    const gui = loadGui();
+    const ws = gui.bootstrap();
+    const zoom = gui.model.easyPlaceModeList.find(item => item.value === 'zoom');
+    assert.equal(zoom.label, '放大模式');
+    assert.equal(zoom.en, 'Zoom Mode');
+    gui.model.setPlacerOption('easyPlaceMode', zoom.value);
+    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    assert.equal(request.kind, 'apply');
+    assert.deepEqual(request.state, { placer: { easyPlaceMode: 'zoom' } });
+    gui.connection.refreshState();
+    const snapshot = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    ws.message({ action: 'results', results: [{ ...snapshot, ok: true, value: {
+        action: 'sync', state: { placer: { easyPlaceMode: 'zoom', active: false } },
+    } }] });
+    gui.flush();
+    assert.equal(gui.model.easyPlaceMode.value, 'zoom');
 });
 
 test('actions wait for actual completion and poll only while results are pending', () => {
@@ -393,6 +420,33 @@ test('failed initial synchronization clears queued commands and stops polling', 
     assert.equal(ws.sent.some(code => code.includes('winLevel')), false);
 });
 
+test('bootstrap import errors show the 1.4.3 result field and stop calls to the unavailable dispatcher', () => {
+    const gui = loadGui();
+    const ws = gui.sockets[0];
+    ws.open();
+    gui.model.sendAction('winLevel');
+    ws.message({ action: 'bootstrapReady', ready: true });
+    ws.message(gameVersionProbe);
+    assert.match(ws.sent.at(-1), /except Exception:\n    import traceback\n    raise RuntimeError\(traceback.format_exc\(\)\)/);
+    const traceback = "Traceback (most recent call last):\n  File 'mods/pgvztool/hook.py', line 60\nNameError: name 'missing_name' is not defined";
+    ws.onmessage({ data: JSON.stringify({ statuscode: 1, errortype: 'RuntimeError', result: traceback }) });
+    assert.equal(gui.model.lastResult.text, `RuntimeError: ${traceback}`);
+    assert.equal(gui.model.connected.value, false);
+    assert.equal(gui.connection.connectionState.value, 'error');
+    assert.equal(gui.model.gameVersion.value, gameVersionProbe.version);
+    assert.equal(gui.timers.size, 0);
+    assert.equal(ws.sent.some(code => /gui_dispatcher\.(poll|cancel)\(/.test(code)), false);
+    assert.equal(ws.sent.some(code => code.includes('winLevel')), false);
+    ws.onmessage({ data: JSON.stringify({ statuscode: 1,
+        errortype: 'IronPython.Runtime.UnboundNameException', result: "name 'gui_dispatcher' is not defined",
+    }) });
+    assert.equal(gui.model.lastResult.text, `RuntimeError: ${traceback}`);
+    gui.model.customCode.value = '1 / 0';
+    gui.model.sendCustomCode();
+    ws.onmessage({ data: JSON.stringify({ statuscode: 1, errortype: 'ZeroDivisionError', result: 'division by zero' }) });
+    assert.equal(gui.model.lastResult.text, 'ZeroDivisionError: division by zero');
+});
+
 test('heartbeat and release use the same request API without changing the result banner', () => {
     const gui = loadGui();
     const ws = gui.bootstrap();
@@ -448,7 +502,12 @@ test('request timeout cancels pending work and ignores late results', () => {
     ws.message({ action: 'results', results: [{ ...request, ok: true, value: null }] });
     assert.equal(gui.model.lastResult.key, 'messages.requestTimeout');
     assert.equal(ws.sent.filter(code => code.includes('winLevel')).length, 1);
-    assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
+    assert.equal(gui.connection.connectionState.value, 'reconnecting');
+    assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
+    gui.model.setLanguage('zh');
+    assert.equal(gui.model.resultText.value, '请求超时，请保证游戏打开并位于前台');
+    gui.model.setLanguage('en');
+    assert.equal(gui.model.resultText.value, 'Request timed out. Make sure the game is open and in the foreground.');
 });
 
 test('unrelated debug errors do not discard concurrent action results', () => {
@@ -472,11 +531,13 @@ test('queued actions time out before bootstrap and are never flushed later', () 
     gui.model.sendAction('winLevel');
     gui.runTimer(30000);
     assert.equal(gui.model.lastResult.key, 'messages.requestTimeout');
-    gui.bootstrap();
+    gui.runTimer(3000);
+    const recovered = gui.bootstrap();
     assert.equal(ws.sent.some(code => code.includes('winLevel')), false);
+    assert.equal(recovered.sent.some(code => code.includes('winLevel')), false);
 });
 
-test('heartbeat timeout clears all pending requests and socket errors clear timers', () => {
+test('heartbeat timeout and socket errors cancel pending work and leave exactly one reconnect timer', () => {
     for (const socketError of [false, true]) {
         const gui = loadGui();
         const ws = gui.bootstrap();
@@ -485,10 +546,129 @@ test('heartbeat timeout clears all pending requests and socket errors clear time
         if (socketError) ws.onerror();
         else gui.runTimer(30000);
         assert.equal(gui.model.connected.value, false);
-        assert.equal(gui.timers.size, 0);
+        assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
         const count = ws.sent.length;
         gui.model.sendAction('nextStage');
         assert.equal(ws.sent.length, count);
-        assert.equal(gui.timers.size, 0);
+        assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
+        ws.onerror();
+        ws.close();
+        assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
+        gui.runTimer(3000);
+        const recovered = gui.bootstrap();
+        assert.equal(gui.model.connected.value, true);
+        assert.equal(recovered.sent.some(code => code.includes('winLevel') || code.includes('nextStage')), false);
     }
+});
+
+test('mobile and PC retry while the game is suspended then pull state before accepting new changes', () => {
+    for (const mobile of [true, false]) {
+        const gui = loadGui({ mobile, saved: { cheat: { freePlant: true } } });
+        const original = gui.bootstrap({ cheat: { freePlant: false } });
+        gui.model.cheatOption.freePlant = true;
+        gui.flush();
+        const pending = JSON.parse(decodeCall(original.sent.at(-1)).args[0]);
+        assert.equal(pending.kind, 'apply');
+        gui.runTimer(30000);
+        assert.equal(gui.connection.connectionState.value, 'reconnecting');
+        gui.runTimer(3000);
+        const suspended = gui.sockets.at(-1);
+        suspended.open();
+        suspended.message({ action: 'bootstrapReady', ready: true });
+        suspended.message(gameVersionProbe);
+        const reconnect = JSON.parse(decodeCall(suspended.sent.at(-1).split('\n').at(-1)).args[0]);
+        assert.equal(reconnect.kind, 'connect');
+        assert.equal('state' in reconnect, false);
+        // The socket accepts messages, but the suspended game never runs its main-thread queue.
+        suspended.message({ action: 'queued', id: reconnect.id });
+        gui.runTimer(30000);
+        assert.equal(gui.connection.connectionState.value, 'reconnecting');
+        gui.runTimer(3000);
+        const recovered = gui.bootstrap({ cheat: { freePlant: false } });
+        assert.equal(gui.model.connected.value, true);
+        assert.equal(gui.model.cheatOption.freePlant, false);
+        assert.equal(gui.model.lastResult.key, 'messages.syncOk');
+        const requests = recovered.sent.filter(code => code.includes('gui_dispatcher.submit'))
+            .map(code => JSON.parse(decodeCall(code.split('\n').at(-1)).args[0]));
+        assert.equal(requests.length, 1);
+        assert.equal('state' in requests[0], false);
+        assert.equal(recovered.sent.some(code => code.includes(pending.id)), false);
+        original.message({ action: 'results', results: [{ ...pending, ok: true, value: null }] });
+        suspended.onerror();
+        assert.equal(gui.model.connected.value, true);
+        assert.equal(gui.model.cheatOption.freePlant, false);
+        gui.model.cheatOption.freePlant = true;
+        gui.flush();
+        const fresh = JSON.parse(decodeCall(recovered.sent.at(-1)).args[0]);
+        assert.equal(fresh.kind, 'apply');
+        assert.equal(fresh.state.cheat.freePlant, true);
+        recovered.message({ action: 'results', results: [{ ...fresh, ok: true, value: null }] });
+        assert.equal(gui.model.lastResult.key, 'messages.success');
+    }
+});
+
+test('handshake and bootstrap probes without responses keep retrying until the game becomes available', () => {
+    for (const blockedStage of ['handshake', 'ready', 'version']) {
+        const gui = loadGui();
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const ws = gui.sockets.at(-1);
+            if (blockedStage !== 'handshake') ws.open();
+            if (blockedStage === 'version') ws.message({ action: 'bootstrapReady', ready: true });
+            gui.runTimer(30000);
+            assert.equal(gui.connection.connectionState.value, 'reconnecting');
+            assert.equal(ws.readyState, 3);
+            assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
+            gui.runTimer(3000);
+        }
+        gui.bootstrap();
+        assert.equal(gui.model.connected.value, true);
+    }
+});
+
+test('expired connect and heartbeat results resume automatic reconnection', () => {
+    for (const kind of ['connect', 'heartbeat']) {
+        const gui = loadGui();
+        let ws;
+        if (kind === 'heartbeat') {
+            ws = gui.bootstrap();
+            gui.runTimer(3000, true);
+        } else {
+            ws = gui.sockets[0];
+            ws.open();
+            ws.message({ action: 'bootstrapReady', ready: true });
+            ws.message(gameVersionProbe);
+        }
+        const request = JSON.parse(decodeCall(ws.sent.at(-1).split('\n').at(-1)).args[0]);
+        assert.equal(request.kind, kind);
+        ws.message({ action: 'results', results: [{ ...request, ok: false,
+            errortype: 'RequestExpired', error: 'expired while the game was suspended',
+        }] });
+        assert.equal(gui.connection.connectionState.value, 'reconnecting');
+        assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
+        gui.runTimer(3000);
+        gui.bootstrap();
+        assert.equal(gui.model.connected.value, true);
+    }
+});
+
+test('leaving the page cancels scheduled retries and rejected recovery sessions do not retry', () => {
+    const leaving = loadGui();
+    leaving.bootstrap().onerror();
+    leaving.listeners.beforeunload();
+    assert.equal(leaving.timers.size, 0);
+    const occupied = loadGui();
+    occupied.bootstrap().onerror();
+    occupied.runTimer(3000);
+    const ws = occupied.sockets.at(-1);
+    ws.open();
+    ws.message({ action: 'bootstrapReady', ready: true });
+    ws.message(gameVersionProbe);
+    const connect = JSON.parse(decodeCall(ws.sent.at(-1).split('\n').at(-1)).args[0]);
+    ws.message({ action: 'results', results: [{ ...connect, ok: true,
+        value: { action: 'sessionRejected', accepted: false },
+    }] });
+    assert.equal(occupied.connection.connectionState.value, 'occupied');
+    assert.equal(occupied.timers.size, 0);
+    ws.close();
+    assert.equal(occupied.timers.size, 0);
 });

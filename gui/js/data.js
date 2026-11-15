@@ -151,6 +151,12 @@ window.PGvZData = (() => {
         { label: '女忍者僵尸', value: 'Ninja', en: 'Ninja' },
         { label: '天尸', value: 'Talisman', en: 'Talisman' },
         { label: '螺旋桨僵尸', value: 'Propeller', en: 'Propeller' },
+        { label: '豌豆僵尸', value: 'PeaHead', en: 'Pea Head' },
+        { label: '坚果僵尸', value: 'WallnutHead', en: 'Wallnut Head' },
+        { label: '辣椒僵尸', value: 'JalapenoHead', en: 'Jalapeno Head' },
+        { label: '机枪豌豆僵尸', value: 'GatlingHead', en: 'Gatling Head' },
+        { label: '窝瓜僵尸', value: 'SquashHead', en: 'Squash Head' },
+        { label: '高坚果僵尸', value: 'TallnutHead', en: 'Tallnut Head' },
     ];
 
     const selectRows = [
@@ -208,6 +214,7 @@ window.PGvZData = (() => {
         { label: '割草机', value: 'mower', en: 'Mower' },
         { label: '传送门', value: 'portal', en: 'Portal' },
         { label: '冰道', value: 'ice', en: 'Ice' },
+        { label: '放大模式', value: 'zoom', en: 'Zoom Mode' },
     ];
 
     const scaryPotType = [
@@ -408,6 +415,8 @@ window.PGvZData = (() => {
         { label: '融合', value: 'ChallengeFusion', en: 'Fusion' },
         { label: '随机挑战', value: 'ChallengeStageRandom', en: 'Stage Random' },
         { label: '占领高地', value: 'OccupyHighGround', en: 'Occupy High Ground' },
+        { label: '轮盘对决', value: 'CornRoulette', en: 'Corn Roulette' },
+        { label: '轮盘对决（无尽）', value: 'CornRouletteEndless', en: 'Corn Roulette (Endless)' },
     ];
 
     const lineupCodeMap = {

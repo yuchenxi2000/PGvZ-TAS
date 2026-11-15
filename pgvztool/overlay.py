@@ -287,6 +287,8 @@ def DrawCraterCooldowns(board: Lawn.Board, g: Sexy.Graphics):
 EASY_PLACE_UI_SCALE = 0.7
 
 def DrawEasyPlaceUI(board: Lawn.Board, g: Sexy.Graphics):
+    if placer.is_grid_focus_active(board):
+        return
     if board.mApp.mGameScene == Lawn.GameScenes.Playing and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
         shovel_rect = board.GetShovelButtonRect()
         glove_rect = board.GetZenButtonRect(Lawn.GameObjectType.Glove)
