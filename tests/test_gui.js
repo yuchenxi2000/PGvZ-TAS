@@ -231,6 +231,31 @@ test('sun limit toggle persists, synchronizes, and controls the sun input range'
     assert.equal(gui.model.sunValue.value, 5000);
 });
 
+test('aquarium brain limit toggle is bilingual, persists, and synchronizes', () => {
+    const gui = loadGui();
+    const ws = gui.bootstrap();
+    const key = 'zombiquariumNoBrainLimit';
+    assert.equal(gui.model.cheatOption[key], false);
+    assert.ok(gui.model.switchGroups.features.includes(key));
+    assert.equal(gui.model.optionLabel(key), 'Unlimited Zombiquarium Brains');
+    gui.model.setLanguage('zh');
+    assert.equal(gui.model.optionLabel(key), '水族馆脑子无上限');
+    gui.model.cheatOption[key] = true;
+    gui.flush();
+    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    assert.deepEqual(request.state, { cheat: { [key]: true } });
+    const saved = JSON.parse(gui.storage.get(storageKey));
+    assert.equal(saved.cheat[key], true);
+    assert.equal(loadGui({ saved }).model.cheatOption[key], true);
+
+    const mobile = loadGui({ mobile: true });
+    const mobileWs = mobile.bootstrap({ cheat: { [key]: true } });
+    assert.equal(mobile.model.cheatOption[key], true);
+    const count = mobileWs.sent.length;
+    mobile.flush();
+    assert.equal(mobileWs.sent.length, count);
+});
+
 test('remote synchronization updates UI without echoing its changes', () => {
     const gui = loadGui({ mobile: true });
     const ws = gui.bootstrap();

@@ -1,5 +1,15 @@
 # 更新日志
 
+## [unreleased]
+
+### 新增
+
+- 特性修改新增“水族馆脑子无上限”开关，解除原生点击投喂最多三颗脑子的限制，保留投喂区域、坐标缩放、每次 5 阳光消耗及原生掉落行为，支持中英文、同步与保存，默认关闭。
+
+### 改进
+
+- 补全 PGvZ 1.4.3 水族馆失败机制说明，记录列表清空与普通僵尸左边界两条判负路径，以及随机僵尸在泳池格被覆盖水族馆状态的风险。
+
 ## [1.17.0] - 2026-11-16
 
 ### 新增
@@ -466,6 +476,7 @@
 - 修复安卓部分区域无法自动收集、移除天尸诅咒不完整，以及过长命令结果挤出网页界面的问题。
 - 进入月夜无尽前检查屋顶无尽存档，避免未经提示直接覆盖。
 
+[unreleased]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.17.0...HEAD
 [1.17.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.17.0
 [1.16.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.16.1
 [1.16.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.16.0

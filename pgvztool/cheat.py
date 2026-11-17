@@ -39,6 +39,7 @@ class CheatOption(Serializable):
         self.noFog = False
         self.transScaryPot = False
         self.scaryPotterNoDelay = False
+        self.zombiquariumNoBrainLimit = False
         self.conveyorNoCooling = False
         self.featureThreePeater = False
         self.butterPult = False

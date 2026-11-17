@@ -77,6 +77,7 @@ window.PGvZOptions = (() => {
                 'hypnoCattailAlwaysHypnotize',
                 'allZombiesHypnotizable',
                 'scaryPotterNoDelay',
+                'zombiquariumNoBrainLimit',
             ],
             scene: [
                 'noFog',

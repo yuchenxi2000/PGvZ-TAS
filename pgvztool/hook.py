@@ -735,6 +735,18 @@ def Board__MouseDownWithTool(orig, board: Lawn.Board, x: int, y: int, clickCnt: 
     if cheat_option.shovelNoReset and clickCnt >= 0 and cursorType == Lawn.CursorType.Shovel:
         board.mCursorObject.mCursorType = Lawn.CursorType.Shovel
 
+# 水族馆原生投喂入口：只移除场上脑子数量检查，保留区域、缩放和阳光消耗。
+@LawnMod.MonoModUtils.HookTo(Lawn.Challenge.ZombiquariumMouseDown)
+def Challenge__ZombiquariumMouseDown(orig, challenge: Lawn.Challenge, x: int, y: int):
+    if not cheat_option.zombiquariumNoBrainLimit:
+        return orig(challenge, x, y)
+    x = int(x * Sexy.Constants.IS)
+    y = int(y * Sexy.Constants.IS)
+    if x < 80 - Sexy.Constants.BOARD_EXTRA_ROOM or x > 720 or y < 90 or y > 430:
+        return
+    if challenge.mBoard.TakeSunMoney(5):
+        challenge.ZombiquariumDropBrain(x, y)
+
 # 轻松放置：点击处理
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.MouseDownInternal)
 def Board__MouseDownInternal(orig, board: Lawn.Board, x: int, y: int, theClickCount: int, isTouch: bool):
