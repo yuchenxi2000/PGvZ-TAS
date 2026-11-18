@@ -1,7 +1,6 @@
 // WebSocket 连接与统一请求结果回传。会话、状态和动作都由后端主线程分发器处理。
 window.PGvZConnection = (() => {
-    const REQUEST_TIMEOUT_MS = 30000;
-    const POLL_TIMEOUT_MS = 5000;
+    const HANDSHAKE_TIMEOUT_MS = 30000;
     const RECONNECT_DELAY_MS = 3000;
     function create({ isMobile, t, setResult, getInitialState, applySyncState, lineupCode }) {
         const { computed, ref } = Vue;
@@ -18,31 +17,29 @@ window.PGvZConnection = (() => {
             && supportedGameVersions.value.length > 0 && !supportedGameVersions.value.includes(gameVersion.value));
         const modVersion = ref('');
         const connectionState = ref('disconnected');
+        const pendingCount = ref(0);
+        const hasUnconfirmedRequests = ref(false);
 
         let ws = null;
-        let pendingCodes = [];
-        let heartbeatTimer = null;
         let bootstrapProbeTimer = null;
         let bootstrapStarted = false;
         let bootstrapFailed = false;
-        let pullStateOnConnect = false;
+        let takeoverOnConnect = false;
         let reconnectTimer = null;
         let connectionAttemptTimer = null;
         let leavingPage = false;
         let requestCounter = 0;
         let resultPollTimer = null;
         let resultPollInFlight = false;
-        let resultPollDeadline = null;
         const pendingRequests = new Map();
 
         function showSessionRejected(showToast = true) {
             stopReconnect();
             stopConnectionAttempt();
+            stopBootstrapProbe();
             sessionRejected.value = true;
             connected.value = false;
             connectionState.value = 'occupied';
-            pendingCodes = [];
-            stopHeartbeat();
             stopResultPolling();
             resultPollInFlight = false;
             clearRequests();
@@ -50,7 +47,7 @@ window.PGvZConnection = (() => {
             if (showToast) ElementPlus.ElMessage.error(t('messages.sessionOccupied'));
         }
 
-        function transmit(code, { allowBeforeReady = false, quiet = false, requestId = null } = {}) {
+        function transmit(code, { allowBeforeReady = false, quiet = false } = {}) {
             if (sessionRejected.value && !allowBeforeReady) {
                 showSessionRejected();
                 return false;
@@ -64,12 +61,13 @@ window.PGvZConnection = (() => {
                 return false;
             }
             if (!connected.value && !allowBeforeReady) {
-                pendingCodes.push({ code, quiet, requestId });
-                return true;
+                ElementPlus.ElMessage.error(t('messages.notReady'));
+                return false;
             }
             try {
                 ws.send(code);
             } catch {
+                retryConnection();
                 ElementPlus.ElMessage.error(t('messages.notConnected'));
                 return false;
             }
@@ -91,17 +89,18 @@ window.PGvZConnection = (() => {
             let code = PGvZProtocol.requestCode(clientId, id, kind, details);
             if (options.bootstrap) code = `${PGvZProtocol.BOOTSTRAP_CODE}\n${code}`;
             if (options.expectResult !== false) {
-                pendingRequests.set(id, { kind, timer: setTimeout(() => requestTimedOut(id), REQUEST_TIMEOUT_MS) });
+                pendingRequests.set(id, { kind });
+                pendingCount.value = pendingRequests.size;
             }
-            if (!transmit(code, { ...options, requestId: id })) finishRequest(id);
+            if (!transmit(code, options)) finishRequest(id);
             scheduleResultPoll();
         }
 
         function finishRequest(id) {
             const request = pendingRequests.get(id);
             if (!request) return null;
-            if (request.timer !== null) clearTimeout(request.timer);
             pendingRequests.delete(id);
+            pendingCount.value = pendingRequests.size;
             return request;
         }
 
@@ -115,22 +114,7 @@ window.PGvZConnection = (() => {
             const ids = [...pendingRequests.keys()];
             ids.forEach(finishRequest);
             if (cancel) cancelRequests(ids);
-            stopPollDeadline();
             resultPollInFlight = false;
-        }
-
-        function requestTimedOut(id) {
-            const request = pendingRequests.get(id);
-            if (!request) return;
-            if (connected.value || request.kind === 'connect' || request.kind === 'heartbeat') {
-                retryConnection();
-            } else {
-                finishRequest(id);
-                cancelRequests([id]);
-                pendingCodes = pendingCodes.filter(item => item.requestId !== id);
-            }
-            setResult(false, 'messages.requestTimeout');
-            scheduleResultPoll();
         }
 
         function sendAction(name, args = {}) {
@@ -152,18 +136,10 @@ window.PGvZConnection = (() => {
             }
         }
 
-        function stopPollDeadline() {
-            if (resultPollDeadline !== null) {
-                clearTimeout(resultPollDeadline);
-                resultPollDeadline = null;
-            }
-        }
-
         function scheduleResultPoll() {
             stopResultPolling();
             // connect 的结果也要轮询，所以这里不能依赖 connected。
             if (!pendingRequests.size) {
-                stopPollDeadline();
                 resultPollInFlight = false;
                 return;
             }
@@ -172,12 +148,8 @@ window.PGvZConnection = (() => {
                 resultPollTimer = null;
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     resultPollInFlight = true;
-                    try { ws.send(PGvZProtocol.pollCode(clientId)); } catch { /* deadline retries result polling */ }
-                    resultPollDeadline = setTimeout(() => {
-                        resultPollDeadline = null;
-                        resultPollInFlight = false;
-                        scheduleResultPoll(); // 只重试取结果，不重放副作用动作。
-                    }, POLL_TIMEOUT_MS);
+                    // 后台暂停可能连 poll 都不能处理；收到响应前不再堆积轮询。
+                    try { ws.send(PGvZProtocol.pollCode(clientId)); } catch { retryConnection(); }
                 }
             }, 100);
         }
@@ -189,7 +161,6 @@ window.PGvZConnection = (() => {
                 setResult(true, 'messages.syncOk');
                 applySyncState(message.state);
                 markConnected();
-                startHeartbeat();
             }
         }
 
@@ -199,22 +170,19 @@ window.PGvZConnection = (() => {
                 acknowledged.push(result.id);
                 if (!finishRequest(result.id)) continue;
                 if (!result.ok) {
-                    if (result.errortype === 'RequestExpired') setResult(false, 'messages.requestExpired');
-                    else setResult(false, '', `${result.errortype}: ${result.error}`);
-                    if (result.errortype === 'RequestExpired'
-                        && (connected.value || result.kind === 'connect' || result.kind === 'heartbeat')) {
-                        retryConnection();
-                        continue;
+                    if (result.errortype === 'SessionRejected') {
+                        showSessionRejected();
+                        break;
                     }
+                    setResult(false, '', `${result.errortype}: ${result.error}`);
                     if (result.kind === 'connect') {
                         stopConnectionAttempt();
-                        pendingCodes = [];
                         clearRequests();
                         connectionState.value = 'error';
-                        stopHeartbeat();
                     }
-                } else if (result.kind === 'connect' || result.kind === 'snapshot' || result.kind === 'heartbeat') {
+                } else if (result.kind === 'connect' || result.kind === 'snapshot') {
                     applyStateMessage(result.value);
+                    if (sessionRejected.value) break;
                 } else if (result.kind === 'action' && result.name === 'getLineup') {
                     lineupCode.value = result.value;
                     setResult(true, 'messages.lineupOk');
@@ -223,7 +191,7 @@ window.PGvZConnection = (() => {
                 }
             }
             if (acknowledged.length && ws && ws.readyState === WebSocket.OPEN) {
-                try { ws.send(PGvZProtocol.acknowledgeCode(clientId, acknowledged)); } catch { /* cached results expire */ }
+                try { ws.send(PGvZProtocol.acknowledgeCode(clientId, acknowledged)); } catch { retryConnection(); }
             }
             scheduleResultPoll();
         }
@@ -234,25 +202,6 @@ window.PGvZConnection = (() => {
             sessionRejected.value = false;
             connected.value = true;
             connectionState.value = 'connected';
-            const queuedCodes = pendingCodes;
-            pendingCodes = [];
-            queuedCodes.forEach(({ code, quiet, requestId }) => transmit(code, { quiet, requestId }));
-        }
-
-        function stopHeartbeat() {
-            if (heartbeatTimer !== null) {
-                clearInterval(heartbeatTimer);
-                heartbeatTimer = null;
-            }
-        }
-
-        function startHeartbeat() {
-            stopHeartbeat();
-            heartbeatTimer = setInterval(() => {
-                if (ws && ws.readyState === WebSocket.OPEN && connected.value) {
-                    submit('heartbeat', {}, { quiet: true });
-                }
-            }, 3000);
         }
 
         function releaseSession() {
@@ -260,16 +209,16 @@ window.PGvZConnection = (() => {
             stopReconnect();
             stopConnectionAttempt();
             stopBootstrapProbe();
-            stopHeartbeat();
-            if (ws && ws.readyState === WebSocket.OPEN && connected.value) {
+            stopResultPolling();
+            if (ws && ws.readyState === WebSocket.OPEN && bootstrapStarted && !bootstrapFailed) {
                 try {
                     clearRequests();
-                    pendingCodes = [];
-                    submit('release', {}, { quiet: true, expectResult: false });
+                    submit('release', {}, { allowBeforeReady: true, quiet: true, expectResult: false });
                 } catch {
                     // 页面关闭期间 WebSocket 可能已经被浏览器释放。
                 }
             }
+            clearRequests(false);
         }
 
         function stopBootstrapProbe() {
@@ -282,7 +231,7 @@ window.PGvZConnection = (() => {
         function requestBootstrapReady() {
             stopBootstrapProbe();
             if (!ws || ws.readyState !== WebSocket.OPEN || bootstrapStarted) return;
-            ws.send(PGvZProtocol.BOOTSTRAP_READY_PROBE_CODE);
+            transmit(PGvZProtocol.BOOTSTRAP_READY_PROBE_CODE, { allowBeforeReady: true, quiet: true });
         }
 
         function retryBootstrapReady() {
@@ -294,9 +243,23 @@ window.PGvZConnection = (() => {
             if (bootstrapStarted || !ws || ws.readyState !== WebSocket.OPEN) return;
             stopBootstrapProbe();
             bootstrapStarted = true;
-            stopConnectionAttempt(); // 从这里开始由 connect 请求自己的超时计时器接管。
-            const state = isMobile || pullStateOnConnect ? undefined : getInitialState();
-            submit('connect', { state }, { allowBeforeReady: true, bootstrap: true });
+            const state = isMobile ? undefined : getInitialState();
+            const details = takeoverOnConnect ? { state, takeover: true } : { state };
+            takeoverOnConnect = false;
+            submit('connect', details, { allowBeforeReady: true, bootstrap: true });
+        }
+
+        function takeoverSession() {
+            if (!sessionRejected.value) return;
+            sessionRejected.value = false;
+            connectionState.value = 'initializing';
+            if (ws && ws.readyState === WebSocket.OPEN && bootstrapStarted) {
+                submit('connect', { state: isMobile ? undefined : getInitialState(), takeover: true },
+                    { allowBeforeReady: true });
+            } else {
+                takeoverOnConnect = true;
+                connect();
+            }
         }
 
         function stopReconnect() {
@@ -316,13 +279,15 @@ window.PGvZConnection = (() => {
         function retryConnection() {
             stopConnectionAttempt();
             stopBootstrapProbe();
-            stopHeartbeat();
             stopResultPolling();
-            clearRequests();
-            pendingCodes = [];
+            if ([...pendingRequests.values()].some(request => request.kind === 'action' || request.kind === 'apply')) {
+                hasUnconfirmedRequests.value = true;
+                setResult(false, 'messages.resultsUnconfirmed');
+            }
+            // 断线不等于执行失败；既不重放动作，也不假定 cancel 能送达。
+            clearRequests(false);
             bootstrapStarted = false;
             connected.value = false;
-            pullStateOnConnect = true;
             gameVersion.value = '';
             modVersion.value = '';
             const previousSocket = ws;
@@ -344,19 +309,21 @@ window.PGvZConnection = (() => {
         }
 
         function connect() {
-            if (leavingPage || sessionRejected.value) return;
+            if (leavingPage) return;
+            if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
             stopReconnect();
             stopConnectionAttempt();
             const socket = new WebSocket(SERVER_URL);
             ws = socket;
-            // 覆盖握手和启动探测无响应的情况，不只依赖 WebSocket 的 close 事件。
+            connectionState.value = 'connecting';
+            // 只限制 WebSocket 握手；打开后允许游戏无限期暂停。
             connectionAttemptTimer = setTimeout(() => {
                 connectionAttemptTimer = null;
                 retryConnection();
-                setResult(false, 'messages.requestTimeout');
-            }, REQUEST_TIMEOUT_MS);
+            }, HANDSHAKE_TIMEOUT_MS);
             socket.onopen = () => {
-                if (ws !== socket) return;
+                if (ws !== socket || leavingPage) return;
+                stopConnectionAttempt();
                 stopBootstrapProbe();
                 bootstrapStarted = false;
                 bootstrapFailed = false;
@@ -364,11 +331,12 @@ window.PGvZConnection = (() => {
                 gameVersion.value = '';
                 supportedGameVersions.value = [];
                 modVersion.value = '';
-                connectionState.value = 'connecting';
+                connectionState.value = 'initializing';
+                setResult(true, 'messages.waiting');
                 requestBootstrapReady();
             };
             socket.onmessage = event => {
-                if (ws !== socket) return;
+                if (ws !== socket || leavingPage) return;
                 try {
                     const data = JSON.parse(event.data);
                     if (data.statuscode === 0) {
@@ -376,7 +344,7 @@ window.PGvZConnection = (() => {
                         if (message && message.action === 'bootstrapReady') {
                             if (message.ready) {
                                 stopBootstrapProbe();
-                                socket.send(PGvZProtocol.GAME_VERSION_PROBE_CODE);
+                                transmit(PGvZProtocol.GAME_VERSION_PROBE_CODE, { allowBeforeReady: true, quiet: true });
                             } else {
                                 retryBootstrapReady();
                             }
@@ -390,7 +358,6 @@ window.PGvZConnection = (() => {
                         } else if (message && (message.action === 'acknowledged' || message.action === 'cancelled')) {
                             // 仅确认传输层交接，不覆盖业务结果。
                         } else if (message && message.action === 'results') {
-                            stopPollDeadline();
                             resultPollInFlight = false;
                             applyRequestResults(message.results);
                         } else {
@@ -400,13 +367,12 @@ window.PGvZConnection = (() => {
                         // 原始调试代码的错误没有请求 ID，不能清空其他动作的等待状态。
                         if (bootstrapFailed) return; // 保留第一次导入错误，忽略已发出轮询的后续错误。
                         // 首次导入失败时分发器可能还不存在，停止轮询且不发送 cancel。
-                        if (!connected.value && [...pendingRequests.values()].some(request => request.kind === 'connect')) {
+                        if (!connected.value && connectionState.value === 'initializing') {
                             stopConnectionAttempt();
+                            stopBootstrapProbe();
                             bootstrapFailed = true;
-                            pendingCodes = [];
                             clearRequests(false);
                             stopResultPolling();
-                            stopHeartbeat();
                             connectionState.value = 'error';
                         }
                         if (data.errortype) setResult(false, '', `${data.errortype}: ${data.error ?? data.result ?? ''}`);
@@ -429,7 +395,8 @@ window.PGvZConnection = (() => {
         return {
             clientId, connected, sessionRejected, unsupportedGameVersion, supportedGameVersions,
             gameVersion, modVersion, connectionState,
-            send, sendAction, applyState, refreshState, connect, releaseSession,
+            pendingCount, hasUnconfirmedRequests,
+            send, sendAction, applyState, refreshState, connect, releaseSession, takeoverSession,
         };
     }
 

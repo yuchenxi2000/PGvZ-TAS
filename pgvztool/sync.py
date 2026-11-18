@@ -2,7 +2,6 @@
 Serializable 基类和集中同步管理
 """
 import json
-import time
 import traceback
 import Sexy
 import System
@@ -10,7 +9,9 @@ from pgvz import __game_version__
 from pgvz.version import MOD_VERSION
 
 
-_SESSION_LEASE_SECONDS = 15.0
+class SessionRejected(RuntimeError):
+    """页面没有当前 GUI 会话的所有权。"""
+    pass
 
 
 def _log_apply_error(json_str, object_name, field_name, client_id):
@@ -102,7 +103,9 @@ class SyncRegistry:
     def __init__(self):
         self._objects = {}
         self._active_client_id = None
-        self._active_client_seen_at = 0.0
+        # 游戏进程内保留；断线、release 和结果缓存清理都不能重新触发恢复。
+        self._initialized_clients = set()
+        self._revoked_clients = set()
 
     def register(self, name, obj):
         self._objects[name] = obj
@@ -116,66 +119,46 @@ class SyncRegistry:
             "modVersion": MOD_VERSION, "gameVersion": __game_version__,
         })
 
-    def _session_is_active(self):
-        return (
-            self._active_client_id is not None
-            and time.monotonic() - self._active_client_seen_at <= _SESSION_LEASE_SECONDS
-        )
-
-    def _session_result(self, accepted):
-        return json.dumps({
-            'action': 'heartbeat' if accepted else 'sessionRejected',
-            'accepted': accepted,
-        })
-
-    def connect(self, client_id, json_str=None):
+    def connect(self, client_id, json_str=None, takeover=False):
         """占用官方 GUI 会话；已有活动页面时拒绝第二个页面。"""
-        if not client_id:
-            return self._session_result(False)
-
-        if (
-            self._session_is_active()
-            and self._active_client_id != client_id
-        ):
+        if not client_id or (not takeover and (
+            client_id in self._revoked_clients
+            or self._active_client_id not in (None, client_id)
+        )):
             Sexy.Debug.Log(
                 '[pgvztool.sync] rejected client_id={} active_client_id={}'.format(
                     client_id,
                     self._active_client_id,
                 )
             )
-            return self._session_result(False)
+            return json.dumps({'action': 'sessionRejected', 'accepted': False})
 
-        previous = self._active_client_id, self._active_client_seen_at
+        previous = self._active_client_id
         self._active_client_id = client_id
-        self._active_client_seen_at = time.monotonic()
 
         try:
-            if json_str is not None:
+            if client_id not in self._initialized_clients and json_str is not None:
                 self.apply(json_str)
-            return self.serialize()
+            result = self.serialize()
         except Exception:
-            # 初始化失败的页面没有开始心跳，不应占用一份新的 GUI 租约。
-            self._active_client_id, self._active_client_seen_at = previous
+            self._active_client_id = previous
             raise
-
-    def heartbeat(self, client_id):
-        if client_id == self._active_client_id:
-            self._active_client_seen_at = time.monotonic()
-            return self._session_result(True)
-        return self._session_result(False)
+        self._initialized_clients.add(client_id)
+        self._revoked_clients.discard(client_id)
+        if previous is not None and previous != client_id:
+            self._revoked_clients.add(previous)
+        return result
 
     def require_client(self, client_id):
         """供官方 GUI 在每条指令前校验会话所有权。"""
         if not client_id or client_id != self._active_client_id:
-            raise RuntimeError(
+            raise SessionRejected(
                 'another pgvztool GUI session is already active'
             )
-        self._active_client_seen_at = time.monotonic()
 
     def release(self, client_id):
         if client_id == self._active_client_id:
             self._active_client_id = None
-            self._active_client_seen_at = 0.0
 
     def apply(self, json_str):
         name = field = client_id = None

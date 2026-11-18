@@ -31,10 +31,21 @@
             <el-alert
                 v-if="sessionRejected"
                 :title="t('messages.sessionOccupied')"
-                :description="t('messages.sessionOccupiedDetail')"
                 type="error"
                 show-icon
                 :closable="false"
+                class="compatibility-alert"
+            >
+                <span>{{ t('messages.sessionOccupiedDetail') }}</span><br>
+                <el-button type="primary" @click="takeoverSession">{{ t('messages.takeoverSession') }}</el-button>
+            </el-alert>
+            <el-alert
+                v-if="hasUnconfirmedRequests"
+                :title="t('messages.resultsUnconfirmed')"
+                type="warning"
+                show-icon
+                @close="hasUnconfirmedRequests = false"
+                class="compatibility-alert"
             ></el-alert>
             <el-alert
                 v-if="unsupportedGameVersion"
@@ -47,6 +58,7 @@
             ></el-alert>
             <el-tabs v-model="activeTab" class="main-tabs">
                 <el-tab-pane :label="t('tabs.player')" name="player">
+                    <el-form :disabled="!connected" @submit.prevent>
                     <section class="panel-grid three">
                         <div class="card-stack">
                             <el-card shadow="never" class="tool-card">
@@ -136,9 +148,11 @@
                         <check-group-card :title="t('sections.commonCheats')" :items="switchGroups.common" :model="cheatOption" :label="optionLabel"></check-group-card>
                         <check-group-card :title="t('sections.featureCheats')" :items="switchGroups.features" :model="cheatOption" :label="optionLabel"></check-group-card>
                     </section>
+                    </el-form>
                 </el-tab-pane>
 
                 <el-tab-pane :label="t('tabs.world')" name="world">
+                    <el-form :disabled="!connected" @submit.prevent>
                     <section class="panel-grid four">
                         <el-card shadow="never" class="tool-card">
                             <template #header>{{ t('sections.typeSelection') }}</template>
@@ -262,9 +276,11 @@
                             </div>
                         </el-card>
                     </section>
+                    </el-form>
                 </el-tab-pane>
 
                 <el-tab-pane :label="t('tabs.stage')" name="stage">
+                    <el-form :disabled="!connected" @submit.prevent>
                     <section class="panel-grid two">
                         <check-group-card :title="t('sections.sceneCheats')" :items="switchGroups.scene" :model="cheatOption" :label="optionLabel"></check-group-card>
                         <div class="card-stack">
@@ -311,9 +327,11 @@
                             </el-card>
                         </div>
                     </section>
+                    </el-form>
                 </el-tab-pane>
 
                 <el-tab-pane :label="t('tabs.lineup')" name="lineup">
+                    <el-form :disabled="!connected" @submit.prevent>
                     <section class="panel-grid two">
                         <el-card shadow="never" class="tool-card">
                             <template #header>{{ t('sections.zombieSpawn') }}</template>
@@ -347,6 +365,7 @@
                             </div>
                         </el-card>
                     </section>
+                    </el-form>
                 </el-tab-pane>
 
                 <el-tab-pane :label="t('tabs.custom')" name="custom">

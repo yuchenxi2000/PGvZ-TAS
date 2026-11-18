@@ -17,16 +17,16 @@ function reprString(value) {
 function loadGui({ mobile = false, saved = {} } = {}) {
     const sockets = [], errors = [], timers = new Map(), listeners = {}, mounted = [], watchers = [], nextTicks = [];
     const storage = new Map([[storageKey, JSON.stringify(saved)]]);
-    let model, connection, timerId = 0;
+    let model, connection, timerId = 0, now = 0;
     const context = {
         URLSearchParams, navigator: { language: 'en', userAgent: mobile ? 'Android' : 'Windows' },
         location: { search: '' }, crypto: { randomUUID: () => 'client-1' }, document: { documentElement: {} },
         localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) },
         ElementPlus: { ElMessage: { error: message => errors.push(message) } },
         addEventListener: (name, handler) => { listeners[name] = handler; },
-        setTimeout: (fn, delay) => { timers.set(++timerId, { fn, delay, interval: false }); return timerId; },
+        setTimeout: (fn, delay) => { timers.set(++timerId, { fn, delay, at: now + delay, interval: false }); return timerId; },
         clearTimeout: id => timers.delete(id),
-        setInterval: (fn, delay) => { timers.set(++timerId, { fn, delay, interval: true }); return timerId; },
+        setInterval: (fn, delay) => { timers.set(++timerId, { fn, delay, at: now + delay, interval: true }); return timerId; },
         clearInterval: id => timers.delete(id),
     };
     const watchValue = source => typeof source === 'function' ? source() : source.map(item => item.value);
@@ -38,6 +38,7 @@ function loadGui({ mobile = false, saved = {} } = {}) {
     };
     context.WebSocket = class {
         static OPEN = 1;
+        static CONNECTING = 0;
         constructor(url) { this.url = url; this.readyState = 0; this.sent = []; sockets.push(this); }
         send(code) { this.sent.push(code); }
         open() { this.readyState = 1; this.onopen(); }
@@ -67,15 +68,30 @@ function loadGui({ mobile = false, saved = {} } = {}) {
     function runTimer(delay, interval = false) {
         const entry = [...timers].find(([, timer]) => timer.delay === delay && timer.interval === interval);
         assert.ok(entry, `expected a ${delay} ms timer`);
+        now = Math.max(now, entry[1].at);
         if (!interval) timers.delete(entry[0]);
+        else entry[1].at = now + delay;
         entry[1].fn();
     }
-    function bootstrap(state = {}) {
-        const ws = sockets.at(-1);
+    function advance(milliseconds) {
+        const target = now + milliseconds;
+        for (;;) {
+            const entry = [...timers].filter(([, timer]) => timer.at <= target)
+                .sort((a, b) => a[1].at - b[1].at)[0];
+            if (!entry) break;
+            runTimer(entry[1].delay, entry[1].interval);
+        }
+        now = target;
+    }
+    function startInitialization(ws = sockets.at(-1)) {
         ws.open();
         ws.message({ action: 'bootstrapReady', ready: true });
         ws.message(gameVersionProbe);
-        const request = JSON.parse(decodeCall(ws.sent.at(-1).split('\n').at(-1)).args[0]);
+        return JSON.parse(decodeCall(ws.sent.at(-1).split('\n').at(-1)).args[0]);
+    }
+    function bootstrap(state = {}) {
+        const ws = sockets.at(-1);
+        const request = startInitialization(ws);
         ws.message({ action: 'queued', id: request.id });
         runTimer(100);
         ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
@@ -84,7 +100,8 @@ function loadGui({ mobile = false, saved = {} } = {}) {
         flush();
         return ws;
     }
-    return { model, connection, context, sockets, errors, timers, storage, listeners, flush, runTimer, bootstrap };
+    return { model, connection, context, sockets, errors, timers, storage, listeners, flush,
+        runTimer, advance, startInitialization, bootstrap };
 }
 
 function decodeCall(code) {
@@ -378,7 +395,7 @@ test('concurrent actions share one result poll in flight', () => {
     const second = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
     ws.message({ action: 'queued', id: second.id });
     assert.equal([...gui.timers.values()].filter(timer => timer.delay === 100).length, 0);
-    assert.equal([...gui.timers.values()].filter(timer => timer.delay === 5000).length, 1);
+    assert.equal(gui.timers.size, 0); // 等前一次 poll 响应，不启动第二个轮询或超时。
     ws.message({ action: 'results', results: [{ ...first, ok: true, value: null }] });
     gui.runTimer(100);
     ws.message({ action: 'results', results: [{ ...second, ok: true, value: null }] });
@@ -415,9 +432,10 @@ test('disconnect cancels action polling and reconnect does not replay old action
 test('rejected sessions cannot submit actions; raw debug execution remains available', () => {
     const gui = loadGui();
     const ws = gui.bootstrap();
-    gui.runTimer(3000, true);
-    const heartbeat = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    ws.message({ action: 'results', results: [{ ...heartbeat, ok: true, value: { action: 'sessionRejected', accepted: false } }] });
+    gui.model.sendAction('winLevel');
+    const action = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    ws.message({ action: 'results', results: [{ ...action, ok: false,
+        errortype: 'SessionRejected', error: 'session taken over' }] });
     const count = ws.sent.length;
     gui.model.sendAction('winLevel');
     assert.equal(ws.sent.length, count);
@@ -472,16 +490,14 @@ test('bootstrap import errors show the 1.4.3 result field and stop calls to the 
     assert.equal(gui.model.lastResult.text, 'ZeroDivisionError: division by zero');
 });
 
-test('heartbeat and release use the same request API without changing the result banner', () => {
+test('idle pages send no traffic; release uses the request API without changing the banner', () => {
     const gui = loadGui();
     const ws = gui.bootstrap();
     const banner = JSON.stringify(gui.model.lastResult);
-    gui.runTimer(3000, true);
-    const heartbeat = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    assert.equal(heartbeat.kind, 'heartbeat');
-    ws.message({ action: 'queued', id: heartbeat.id });
-    gui.runTimer(100);
-    ws.message({ action: 'results', results: [{ ...heartbeat, ok: true, value: { action: 'heartbeat', accepted: true } }] });
+    const sent = ws.sent.length;
+    gui.advance(300000);
+    assert.equal(ws.sent.length, sent);
+    assert.equal(gui.timers.size, 0);
     assert.equal(JSON.stringify(gui.model.lastResult), banner);
     gui.listeners.beforeunload();
     const release = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
@@ -490,15 +506,16 @@ test('heartbeat and release use the same request API without changing the result
     assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
 });
 
-test('missing queue acknowledgement still polls results and lost polls retry without replaying actions', () => {
+test('missing queue acknowledgement still polls; delayed results and lost acknowledgements do not replay actions', () => {
     const gui = loadGui();
     const ws = gui.bootstrap();
     gui.model.sendAction('winLevel');
     const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
     gui.runTimer(100); // queued acknowledgement was lost
     assert.equal(decodeCall(ws.sent.at(-1)).name, 'poll');
-    gui.runTimer(5000); // poll response was lost
-    gui.runTimer(100);
+    const sent = ws.sent.length;
+    gui.advance(300000); // poll response is delayed while the game is in the background
+    assert.equal(ws.sent.length, sent);
     assert.equal(decodeCall(ws.sent.at(-1)).name, 'poll');
     assert.equal(ws.sent.filter(code => code.includes('winLevel')).length, 1);
     const result = { ...request, ok: true, value: null };
@@ -512,27 +529,30 @@ test('missing queue acknowledgement still polls results and lost polls retry wit
     assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
 });
 
-test('request timeout cancels pending work and ignores late results', () => {
-    const gui = loadGui();
-    const ws = gui.bootstrap();
-    gui.model.sendAction('winLevel');
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    gui.runTimer(100);
-    gui.runTimer(30000);
-    assert.equal(gui.model.lastResult.ok, false);
-    assert.equal(gui.model.lastResult.key, 'messages.requestTimeout');
-    const cancel = decodeCall(ws.sent.at(-1));
-    assert.equal(cancel.name, 'cancel');
-    assert.deepEqual(JSON.parse(cancel.args[1]), [request.id]);
-    ws.message({ action: 'results', results: [{ ...request, ok: true, value: null }] });
-    assert.equal(gui.model.lastResult.key, 'messages.requestTimeout');
-    assert.equal(ws.sent.filter(code => code.includes('winLevel')).length, 1);
-    assert.equal(gui.connection.connectionState.value, 'reconnecting');
-    assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
-    gui.model.setLanguage('zh');
-    assert.equal(gui.model.resultText.value, '请求超时，请保证游戏打开并位于前台');
-    gui.model.setLanguage('en');
-    assert.equal(gui.model.resultText.value, 'Request timed out. Make sure the game is open and in the foreground.');
+test('actions survive a long background pause and complete once the game resumes', () => {
+    for (const mobile of [false, true]) {
+        const gui = loadGui({ mobile });
+        const ws = gui.bootstrap();
+        gui.model.sendAction('winLevel');
+        const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+        gui.runTimer(100);
+        const sent = ws.sent.length;
+        gui.advance(600000);
+        assert.equal(ws.sent.length, sent);
+        assert.equal(gui.sockets.length, 1);
+        assert.equal(gui.model.connected.value, true);
+        assert.equal(gui.model.pendingCount.value, 1);
+        assert.equal(gui.timers.size, 0);
+        ws.message({ action: 'results', results: [{ ...request, ok: true, value: null }] });
+        assert.equal(gui.model.lastResult.key, 'messages.success');
+        assert.equal(gui.model.pendingCount.value, 0);
+        assert.equal(ws.sent.filter(code => code.includes('winLevel')).length, 1);
+        assert.equal(ws.sent.some(code => code.includes('cancel')), false);
+        gui.model.setLanguage('zh');
+        assert.equal(gui.model.t('messages.sent'), '已发送，切回游戏后生效');
+        gui.model.setLanguage('en');
+        assert.equal(gui.model.t('messages.sent'), 'Sent. Takes effect when you switch back to the game');
+    }
 });
 
 test('unrelated debug errors do not discard concurrent action results', () => {
@@ -549,130 +569,119 @@ test('unrelated debug errors do not discard concurrent action results', () => {
     assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
 });
 
-test('queued actions time out before bootstrap and are never flushed later', () => {
+test('business operations before initialization are rejected without a local send queue', () => {
     const gui = loadGui();
     const ws = gui.sockets[0];
     ws.open();
     gui.model.sendAction('winLevel');
-    gui.runTimer(30000);
-    assert.equal(gui.model.lastResult.key, 'messages.requestTimeout');
-    gui.runTimer(3000);
-    const recovered = gui.bootstrap();
+    assert.match(gui.errors.at(-1), /finish initializing/);
+    assert.equal(gui.model.pendingCount.value, 0);
+    gui.advance(600000);
+    gui.bootstrap();
     assert.equal(ws.sent.some(code => code.includes('winLevel')), false);
-    assert.equal(recovered.sent.some(code => code.includes('winLevel')), false);
+    assert.equal((html.match(/<el-form :disabled="!connected"/g) || []).length, 4);
 });
 
-test('heartbeat timeout and socket errors cancel pending work and leave exactly one reconnect timer', () => {
+test('real socket failures report uncertain results and reconnect once without replaying actions', () => {
     for (const socketError of [false, true]) {
         const gui = loadGui();
         const ws = gui.bootstrap();
-        gui.runTimer(3000, true);
         gui.model.sendAction('winLevel');
+        const pending = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
         if (socketError) ws.onerror();
-        else gui.runTimer(30000);
+        else ws.close();
         assert.equal(gui.model.connected.value, false);
+        assert.equal(gui.model.hasUnconfirmedRequests.value, true);
+        assert.equal(gui.model.lastResult.key, 'messages.resultsUnconfirmed');
         assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
         const count = ws.sent.length;
         gui.model.sendAction('nextStage');
         assert.equal(ws.sent.length, count);
-        assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
         ws.onerror();
         ws.close();
         assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
         gui.runTimer(3000);
         const recovered = gui.bootstrap();
         assert.equal(gui.model.connected.value, true);
+        assert.equal(gui.model.hasUnconfirmedRequests.value, true);
         assert.equal(recovered.sent.some(code => code.includes('winLevel') || code.includes('nextStage')), false);
+        ws.message({ action: 'results', results: [{ ...pending, ok: true, value: null }] });
+        assert.equal(gui.model.lastResult.key, 'messages.syncOk');
     }
 });
 
-test('mobile and PC retry while the game is suspended then pull state before accepting new changes', () => {
+test('PC saves changed options immediately while the suspended game waits to apply them; mobile keeps storage untouched', () => {
     for (const mobile of [true, false]) {
-        const gui = loadGui({ mobile, saved: { cheat: { freePlant: true } } });
-        const original = gui.bootstrap({ cheat: { freePlant: false } });
+        const saved = { cheat: { freePlant: false } };
+        const gui = loadGui({ mobile, saved });
+        const ws = gui.bootstrap({ cheat: { freePlant: false } });
         gui.model.cheatOption.freePlant = true;
         gui.flush();
-        const pending = JSON.parse(decodeCall(original.sent.at(-1)).args[0]);
+        const pending = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
         assert.equal(pending.kind, 'apply');
-        gui.runTimer(30000);
-        assert.equal(gui.connection.connectionState.value, 'reconnecting');
-        gui.runTimer(3000);
-        const suspended = gui.sockets.at(-1);
-        suspended.open();
-        suspended.message({ action: 'bootstrapReady', ready: true });
-        suspended.message(gameVersionProbe);
-        const reconnect = JSON.parse(decodeCall(suspended.sent.at(-1).split('\n').at(-1)).args[0]);
-        assert.equal(reconnect.kind, 'connect');
-        assert.equal('state' in reconnect, false);
-        // The socket accepts messages, but the suspended game never runs its main-thread queue.
-        suspended.message({ action: 'queued', id: reconnect.id });
-        gui.runTimer(30000);
-        assert.equal(gui.connection.connectionState.value, 'reconnecting');
-        gui.runTimer(3000);
-        const recovered = gui.bootstrap({ cheat: { freePlant: false } });
-        assert.equal(gui.model.connected.value, true);
-        assert.equal(gui.model.cheatOption.freePlant, false);
-        assert.equal(gui.model.lastResult.key, 'messages.syncOk');
-        const requests = recovered.sent.filter(code => code.includes('gui_dispatcher.submit'))
-            .map(code => JSON.parse(decodeCall(code.split('\n').at(-1)).args[0]));
-        assert.equal(requests.length, 1);
-        assert.equal('state' in requests[0], false);
-        assert.equal(recovered.sent.some(code => code.includes(pending.id)), false);
-        original.message({ action: 'results', results: [{ ...pending, ok: true, value: null }] });
-        suspended.onerror();
-        assert.equal(gui.model.connected.value, true);
-        assert.equal(gui.model.cheatOption.freePlant, false);
-        gui.model.cheatOption.freePlant = true;
-        gui.flush();
-        const fresh = JSON.parse(decodeCall(recovered.sent.at(-1)).args[0]);
-        assert.equal(fresh.kind, 'apply');
-        assert.equal(fresh.state.cheat.freePlant, true);
-        recovered.message({ action: 'results', results: [{ ...fresh, ok: true, value: null }] });
+        assert.equal(JSON.parse(gui.storage.get(storageKey)).cheat.freePlant, !mobile);
+        gui.advance(600000);
+        assert.equal(gui.sockets.length, 1);
+        assert.equal(gui.model.cheatOption.freePlant, true);
+        assert.equal(gui.model.pendingCount.value, 1);
+        ws.message({ action: 'results', results: [{ ...pending, ok: true, value: null }] });
+        assert.equal(gui.model.pendingCount.value, 0);
         assert.equal(gui.model.lastResult.key, 'messages.success');
     }
 });
 
-test('handshake and bootstrap probes without responses keep retrying until the game becomes available', () => {
-    for (const blockedStage of ['handshake', 'ready', 'version']) {
-        const gui = loadGui();
-        for (let attempt = 0; attempt < 2; attempt++) {
-            const ws = gui.sockets.at(-1);
-            if (blockedStage !== 'handshake') ws.open();
-            if (blockedStage === 'version') ws.message({ action: 'bootstrapReady', ready: true });
-            gui.runTimer(30000);
-            assert.equal(gui.connection.connectionState.value, 'reconnecting');
-            assert.equal(ws.readyState, 3);
-            assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
-            gui.runTimer(3000);
-        }
-        gui.bootstrap();
+test('only the WebSocket handshake has a timeout; bootstrap probes can wait indefinitely', () => {
+    const handshake = loadGui();
+    handshake.runTimer(30000);
+    assert.equal(handshake.connection.connectionState.value, 'reconnecting');
+    handshake.runTimer(3000);
+    handshake.bootstrap();
+    assert.equal(handshake.model.connected.value, true);
+    for (const blockedStage of ['ready', 'version', 'connect']) {
+        const gui = loadGui({ saved: { cheat: { freePlant: true } } });
+        const ws = gui.sockets[0];
+        ws.open();
+        if (blockedStage !== 'ready') ws.message({ action: 'bootstrapReady', ready: true });
+        if (blockedStage === 'connect') ws.message(gameVersionProbe);
+        gui.advance(600000);
+        assert.equal(gui.sockets.length, 1);
+        assert.equal(ws.readyState, 1);
+        assert.equal(gui.connection.connectionState.value, 'initializing');
+        assert.equal(JSON.parse(gui.storage.get(storageKey)).cheat.freePlant, true);
+        if (blockedStage === 'ready') ws.message({ action: 'bootstrapReady', ready: true });
+        if (blockedStage !== 'connect') ws.message(gameVersionProbe);
+        const connect = JSON.parse(decodeCall(ws.sent.findLast(code => code.includes('gui_dispatcher.submit')).split('\n').at(-1)).args[0]);
+        ws.message({ action: 'results', results: [{ ...connect, ok: true, value: {
+            action: 'sync', state: { cheat: { freePlant: true } },
+        } }] });
+        gui.flush();
         assert.equal(gui.model.connected.value, true);
+        assert.equal(gui.model.cheatOption.freePlant, true);
     }
 });
 
-test('expired connect and heartbeat results resume automatic reconnection', () => {
-    for (const kind of ['connect', 'heartbeat']) {
-        const gui = loadGui();
-        let ws;
-        if (kind === 'heartbeat') {
-            ws = gui.bootstrap();
-            gui.runTimer(3000, true);
-        } else {
-            ws = gui.sockets[0];
-            ws.open();
-            ws.message({ action: 'bootstrapReady', ready: true });
-            ws.message(gameVersionProbe);
+test('initialization disconnects preserve PC restoration state and never push saved state on mobile', () => {
+    for (const mobile of [false, true]) {
+        const saved = { cheat: { freePlant: true, autoCollect: false }, placer: { imitater: true } };
+        const gui = loadGui({ mobile, saved });
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const ws = gui.sockets.at(-1);
+            const connect = gui.startInitialization(ws);
+            assert.equal('state' in connect, !mobile);
+            if (!mobile) {
+                assert.equal(connect.state.cheat.freePlant, true);
+                assert.equal(connect.state.cheat.autoCollect, false);
+                assert.equal(connect.state.placer.imitater, true);
+            }
+            gui.advance(300000);
+            assert.deepEqual(JSON.parse(gui.storage.get(storageKey)), saved);
+            ws.close();
+            gui.runTimer(3000);
         }
-        const request = JSON.parse(decodeCall(ws.sent.at(-1).split('\n').at(-1)).args[0]);
-        assert.equal(request.kind, kind);
-        ws.message({ action: 'results', results: [{ ...request, ok: false,
-            errortype: 'RequestExpired', error: 'expired while the game was suspended',
-        }] });
-        assert.equal(gui.connection.connectionState.value, 'reconnecting');
-        assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
-        gui.runTimer(3000);
-        gui.bootstrap();
+        const ws = gui.bootstrap({ cheat: { freePlant: !mobile } });
         assert.equal(gui.model.connected.value, true);
+        assert.equal(gui.model.cheatOption.freePlant, !mobile);
+        assert.equal(ws.sent.some(code => code.includes('winLevel')), false);
     }
 });
 
@@ -696,4 +705,93 @@ test('leaving the page cancels scheduled retries and rejected recovery sessions 
     assert.equal(occupied.timers.size, 0);
     ws.close();
     assert.equal(occupied.timers.size, 0);
+});
+
+
+test('explicit takeover works on an open or closed occupied socket and uses bilingual controls', () => {
+    for (const closeSocket of [false, true]) {
+        const gui = loadGui();
+        let ws = gui.sockets[0];
+        const request = gui.startInitialization(ws);
+        ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
+            action: 'sessionRejected', accepted: false,
+        } }] });
+        assert.equal(gui.model.sessionRejected.value, true);
+        assert.equal(gui.timers.size, 0);
+        if (closeSocket) ws.close();
+        gui.model.takeoverSession();
+        assert.equal(gui.model.connected.value, false);
+        if (closeSocket) {
+            ws = gui.sockets.at(-1);
+            gui.startInitialization(ws);
+        }
+        const takeover = JSON.parse(decodeCall(ws.sent.at(-1).split('\n').at(-1)).args[0]);
+        assert.equal(takeover.kind, 'connect');
+        assert.equal(takeover.takeover, true);
+        ws.message({ action: 'results', results: [{ ...takeover, ok: true, value: { action: 'sync', state: {} } }] });
+        assert.equal(gui.model.connected.value, true);
+        assert.equal(gui.model.sessionRejected.value, false);
+        gui.model.setLanguage('zh');
+        assert.equal(gui.model.t('messages.takeoverSession'), '接管控制权');
+        assert.equal(gui.model.t('messages.sessionOccupiedDetail'), '可以继续使用原页面，或接管控制权以使用当前页面');
+        gui.model.setLanguage('en');
+        assert.equal(gui.model.t('messages.takeoverSession'), 'Take Control');
+        assert.equal(gui.model.t('messages.sessionOccupiedDetail'), 'Continue using the other page, or take control to use this page');
+    }
+});
+
+test('remote PC snapshots save only after successful synchronization and never echo apply requests', () => {
+    const saved = { cheat: { freePlant: true } };
+    const gui = loadGui({ saved });
+    const request = gui.startInitialization();
+    const ws = gui.sockets[0];
+    ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
+        action: 'sync', state: { cheat: { freePlant: false }, placer: { imitater: true } },
+    } }] });
+    assert.deepEqual(JSON.parse(gui.storage.get(storageKey)), saved);
+    const sent = ws.sent.length;
+    gui.flush();
+    const stored = JSON.parse(gui.storage.get(storageKey));
+    assert.equal(stored.cheat.freePlant, false);
+    assert.equal(stored.placer.imitater, true);
+    assert.equal(ws.sent.length, sent);
+});
+
+test('page exit during bootstrap ignores late responses and does not acquire a new session', () => {
+    for (const stage of ['handshake', 'ready', 'connect']) {
+        const gui = loadGui();
+        const ws = gui.sockets[0];
+        if (stage !== 'handshake') ws.open();
+        if (stage === 'connect') {
+            ws.message({ action: 'bootstrapReady', ready: true });
+            ws.message(gameVersionProbe);
+        }
+        gui.listeners.beforeunload();
+        const sent = ws.sent.length;
+        ws.open();
+        ws.message({ action: 'bootstrapReady', ready: true });
+        ws.message(gameVersionProbe);
+        gui.advance(600000);
+        assert.equal(ws.sent.length, sent);
+        assert.equal(gui.model.pendingCount.value, 0);
+        assert.equal(gui.timers.size, 0);
+    }
+});
+
+test('lost takeover replies do not automatically repeat a forced takeover on reconnection', () => {
+    const gui = loadGui();
+    const ws = gui.sockets[0];
+    const request = gui.startInitialization();
+    ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
+        action: 'sessionRejected', accepted: false,
+    } }] });
+    gui.model.takeoverSession();
+    const takeover = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    assert.equal(takeover.takeover, true);
+    ws.close();
+    gui.runTimer(3000);
+    const reconnect = gui.startInitialization();
+    assert.equal('takeover' in reconnect, false);
+    assert.equal('state' in reconnect, true);
+    assert.equal(gui.sockets.length, 2);
 });

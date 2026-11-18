@@ -316,13 +316,14 @@ class GuiDispatcherTests(unittest.TestCase):
         self.assertTrue(results[1]['value']['state']['cheat']['noCooldown'])
 
     def test_connect_applies_pc_state_and_reads_mobile_state_on_main_thread(self):
-        self.submit('connect', state={'cheat': {'noCooldown': True}}, request_id='pc')
+        self.submit('connect', client_id='pc', takeover=True,
+                    state={'cheat': {'noCooldown': True}}, request_id='pc')
         self.assertFalse(self.state._value)
         self.run_tasks()
-        self.assertTrue(self.results()[0]['value']['state']['cheat']['noCooldown'])
-        self.submit('connect', request_id='mobile')
+        self.assertTrue(self.results('pc')[0]['value']['state']['cheat']['noCooldown'])
+        self.submit('connect', client_id='mobile', takeover=True, request_id='mobile')
         self.run_tasks()
-        self.assertTrue(self.results()[0]['value']['state']['cheat']['noCooldown'])
+        self.assertTrue(self.results('mobile')[0]['value']['state']['cheat']['noCooldown'])
 
     def test_rejected_connect_is_delivered_without_touching_state(self):
         self.submit('connect', client_id='other', state={'cheat': {'noCooldown': True}})
@@ -332,16 +333,34 @@ class GuiDispatcherTests(unittest.TestCase):
         self.assertEqual(result['value']['action'], 'sessionRejected')
         self.assertFalse(self.state._value)
 
-    def test_heartbeat_and_release_are_main_thread_control_requests(self):
-        self.submit('heartbeat', request_id='heartbeat')
-        self.run_tasks()
-        self.assertTrue(self.results()[0]['value']['accepted'])
+    def test_release_is_a_main_thread_control_request_and_cancels_later_work(self):
         self.dispatch('setMoney', {'value': 3})
         self.run_tasks()
         self.submit('release', request_id='release')
+        self.dispatch('placeMower', request_id='after-release')
+        self.assertEqual(self.registry._active_client_id, 'client-1')
         self.run_tasks()
         self.assertIsNone(self.registry._active_client_id)
         self.assertEqual(self.results(), [])
+        self.assertEqual(self.calls, [])
+
+    def test_takeover_blocks_queued_actions_and_late_reconnects_from_previous_owner(self):
+        self.submit('connect', client_id='new', takeover=True)
+        self.dispatch('winLevel', request_id='old-action')
+        self.submit('connect', request_id='old-reconnect')
+        self.run_tasks()
+        self.assertEqual(self.calls, [])
+        old_results = self.results()
+        self.assertEqual(old_results[0]['errortype'], 'SessionRejected')
+        self.assertEqual(old_results[1]['value']['action'], 'sessionRejected')
+        self.assertEqual(self.results('new')[0]['value']['action'], 'sync')
+        self.assertEqual(self.registry._active_client_id, 'new')
+
+    def test_takeover_flag_requires_a_boolean(self):
+        self.submit('connect', client_id='other', takeover='false')
+        self.run_tasks()
+        self.assertEqual(self.results('other')[0]['errortype'], 'TypeError')
+        self.assertEqual(self.registry._active_client_id, 'client-1')
 
     def test_business_execution_does_not_hold_the_queue_lock(self):
         def probe():
@@ -401,16 +420,16 @@ class GuiDispatcherTests(unittest.TestCase):
         self.results()
         self.assertEqual(json.loads(self.dispatcher.poll('client-1'))['results'], [])
 
-    def test_pending_request_expires_without_executing(self):
+    def test_pending_request_survives_long_background_pause(self):
         with patch.object(self.dispatcher_module.time, 'monotonic', return_value=100):
             self.dispatch('placeMower')
-        with patch.object(self.dispatcher_module.time, 'monotonic', return_value=131):
+        with patch.object(self.dispatcher_module.time, 'monotonic', return_value=10000):
             self.run_tasks()
             result = self.results()[0]
-        self.assertEqual(result['errortype'], 'RequestExpired')
-        self.assertEqual(self.calls, [])
+        self.assertTrue(result['ok'])
+        self.assertEqual(len(self.calls), 1)
 
-    def test_completed_and_uncollected_results_are_eventually_removed(self):
+    def test_only_acknowledged_results_expire_and_background_page_can_collect_later(self):
         with patch.object(self.dispatcher_module.time, 'monotonic', return_value=100):
             self.dispatch('placeMower', request_id='acknowledged')
             self.run_tasks()
@@ -418,6 +437,10 @@ class GuiDispatcherTests(unittest.TestCase):
             self.dispatch('startMower', request_id='orphan')
             self.run_tasks()
         with patch.object(self.dispatcher_module.time, 'monotonic', return_value=161):
+            self.run_tasks()
+        self.assertEqual(list(self.dispatcher._records), [('client-1', 'orphan')])
+        with patch.object(self.dispatcher_module.time, 'monotonic', return_value=10000):
+            self.assertEqual(self.results()[0]['id'], 'orphan')
             self.run_tasks()
         self.assertEqual(self.dispatcher._records, {})
         self.assertEqual(self.dispatcher._pending, [])

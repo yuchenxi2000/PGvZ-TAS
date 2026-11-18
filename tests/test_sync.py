@@ -133,6 +133,55 @@ class SyncTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 self.registry.connect('new')
         self.assertIsNone(self.registry._active_client_id)
+        self.assertNotIn('new', self.registry._initialized_clients)
+
+    def test_restoration_runs_once_even_after_lost_reply_release_and_long_pause(self):
+        self.registry.release('client')
+        payload = json.dumps({'_clientId': 'pc', 'first': {'flag': True}})
+        self.registry.connect('pc', payload)  # 首次结果丢失。
+        self.assertTrue(self.state.flag)
+        self.state.flag = False  # 游戏中后续修改不能被重连时的旧设置覆盖。
+        self.registry.release('pc')
+        with patch('time.monotonic', return_value=100000):
+            result = json.loads(self.registry.connect('pc', payload))
+        self.assertFalse(self.state.flag)
+        self.assertFalse(result['state']['first']['flag'])
+
+    def test_new_game_registry_restores_same_page_again(self):
+        registry = self.module.SyncRegistry()
+        registry.register('first', self.state)
+        payload = json.dumps({'_clientId': 'client', 'first': {'flag': True}})
+        registry.connect('client', payload)
+        self.assertTrue(self.state.flag)
+
+    def test_background_pause_does_not_expire_ownership(self):
+        with patch('time.monotonic', return_value=100000):
+            result = json.loads(self.registry.connect('other'))
+        self.assertEqual(result['action'], 'sessionRejected')
+        self.assertEqual(self.registry._active_client_id, 'client')
+
+    def test_takeover_revokes_old_page_even_after_new_page_releases(self):
+        result = json.loads(self.registry.connect('new', takeover=True))
+        self.assertEqual(result['action'], 'sync')
+        with self.assertRaises(self.module.SessionRejected):
+            self.registry.require_client('client')
+        self.registry.release('client')  # 旧页面迟到退出不释放新会话。
+        self.assertEqual(self.registry._active_client_id, 'new')
+        self.registry.release('new')
+        self.assertEqual(json.loads(self.registry.connect('client'))['action'], 'sessionRejected')
+        self.assertEqual(json.loads(self.registry.connect('client', takeover=True))['action'], 'sync')
+
+    def test_failed_takeover_keeps_previous_owner_and_can_retry_restoration(self):
+        payload = json.dumps({'_clientId': 'new', 'first': {'flag': True}})
+        with patch.object(self.registry, 'serialize', side_effect=RuntimeError('snapshot unavailable')):
+            with self.assertRaises(RuntimeError):
+                self.registry.connect('new', payload, takeover=True)
+        self.assertEqual(self.registry._active_client_id, 'client')
+        self.assertNotIn('client', self.registry._revoked_clients)
+        self.assertNotIn('new', self.registry._initialized_clients)
+        self.state.flag = False
+        self.registry.connect('new', payload, takeover=True)
+        self.assertTrue(self.state.flag)
 
 
 if __name__ == '__main__':

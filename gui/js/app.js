@@ -151,7 +151,8 @@ const app = createApp({
         const {
             connected, sessionRejected, unsupportedGameVersion, supportedGameVersions,
             gameVersion, modVersion, connectionState,
-            send, sendAction, applyState, connect, releaseSession,
+            pendingCount, hasUnconfirmedRequests,
+            send, sendAction, applyState, connect, releaseSession, takeoverSession,
         } = PGvZConnection.create({
             isMobile, t, setResult, getInitialState, applySyncState, lineupCode,
         });
@@ -203,7 +204,7 @@ const app = createApp({
         }
 
         function saveCheckboxState() {
-            if (isMobile) return;
+            if (isMobile || applyingRemoteState) return;
             writeCheckboxState({
                 cheat: { ...cheatOption },
                 placer: {
@@ -235,8 +236,8 @@ const app = createApp({
         watch(
             () => ({ ...cheatOption }),
             (newVal, oldVal) => {
-                saveCheckboxState();
                 if (applyingRemoteState) return;
+                saveCheckboxState();
                 for (const key in newVal) {
                     if (newVal[key] !== oldVal[key]) {
                         setCheatOption(key, newVal[key]);
@@ -282,6 +283,8 @@ const app = createApp({
             }
             nextTick(() => {
                 applyingRemoteState = false;
+                // 仅成功的 sync 回包能更新保存状态；watch 不把远端同步当成本地操作。
+                saveCheckboxState();
             });
         }
 
@@ -335,6 +338,10 @@ const app = createApp({
             optionLabel,
             connected,
             sessionRejected,
+            connectionState,
+            pendingCount,
+            hasUnconfirmedRequests,
+            takeoverSession,
             unsupportedGameVersion,
             unsupportedGameVersionDetail,
             gameVersion,

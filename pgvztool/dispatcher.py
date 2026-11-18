@@ -10,11 +10,10 @@ from .placer import placer
 from .sync import sync_reg
 
 
-REQUEST_TIMEOUT_SECONDS = 30.0
 RESULT_RETENTION_SECONDS = 60.0
 
 
-REQUEST_KINDS = ('connect', 'apply', 'snapshot', 'action', 'heartbeat', 'release')
+REQUEST_KINDS = ('connect', 'apply', 'snapshot', 'action', 'release')
 
 
 def _integer(value):
@@ -136,7 +135,7 @@ class GuiDispatcher:
             else:
                 self._next_order += 1
                 record = {
-                    'request': request, 'created': time.monotonic(), 'finished': None,
+                    'request': request, 'finished': None,
                     'status': 'pending', 'result': None, 'order': self._next_order,
                     'acknowledged': False, 'abandoned': False,
                 }
@@ -158,10 +157,8 @@ class GuiDispatcher:
         now = time.monotonic()
         expired = []
         for key, record in self._records.items():
-            if record['status'] == 'pending' and now - record['created'] >= REQUEST_TIMEOUT_SECONDS:
-                self._finish_locked(record, self._error_result(
-                    record['request'], 'RequestExpired', 'request expired before execution'))
-            elif record['status'] == 'done' and now - record['finished'] >= RESULT_RETENTION_SECONDS:
+            if (record['status'] == 'done' and record['acknowledged']
+                    and now - record['finished'] >= RESULT_RETENTION_SECONDS):
                 expired.append(key)
         for key in expired:
             del self._records[key]
@@ -191,11 +188,11 @@ class GuiDispatcher:
                 self._finish_locked(record, result)
                 if request['kind'] == 'release':
                     for other in self._records.values():
-                        if other['request']['_clientId'] == request['_clientId'] and other['status'] == 'done':
-                            other['acknowledged'] = True
+                        if other['request']['_clientId'] == request['_clientId']:
+                            self._cancel_locked(other)
 
     def poll(self, client_id):
-        """结果保留至 ack 或过期；轮询响应丢失不会丢掉已执行动作的结果。"""
+        """未确认结果一直保留；页面回到前台后仍能领取。"""
         self._client_id(client_id)
         with self._lock:
             self._cleanup_locked()
@@ -230,14 +227,17 @@ class GuiDispatcher:
                 record = self._records.get(key)
                 if record is None:
                     continue
-                record['abandoned'] = True
-                if record['status'] == 'pending':
-                    self._finish_locked(record, self._error_result(
-                        record['request'], 'RequestCancelled', 'request cancelled before execution'))
-                elif record['status'] == 'done':
-                    record['acknowledged'] = True
-                # running 不能安全中断；完成后只保留缓存，不再主动回传。
+                self._cancel_locked(record)
         return json.dumps({'action': 'cancelled'})
+
+    def _cancel_locked(self, record):
+        record['abandoned'] = True
+        if record['status'] == 'pending':
+            self._finish_locked(record, self._error_result(
+                record['request'], 'RequestCancelled', 'request cancelled before execution'))
+        elif record['status'] == 'done':
+            record['acknowledged'] = True
+        # running 不能安全中断；完成后只保留缓存，不再主动回传。
 
     def _client_id(self, value):
         if not isinstance(value, str) or not value:
@@ -251,9 +251,9 @@ class GuiDispatcher:
             if state is not None and not isinstance(state, dict):
                 raise TypeError('initial state must be an object')
             payload = dict(state, _clientId=client_id) if state is not None else None
-            return json.loads(sync_reg.connect(client_id, json.dumps(payload) if payload is not None else None))
-        if kind == 'heartbeat':
-            return json.loads(sync_reg.heartbeat(client_id))
+            takeover = _boolean(request.get('takeover', False))
+            return json.loads(sync_reg.connect(
+                client_id, json.dumps(payload) if payload is not None else None, takeover))
         if kind == 'release':
             return sync_reg.release(client_id)
 

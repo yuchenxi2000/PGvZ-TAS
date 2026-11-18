@@ -1,6 +1,6 @@
 # 更新日志
 
-## [unreleased]
+## [1.17.1] - 2026-11-18
 
 ### 新增
 
@@ -8,6 +8,7 @@
 
 ### 改进
 
+- 简化 GUI 通信：移除心跳、会话租约及业务请求超时，游戏后台暂停时保留初始化和已发送请求；仅真实断线或握手失败才重连，断线未确认操作提示检查游戏且不自动重放。PC 设置按页面在每个游戏进程内只恢复一次，修复首次初始化前断线导致保存设置失效的问题；新增中英文“接管控制权”入口，防止旧页面迟到重连夺回会话，并更新协议与故障排查说明。
 - 补全 PGvZ 1.4.3 水族馆失败机制说明，记录列表清空与普通僵尸左边界两条判负路径，以及随机僵尸在泳池格被覆盖水族馆状态的风险。
 
 ## [1.17.0] - 2026-11-16
@@ -476,7 +477,7 @@
 - 修复安卓部分区域无法自动收集、移除天尸诅咒不完整，以及过长命令结果挤出网页界面的问题。
 - 进入月夜无尽前检查屋顶无尽存档，避免未经提示直接覆盖。
 
-[unreleased]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.17.0...HEAD
+[1.17.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.17.1
 [1.17.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.17.0
 [1.16.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.16.1
 [1.16.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.16.0
