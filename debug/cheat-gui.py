@@ -140,6 +140,7 @@ _gui_files = [
     'gui/js/i18n.js',
     'gui/js/options.js',
     'gui/js/protocol.js',
+    'gui/js/terrain.js',
 ]
 _gui_index_path = _join_mod_path('gui/index.html')
 if System.IO.File.Exists(_gui_index_path):

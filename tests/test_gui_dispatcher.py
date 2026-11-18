@@ -31,6 +31,9 @@ class GuiDispatcherTests(unittest.TestCase):
             'CoinType': {'Silver': 0},
             'GameMode': {'Adventure': 0},
             'ScaryPotType': {'None': 0, 'Sun': 1, 'Seed': 2, 'Zombie': 3},
+            'BackgroundType': {'Num1Day': 0, 'Num6Boss': 5},
+            'GridSquareType': {'None': 0, 'Grass': 1, 'Dirt': 2, 'Pool': 3, 'HighGround': 4, 'Shallow': 5},
+            'PlantRowType': {'Dirt': 0, 'Normal': 1, 'Pool': 2, 'HighGround': 3, 'Shallow': 4},
         }.items():
             setattr(self.lawn, name, enum.Enum(name, members))
         self.lawn.LawnApp = self.lawn.Board = self.lawn.PlayerInfo = self.lawn.GardenType = object
@@ -164,6 +167,192 @@ class GuiDispatcherTests(unittest.TestCase):
         self.run_tasks()
         self.assertEqual(self.board.mSunMoney, 9990)
         self.assertTrue(self.results()[0]['ok'])
+
+    def terrain_board(self):
+        # .NET enums stringify to their member names.
+        for enum_type in (self.lawn.BackgroundType, self.lawn.GridSquareType, self.lawn.PlantRowType):
+            enum_type.__str__ = lambda member: member.name
+        self.board.mGameID = 42
+        self.board.mBackground = self.lawn.BackgroundType.Num1Day
+        self.board.mGridSquareType = {(col, row): self.lawn.GridSquareType.Grass
+                                      for row in range(6) for col in range(9)}
+        self.board.mPlantRow = [self.lawn.PlantRowType.Normal] * 6
+        self.board.mPlants = types.SimpleNamespace(Count=0)
+        self.board.mApp = types.SimpleNamespace(IsWallnutBowlingLevel=lambda: False)
+        def load_background():
+            self.assertTrue(self.main_thread)
+            self.calls.append(('LoadBackgroundImages', self.board.mBackground))
+        self.board.LoadBackgroundImages = load_background
+        self.dispatch('getTerrain')
+        self.run_tasks()
+        return self.results()[0]['value']
+
+    def test_terrain_is_read_then_applied_once_on_main_thread_with_correct_axes(self):
+        draft = self.terrain_board()
+        self.assertEqual(draft['grid'], [['Grass'] * 9 for _ in range(6)])
+        draft['background'] = 'Num6Boss'
+        draft['grid'][1][7] = 'None'
+        draft['grid'][5][0] = 'Shallow'
+        draft['rows'][4] = 'Pool'
+        self.assertEqual(self.board.mBackground, self.lawn.BackgroundType.Num1Day)
+        self.dispatch('applyTerrain', draft)
+        self.assertEqual(self.board.mGridSquareType[7, 1], self.lawn.GridSquareType.Grass)
+
+        self.run_tasks()
+        result = self.results()[0]
+        self.assertTrue(result['ok'], result)
+        self.assertEqual(self.board.mGridSquareType[7, 1], getattr(self.lawn.GridSquareType, 'None'))
+        self.assertEqual(self.board.mGridSquareType[0, 5], self.lawn.GridSquareType.Shallow)
+        self.assertEqual(self.board.mPlantRow[4], self.lawn.PlantRowType.Pool)
+        self.assertEqual(self.calls, [('LoadBackgroundImages', self.lawn.BackgroundType.Num6Boss)])
+        self.assertEqual(result['value']['grid'], draft['grid'])
+        self.board.mGridSquareType[7, 1] = self.lawn.GridSquareType.Grass
+        self.run_tasks()
+        self.assertEqual(self.board.mGridSquareType[7, 1], self.lawn.GridSquareType.Grass)
+
+    def test_read_terrain_without_board_returns_day_with_five_grass_rows_and_one_dirt_row(self):
+        self.board = None
+        self.dispatch('getTerrain')
+        self.run_tasks()
+        result = self.results()[0]
+        self.assertTrue(result['ok'], result)
+        self.assertEqual(result['value'], {
+            'background': 'Num1Day',
+            'grid': [['Grass'] * 9 for _ in range(5)] + [['Dirt'] * 9],
+            'rows': ['Normal'] * 5 + ['Dirt'],
+        })
+        self.assertEqual(self.calls, [])
+
+    def test_terrain_repositions_grounded_plants_after_writing_all_terrain(self):
+        draft = self.terrain_board()
+        draft['background'] = 'Num6Boss'
+        draft['grid'][2][3] = 'HighGround'
+        draft['rows'][2] = 'HighGround'
+        plants = [types.SimpleNamespace(
+            mDead=False, mPlantCol=3, mRow=2, mX=0, mY=0,
+            mPlantHealth=123, mLaunchCounter=456, mState='attacking',
+            mIsAsleep=asleep, NotOnGround=lambda: False,
+        ) for asleep in (False, True)]
+        plants.extend([
+            types.SimpleNamespace(mDead=True),
+            types.SimpleNamespace(mDead=False, NotOnGround=lambda: True),
+            types.SimpleNamespace(mDead=False, NotOnGround=lambda: False, mPlantCol=-1, mRow=0),
+        ])
+        class PlantList(list):
+            @property
+            def Count(self):
+                return len(self)
+        self.board.mPlants = PlantList(plants)
+        moved = []
+        def move_plant(plant, col, row):
+            self.assertTrue(self.main_thread)
+            self.assertEqual(self.board.mBackground, self.lawn.BackgroundType.Num6Boss)
+            self.assertEqual(self.board.mPlantRow[2], self.lawn.PlantRowType.HighGround)
+            self.assertEqual(self.board.mGridSquareType[3, 2], self.lawn.GridSquareType.HighGround)
+            self.assertEqual(self.board.mGridSquareType[8, 5], self.lawn.GridSquareType.Grass)
+            self.assertEqual((col, row), (3, 2))
+            # 模拟原生 MovePlant 使用新背景和地形重新计算发射坐标。
+            plant.mX, plant.mY = 80 * col, 85 * row - 40
+            moved.append(plant)
+        self.board.mChallenge.MovePlant = move_plant
+        self.dispatch('applyTerrain', draft)
+        self.assertEqual(moved, [])
+        self.run_tasks()
+        result = self.results()[0]
+        self.assertTrue(result['ok'], result)
+        self.assertEqual(len(moved), 2)
+        for index, plant in enumerate(plants[:2]):
+            self.assertIs(moved[index], plant)
+            self.assertEqual((plant.mX, plant.mY), (240, 130))
+            self.assertEqual((plant.mPlantHealth, plant.mLaunchCounter, plant.mState), (123, 456, 'attacking'))
+            self.assertEqual(plant.mIsAsleep, bool(index))
+        self.run_tasks()
+        self.assertEqual(len(moved), 2)
+
+    def test_terrain_does_not_snap_bowling_plants_back_to_their_grid(self):
+        draft = self.terrain_board()
+        self.board.mApp.IsWallnutBowlingLevel = lambda: True
+        class RejectPlantAccess:
+            @property
+            def Count(self):
+                raise AssertionError('bowling plants must not be repositioned')
+        self.board.mPlants = RejectPlantAccess()
+        draft['grid'][0][0] = 'Pool'
+        self.dispatch('applyTerrain', draft)
+        self.run_tasks()
+        self.assertTrue(self.results()[0]['ok'])
+        self.assertEqual(self.board.mGridSquareType[0, 0], self.lawn.GridSquareType.Pool)
+
+    def test_terrain_validates_entire_payload_before_any_game_write(self):
+        draft = self.terrain_board()
+        draft['background'] = 'Num6Boss'
+        for field, invalid in (
+            ('grid', [['Pool'] * 9] * 5),
+            ('grid', [['Pool'] * 8] * 6),
+            ('grid', [['INVALID'] * 9] * 6),
+            ('rows', ['Pool'] * 5),
+            ('rows', ['INVALID'] * 6),
+            ('background', 'INVALID'),
+        ):
+            with self.subTest(field=field, invalid=invalid):
+                self.dispatch('applyTerrain', dict(draft, **{field: invalid}))
+                self.run_tasks()
+                self.assertFalse(self.results()[0]['ok'])
+                self.assertEqual(self.board.mBackground, self.lawn.BackgroundType.Num1Day)
+                self.assertEqual(self.calls, [])
+                self.assertTrue(all(value == self.lawn.GridSquareType.Grass
+                                    for value in self.board.mGridSquareType.values()))
+
+    def test_terrain_applies_draft_to_current_board_after_level_or_stage_changes(self):
+        draft = self.terrain_board()
+        draft['background'] = 'Num6Boss'
+        original = self.board
+        for change in ('board', 'stage', 'game_id'):
+            with self.subTest(change=change):
+                self.board = original
+                self.board.mGameID = 42
+                self.board.mChallenge.mSurvivalStage = 0
+                self.board.mBackground = self.lawn.BackgroundType.Num1Day
+                self.calls.clear()
+                payload = dict(draft)
+                if change == 'board':
+                    # Apply targets the Board present when the queued request executes.
+                    self.board = types.SimpleNamespace(**vars(original), replacement=True)
+                elif change == 'stage':
+                    self.board.mChallenge.mSurvivalStage = 1
+                elif change == 'game_id':
+                    self.board.mGameID = 43
+                self.dispatch('applyTerrain', payload)
+                self.run_tasks()
+                self.assertTrue(self.results()[0]['ok'])
+                self.assertEqual(self.board.mBackground, self.lawn.BackgroundType.Num6Boss)
+                self.assertEqual(self.calls, [('LoadBackgroundImages', self.lawn.BackgroundType.Num6Boss)])
+
+    def test_failed_background_load_does_not_change_terrain_or_background(self):
+        draft = self.terrain_board()
+        draft['background'] = 'Num6Boss'
+        draft['rows'][0] = 'Pool'
+        draft['grid'][0][0] = 'Pool'
+        self.board.LoadBackgroundImages = lambda: (_ for _ in ()).throw(RuntimeError('load failed'))
+        self.dispatch('applyTerrain', draft)
+        self.run_tasks()
+        self.assertFalse(self.results()[0]['ok'])
+        self.assertEqual(self.board.mBackground, self.lawn.BackgroundType.Num1Day)
+        self.assertEqual(self.board.mPlantRow[0], self.lawn.PlantRowType.Normal)
+        self.assertEqual(self.board.mGridSquareType[0, 0], self.lawn.GridSquareType.Grass)
+
+    def test_grid_only_edit_keeps_background_resources_and_wave_state(self):
+        draft = self.terrain_board()
+        waves = self.board.mZombiesInWave = object()
+        self.board.mCurrentWave = 7
+        self.board.mZombieCountDown = 123
+        draft['grid'][0][8] = 'HighGround'
+        self.dispatch('applyTerrain', draft)
+        self.run_tasks()
+        self.assertTrue(self.results()[0]['ok'])
+        self.assertEqual(self.calls, [])
+        self.assertIs(self.board.mZombiesInWave, waves)
+        self.assertEqual((self.board.mCurrentWave, self.board.mZombieCountDown), (7, 123))
         self.assertEqual(self.results(), [])
 
     def test_calls_synchronous_api_once(self):

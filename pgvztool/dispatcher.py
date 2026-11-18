@@ -51,6 +51,23 @@ def _zombie_list(value):
     return [_enum(Lawn.ZombieType)(item) for item in value]
 
 
+def _terrain_grid(value):
+    if not isinstance(value, list) or len(value) != 6:
+        raise ValueError('terrain grid must have 6 rows')
+    result = []
+    for row in value:
+        if not isinstance(row, list) or len(row) != 9:
+            raise ValueError('terrain grid rows must have 9 columns')
+        result.append([_enum(Lawn.GridSquareType)(item) for item in row])
+    return result
+
+
+def _terrain_rows(value):
+    if not isinstance(value, list) or len(value) != 6:
+        raise ValueError('terrain row types must have 6 entries')
+    return [_enum(Lawn.PlantRowType)(item) for item in value]
+
+
 class GuiDispatcher:
     def __init__(self):
         # 此锁只保护跨线程的数据交接；业务执行期间不持锁，也不需要递归锁。
@@ -109,6 +126,10 @@ class GuiDispatcher:
             'setZombies': (cheat_actions.CheatSetZombies, (('types', _zombie_list), ('natural', _boolean))),
             'applyLineup': (cheat_actions.LineUpOnBoard, (('code', _string),)),
             'getLineup': (cheat_actions.GetLineup, ()),
+            'getTerrain': (cheat_actions.GetTerrain, ()),
+            'applyTerrain': (cheat_actions.ApplyTerrain, (
+                ('background', _enum(Lawn.BackgroundType)),
+                ('grid', _terrain_grid), ('rows', _terrain_rows))),
         }
 
     def submit(self, json_str):

@@ -368,6 +368,64 @@
                     </el-form>
                 </el-tab-pane>
 
+                <el-tab-pane :label="t('tabs.terrain')" name="terrain">
+                    <el-card shadow="never" class="tool-card">
+                        <template #header>{{ t('tabs.terrain') }}</template>
+                        <div class="terrain-toolbar">
+                            <label class="field terrain-background">
+                                <span>{{ t('terrain.background') }}</span>
+                                <el-select v-model="terrainDraft.background" :disabled="terrainBusy">
+                                    <el-option v-for="item in terrainBackgrounds" :key="item.value" :value="item.value" :label="dataLabel(item)" />
+                                </el-select>
+                            </label>
+                            <el-button :disabled="!connected || terrainBusy" :loading="terrainLoading" @click="loadTerrain">{{ t('terrain.reload') }}</el-button>
+                            <el-button type="primary" :disabled="!connected || terrainBusy || !!terrainSelection" :loading="terrainApplying" @click="applyTerrain">{{ t('terrain.apply') }}</el-button>
+                            <el-tag v-if="terrainDirty" type="warning" effect="plain">{{ t('terrain.unsaved') }}</el-tag>
+                        </div>
+                        <p class="terrain-hint">{{ t('terrain.hint') }}</p>
+                        <fieldset class="terrain-workspace" :disabled="terrainBusy">
+                            <div class="terrain-palette">
+                                <h3>{{ t('terrain.brush') }}</h3>
+                                <button v-for="item in terrainTypes" :key="item.value" type="button"
+                                    class="terrain-brush" :aria-pressed="terrainBrush === item.value"
+                                    @click="terrainBrush = item.value">
+                                    <span class="terrain-swatch" :class="'terrain-type-' + item.value.toLowerCase()"></span>{{ dataLabel(item) }}
+                                </button>
+                            </div>
+                            <div class="terrain-map-scroll">
+                                <div class="terrain-maps" @pointerdown="terrainPointerDown" @pointermove="terrainPointerMove"
+                                    @pointerup="terrainPointerUp" @pointercancel="terrainCancel" @lostpointercapture="terrainCancel">
+                                    <div class="terrain-grid-panel">
+                                        <h3>{{ t('terrain.grid') }}</h3>
+                                        <div class="terrain-column-labels"><span></span><span v-for="col in 9" :key="col">{{ col }}</span></div>
+                                        <div class="terrain-grid-body">
+                                            <div class="terrain-row-labels"><span v-for="row in 6" :key="row">{{ row }}</span></div>
+                                            <div class="terrain-grid">
+                                                <template v-for="(row, r) in terrainDraft.grid" :key="r">
+                                                    <button v-for="(value, c) in row" :key="c" type="button" class="terrain-cell"
+                                                        :class="['terrain-type-' + value.toLowerCase(), { 'is-selected': terrainSelected('grid', r, c) }]"
+                                                        :title="terrainCellLabel('grid', value, r, c)" :aria-label="terrainCellLabel('grid', value, r, c)"
+                                                        @click="terrainCellClick($event, 'grid', r, c)">{{ terrainTypeShort('grid', value) }}</button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="terrain-rows-panel">
+                                        <h3>{{ t('terrain.rows') }}</h3>
+                                        <div class="terrain-column-labels terrain-rows-label"><span>{{ t('fields.row') }}</span></div>
+                                        <div class="terrain-rows">
+                                            <button v-for="(value, r) in terrainDraft.rows" :key="r" type="button" class="terrain-cell"
+                                                :class="['terrain-type-' + value.toLowerCase(), { 'is-selected': terrainSelected('rows', r, 0) }]"
+                                                :title="terrainCellLabel('rows', value, r, 0)" :aria-label="terrainCellLabel('rows', value, r, 0)"
+                                                @click="terrainCellClick($event, 'rows', r, 0)">{{ terrainTypeShort('rows', value) }}</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </el-card>
+                </el-tab-pane>
+
                 <el-tab-pane :label="t('tabs.custom')" name="custom">
                     <el-card shadow="never" class="tool-card">
                         <template #header>{{ t('sections.customCode') }}</template>
@@ -402,6 +460,7 @@
     <script src="./js/protocol.js"></script>
     <script src="./js/options.js"></script>
     <script src="./js/connection.js"></script>
+    <script src="./js/terrain.js"></script>
     <script src="./js/app.js"></script>
 </body>
 

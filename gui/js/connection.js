@@ -2,7 +2,7 @@
 window.PGvZConnection = (() => {
     const HANDSHAKE_TIMEOUT_MS = 30000;
     const RECONNECT_DELAY_MS = 3000;
-    function create({ isMobile, t, setResult, getInitialState, applySyncState, lineupCode }) {
+    function create({ isMobile, t, setResult, getInitialState, applySyncState, lineupCode, onActionResult = () => {} }) {
         const { computed, ref } = Vue;
         const wsParams = new URLSearchParams(location.search);
         const SERVER_URL = wsParams.get('ws') || 'ws://localhost:8080/Py';
@@ -92,8 +92,10 @@ window.PGvZConnection = (() => {
                 pendingRequests.set(id, { kind });
                 pendingCount.value = pendingRequests.size;
             }
-            if (!transmit(code, options)) finishRequest(id);
+            const sent = transmit(code, options);
+            if (!sent) finishRequest(id);
             scheduleResultPoll();
+            return sent;
         }
 
         function finishRequest(id) {
@@ -118,7 +120,7 @@ window.PGvZConnection = (() => {
         }
 
         function sendAction(name, args = {}) {
-            submit('action', { name, args });
+            return submit('action', { name, args });
         }
 
         function applyState(state) {
@@ -169,6 +171,7 @@ window.PGvZConnection = (() => {
             for (const result of results) {
                 acknowledged.push(result.id);
                 if (!finishRequest(result.id)) continue;
+                if (result.kind === 'action') onActionResult(result);
                 if (!result.ok) {
                     if (result.errortype === 'SessionRejected') {
                         showSessionRejected();

@@ -11,6 +11,7 @@ window.PGvZI18n = (() => {
                 world: '场地',
                 stage: '关卡',
                 lineup: '出怪与布阵',
+                terrain: '地形',
                 custom: '调试',
             },
             sections: {
@@ -132,6 +133,16 @@ window.PGvZI18n = (() => {
                 roof: '屋顶',
                 moon: '月夜',
             },
+            terrain: {
+                background: '场景背景',
+                reload: '读取当前地形',
+                apply: '实施修改',
+                unsaved: '尚未实施',
+                brush: '地形画笔',
+                grid: '地形',
+                rows: '行类型',
+                hint: '先选择画笔，再点击格子设置单格或拖动批量设置矩形区域。点击“实施修改”后写入当前关卡。',
+            },
             weather: {
                 default: '默认',
                 sunny: '晴天',
@@ -233,6 +244,7 @@ window.PGvZI18n = (() => {
                 world: 'Board',
                 stage: 'Stage',
                 lineup: 'Spawns & Lineup',
+                terrain: 'Terrain',
                 custom: 'Debug',
             },
             sections: {
@@ -353,6 +365,16 @@ window.PGvZI18n = (() => {
                 fog: 'Fog',
                 roof: 'Roof',
                 moon: 'Moon',
+            },
+            terrain: {
+                background: 'Background',
+                reload: 'Read Current Terrain',
+                apply: 'Apply Changes',
+                unsaved: 'Not applied',
+                brush: 'Terrain Brush',
+                grid: 'Terrain',
+                rows: 'Row Types',
+                hint: 'Choose a brush, then click to set a single cell or drag to fill a rectangular area. Click Apply Changes to write to the current level.',
             },
             weather: {
                 default: 'Default',

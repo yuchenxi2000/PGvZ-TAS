@@ -41,7 +41,8 @@ PGvZTool v{{MOD_VERSION}} for PGvZ v{{GAME_VERSION}}
 1. 必须先启动游戏，再打开网页控制台。
 2. 如果安装时游戏已经打开，请重启游戏后再使用。
 3. 网页左上角显示“已连接到游戏服务器”后，按钮才会执行到游戏里。
-4. 点击网页上方的“基础”“场地”“关卡”“出怪与布阵”“调试”标签，可切换到对应的功能组。
+4. 点击网页上方的“基础”“场地”“关卡”“出怪与布阵”“地形”“调试”标签，可切换到对应的功能组。
+5. “地形”页手动读取当前关卡，选择画笔后点击格子或拖动矩形批量修改；背景、6×9 格子与六行类型都在点击“实施修改”后一次性写入当前关卡。
 5. 点击网页右上角的语言选项，可在中文和英文之间切换。
 6. 遇到安装或使用问题，可参看下方“常见问题排查”和“使用调试入口”，尝试按指示排查和修复。
 
@@ -242,7 +243,8 @@ Option 2: manual install
 1. Start the game before opening the web console.
 2. If the game was already running during installation, restart it.
 3. Buttons only affect the game after the page shows that it is connected to the game server.
-4. Click the Basics, Board, Stage, Spawns & Lineup, or Debug tab at the top of the page to switch between feature groups.
+4. Click the Basics, Board, Stage, Spawns & Lineup, Terrain, or Debug tab at the top of the page to switch between feature groups.
+5. In Terrain, manually read the current level, choose a brush, then click cells or drag a rectangle to fill them. Apply Changes writes the background, 6×9 cell grid, and six row types once to the level active when the action runs.
 5. Use the language selector in the upper-right corner to switch between Chinese and English.
 6. If you encounter installation or usage problems, see Troubleshooting and Using the Debug Entry below and follow the instructions to diagnose and resolve them.
 

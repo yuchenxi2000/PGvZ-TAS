@@ -20,6 +20,7 @@
 - `gui/js/connection.js`：WebSocket 连接、引导、单客户端会话、显式接管、请求结果轮询和断线重连。
 - `gui/js/options.js`：开关分组、默认值和复选框状态的本地存储。
 - `gui/js/app.js`：Vue 界面、业务操作、状态同步和组装上述模块。
+- `gui/js/terrain.js`：当前关卡的地形草稿、单格编辑与矩形拖选；只在用户实施修改时提交。
 
 这些文件按 `gui/index.html` 中的脚本顺序加载，不需要构建步骤。连接模块通过回调触发
 `app.js` 中的 `getInitialState()` 和 `applySyncState()` 获取初始状态及应用远端状态；
@@ -284,6 +285,40 @@ Python，业务请求通过分发器转入主线程；`Sexy/Main.cs` 的 `Update
 `sendAction('getLineup')` 在主线程调用 `cheat_actions.GetLineup()`，返回布阵码字符串。
 `sendAction('applyLineup', { code })` 调用 `cheat_actions.LineUpOnBoard(code)`。
 前端不访问 `Board`，也不构造包含用户输入的 Python 表达式。
+
+### 地形编辑
+
+“地形”页只在点击“读取当前地形”时用 `sendAction('getTerrain')` 读取当前关卡，可丢弃
+草稿并重新读取；打开页面、换关或生存换轮不会自动读取。返回值包含背景枚举名 `background`、行优先的 `grid`（6×9）
+及 `rows`（六个行类型名）。后端负责将网页的 `grid[row][col]` 转换为游戏的 `[col, row]`。
+页面初始和断线重置后均显示默认草稿：白天、前五行 `Grass` / `Normal`、第六行九格及行类型均为 `Dirt`；未进入关卡
+或尚未连接时也显示完整编辑器，并允许本地编辑。无 Board 时手动读取返回同一默认设置。
+
+`terrain.js` 保存一份独立草稿和读取时的基准值。背景选择、单格点击、键盘 Enter/Space
+及矩形拖选只更新草稿；拖选期间预览选区，松开指针后填色，取消指针则放弃选区。
+两侧共用外层指针捕获和选区，格子列为 0..8、右侧行类型为第 9 列，拖选可跨越两部分，
+也可从行类型反向拖至格子。中间间隔不作为单元格，不可在间隔起选；拖入间隔但尚未
+到达另一侧时，不选中另一侧。选区行号按对齐后的六行计算。
+格子与行类型共用一组画笔：草地、裸地、泳池、高地、浅水。“草地”写格子时为 `Grass`，
+写行类型时为 `Normal`，其余同名对应；画格子和画行类型仍独立修改对应数组。
+不提供 `None` 画笔，但手动读取到的既有 `None` 格子保留原值并显示为“—”。
+“实施修改”调用 `sendAction('applyTerrain', { background, grid, rows })`。
+`connection.js` 将已确认、尚未处理的动作结果通过 `onActionResult` 交给编辑器，成功时
+采用后端返回的最新快照；失败时保留草稿，断线或失去会话时恢复默认草稿并清除等待状态。
+
+动作执行前，分发器完整验证背景、格子和行类型的枚举名与数组尺寸，再调用业务方法。
+`CheatActions` 在请求执行时取得当前 Board 并写入，不绑定读取时的关卡或生存轮次；
+换关后仍可将网页草稿实施到当前关卡，不会因关卡已变化而报错。
+背景改变时先赋值并调用 `LoadBackgroundImages()`，加载失败则恢复背景且不写地形数组。
+成功后写入两组地形，再对有效格子内存活且 `NotOnGround()` 为假的植物调用
+`Challenge.MovePlant(plant, plant.mPlantCol, plant.mRow)`，按新地形原地校正坐标与相关特效；
+保龄球关卡跳过这一步，避免把滚动植物移回原始格子。血量、攻击计时和睡眠状态保留，
+不额外调用 `UpdateReanim()` 推进动画，也不修改已有子弹。
+随后返回实际快照，不调用 `PickBackground()`、出怪重建或已有对象重建。
+
+地形不注册到 `SyncRegistry`，不写入 localStorage，也不作为 PC 恢复设置推送；没有逐帧
+重设地形的脚本。这是对当前 Board 的一次赋值，后续游戏自身的存档或换轮行为仍按原生
+逻辑处理。具体字段的影响见[场景、格子地形与行类型](../../game-mechanics/other/background-and-terrain.md)。
 
 ### 统一的主线程入口
 

@@ -148,6 +148,7 @@ const app = createApp({
         const currentLineupList = computed(() => lineupCodeMap[selectedScene.value] || []);
 
         let applyingRemoteState = false;
+        const terrain = PGvZTerrain.create({ sendAction: (...args) => sendAction(...args) });
         const {
             connected, sessionRejected, unsupportedGameVersion, supportedGameVersions,
             gameVersion, modVersion, connectionState,
@@ -155,7 +156,22 @@ const app = createApp({
             send, sendAction, applyState, connect, releaseSession, takeoverSession,
         } = PGvZConnection.create({
             isMobile, t, setResult, getInitialState, applySyncState, lineupCode,
+            onActionResult: terrain.receive,
         });
+        watch(() => connected.value, ready => {
+            if (!ready) terrain.reset();
+        });
+
+        function terrainTypeShort(kind, value) {
+            const item = terrain.typeInfo(kind, value);
+            return item ? (language.value === 'zh' ? item.short : item.code) : value;
+        }
+
+        function terrainCellLabel(kind, value, row, col) {
+            const item = terrain.typeInfo(kind, value);
+            const position = kind === 'grid' ? `${t('fields.row')} ${row + 1}, ${t('fields.col')} ${col + 1}` : `${t('fields.row')} ${row + 1}`;
+            return `${position}: ${item ? dataLabel(item) : value}`;
+        }
         const statusText = computed(() => t(`status.${connectionState.value}`));
         const unsupportedGameVersionDetail = computed(() => {
             if (!unsupportedGameVersion.value) return '';
@@ -331,6 +347,25 @@ const app = createApp({
         });
 
         return {
+            terrainDraft: terrain.draft,
+            terrainLoading: terrain.loading,
+            terrainApplying: terrain.applying,
+            terrainBusy: terrain.busy,
+            terrainDirty: terrain.dirty,
+            terrainSelection: terrain.selection,
+            terrainBrush: terrain.brush,
+            terrainTypes: terrain.types,
+            terrainBackgrounds: PGvZData.terrainBackgrounds,
+            loadTerrain: terrain.load,
+            applyTerrain: terrain.apply,
+            terrainPointerDown: terrain.pointerDown,
+            terrainPointerMove: terrain.pointerMove,
+            terrainPointerUp: terrain.pointerUp,
+            terrainCancel: terrain.cancel,
+            terrainSelected: terrain.selected,
+            terrainCellClick: terrain.cellClick,
+            terrainTypeShort,
+            terrainCellLabel,
             language,
             languageOptions,
             setLanguage,

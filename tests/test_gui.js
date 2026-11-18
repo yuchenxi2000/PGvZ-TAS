@@ -14,6 +14,199 @@ function reprString(value) {
     return "'" + value.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n') + "'";
 }
 
+function terrainSnapshot() {
+    return {
+        background: 'Num1Day',
+        grid: Array.from({ length: 6 }, (_, row) => Array(9).fill(row === 5 ? 'Dirt' : 'Grass')),
+        rows: ['Normal', 'Normal', 'Normal', 'Normal', 'Normal', 'Dirt'],
+    };
+}
+
+function terrainPointerTarget() {
+    const grid = { left: 0, top: 0, right: 900, bottom: 600, width: 900, height: 600 };
+    const rows = { left: 1000, top: 0, right: 1100, bottom: 600, width: 100, height: 600 };
+    return {
+        querySelector: selector => ({ getBoundingClientRect: () => selector === '.terrain-grid' ? grid : rows }),
+        setPointerCapture() {}, releasePointerCapture() {},
+    };
+}
+
+test('terrain edits stay local, fill reverse rectangles and rows, and submit only on apply', () => {
+    const gui = loadGui();
+    const ws = gui.bootstrap();
+    const sentBeforeOpening = ws.sent.length;
+    gui.model.activeTab.value = 'terrain';
+    gui.flush();
+    assert.equal(ws.sent.length, sentBeforeOpening);
+    assert.deepEqual(JSON.parse(JSON.stringify(gui.model.terrainDraft.value)), terrainSnapshot());
+    gui.model.loadTerrain();
+    const read = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    assert.equal(read.name, 'getTerrain');
+    const original = terrainSnapshot();
+    ws.message({ action: 'results', results: [{ ...read, ok: true, value: original }] });
+    assert.equal(gui.model.terrainLoading.value, false);
+    const sentBeforePainting = ws.sent.length;
+    const target = terrainPointerTarget();
+    const event = (x, y) => ({ currentTarget: target, clientX: x, clientY: y, button: 0, pointerId: 7, preventDefault() {} });
+    gui.model.terrainBrush.value = 'Pool';
+    gui.model.terrainPointerDown(event(450, 350));
+    gui.model.terrainPointerMove(event(150, 150));
+    assert.equal(gui.model.terrainSelected('grid', 2, 3), true);
+    assert.equal(gui.model.terrainDraft.value.grid[2][3], 'Grass');
+    gui.model.terrainPointerUp(event(150, 150));
+    for (let r = 0; r < 6; r++) {
+        for (let c = 0; c < 9; c++) {
+            assert.equal(gui.model.terrainDraft.value.grid[r][c], r >= 1 && r <= 3 && c >= 1 && c <= 4 ? 'Pool' : r === 5 ? 'Dirt' : 'Grass');
+        }
+    }
+    assert.equal(original.grid[2][3], 'Grass');
+    gui.model.terrainBrush.value = 'Dirt';
+    gui.model.terrainPointerDown(event(1050, 150));
+    gui.model.terrainPointerUp(event(1050, 450));
+    assert.deepEqual(Array.from(gui.model.terrainDraft.value.rows), ['Normal', 'Dirt', 'Dirt', 'Dirt', 'Dirt', 'Dirt']);
+    gui.model.terrainDraft.value.background = 'Num6Boss';
+    assert.equal(gui.model.terrainDirty.value, true);
+    assert.equal(ws.sent.length, sentBeforePainting);
+    gui.model.applyTerrain();
+    const apply = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    assert.equal(apply.name, 'applyTerrain');
+    assert.deepEqual(apply.args, JSON.parse(JSON.stringify(gui.model.terrainDraft.value)));
+    ws.message({ action: 'results', results: [{ ...apply, ok: true, value: apply.args }] });
+    assert.equal(gui.model.terrainDirty.value, false);
+    assert.equal(gui.model.terrainApplying.value, false);
+    assert.equal(JSON.parse(gui.storage.get(storageKey)).terrain, undefined);
+});
+
+test('terrain cancels selections, supports keyboard painting, and discards drafts on disconnect', () => {
+    const gui = loadGui();
+    const ws = gui.bootstrap();
+    gui.model.loadTerrain();
+    const read = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    ws.message({ action: 'results', results: [{ ...read, ok: true, value: terrainSnapshot() }] });
+    const target = terrainPointerTarget();
+    const event = { currentTarget: target, clientX: 50, clientY: 50, button: 0, pointerId: 1, preventDefault() {} };
+    gui.model.terrainBrush.value = 'HighGround';
+    gui.model.terrainPointerDown(event);
+    gui.model.terrainCancel();
+    assert.equal(gui.model.terrainDraft.value.grid[0][0], 'Grass');
+    gui.model.terrainCellClick({ detail: 0 }, 'grid', 5, 8);
+    assert.equal(gui.model.terrainDraft.value.grid[5][8], 'HighGround');
+    assert.equal(gui.model.terrainDraft.value.grid[0][0], 'Grass');
+    ws.close();
+    gui.flush();
+    assert.deepEqual(JSON.parse(JSON.stringify(gui.model.terrainDraft.value)), terrainSnapshot());
+    assert.equal(gui.model.terrainSelection.value, null);
+    assert.equal(gui.model.terrainBusy.value, false);
+});
+
+test('terrain action failures preserve the draft and do not retry or replay edits', () => {
+    const gui = loadGui();
+    const ws = gui.bootstrap();
+    gui.model.loadTerrain();
+    const read = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    ws.message({ action: 'results', results: [{ ...read, ok: true, value: terrainSnapshot() }] });
+    gui.model.terrainDraft.value.rows[0] = 'Dirt';
+    gui.model.applyTerrain();
+    const apply = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    ws.message({ action: 'results', results: [{ ...apply, ok: false, errortype: 'RuntimeError', error: 'load failed' }] });
+    assert.equal(gui.model.terrainBusy.value, false);
+    assert.equal(gui.model.terrainDirty.value, true);
+    assert.equal(gui.model.terrainDraft.value.rows[0], 'Dirt');
+    assert.match(gui.model.resultText.value, /load failed/);
+    const sent = ws.sent.length;
+    gui.advance(60000);
+    assert.equal(ws.sent.length, sent);
+});
+
+test('terrain starts with editable defaults before connection and sends no automatic terrain actions', () => {
+    const gui = loadGui();
+    const draft = gui.model.terrainDraft.value;
+    assert.deepEqual(JSON.parse(JSON.stringify(draft)), terrainSnapshot());
+    assert.equal(gui.model.terrainDirty.value, false);
+    gui.model.terrainBrush.value = 'Pool';
+    gui.model.terrainCellClick({ detail: 0 }, 'grid', 0, 0);
+    draft.background = 'Num6Boss';
+    assert.equal(draft.grid[0][0], 'Pool');
+    assert.equal(draft.grid[1][0], 'Grass');
+    assert.equal(gui.model.terrainDirty.value, true);
+    assert.equal(gui.sockets[0].sent.length, 0);
+    const ws = gui.bootstrap();
+    assert.equal(gui.model.terrainDraft.value.background, 'Num6Boss');
+    const beforeOpening = ws.sent.length;
+    gui.model.activeTab.value = 'terrain';
+    gui.flush();
+    assert.equal(ws.sent.length, beforeOpening);
+    gui.model.applyTerrain();
+    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    assert.equal(request.name, 'applyTerrain');
+    assert.equal(request.args.background, 'Num6Boss');
+    assert.equal(request.args.grid[0][0], 'Pool');
+});
+
+test('one terrain palette paints cells and row types with Grass mapped to Normal', () => {
+    const gui = loadGui();
+    assert.deepEqual(Array.from(gui.model.terrainTypes, item => item.value), ['Grass', 'Dirt', 'Pool', 'HighGround', 'Shallow']);
+    for (const item of gui.model.terrainTypes) {
+        gui.model.terrainBrush.value = item.value;
+        const oldRow = gui.model.terrainDraft.value.rows[0];
+        gui.model.terrainCellClick({ detail: 0 }, 'grid', 0, 0);
+        assert.equal(gui.model.terrainDraft.value.grid[0][0], item.value);
+        assert.equal(gui.model.terrainDraft.value.rows[0], oldRow);
+        gui.model.terrainCellClick({ detail: 0 }, 'rows', 0, 0);
+        assert.equal(gui.model.terrainDraft.value.rows[0], item.value === 'Grass' ? 'Normal' : item.value);
+        assert.equal(gui.model.terrainDraft.value.grid[0][0], item.value);
+    }
+    assert.equal(gui.model.terrainTypeShort('grid', 'Grass'), gui.model.terrainTypeShort('rows', 'Normal'));
+    // Existing None cells remain representable without offering a None brush.
+    assert.equal(gui.model.terrainTypeShort('grid', 'None'), '—');
+    assert.equal(gui.sockets[0].sent.length, 0);
+});
+
+test('terrain rectangles span cells and row types in either direction without sending edits', () => {
+    for (const reverse of [false, true]) {
+        const gui = loadGui();
+        gui.model.terrainBrush.value = 'Pool';
+        const target = terrainPointerTarget();
+        const event = (x, y) => ({ currentTarget: target, clientX: x, clientY: y, button: 0, pointerId: 2, preventDefault() {} });
+        const from = reverse ? event(1050, 450) : event(750, 150);
+        const to = reverse ? event(750, 150) : event(1050, 450);
+        gui.model.terrainPointerDown(from);
+        gui.model.terrainPointerMove(to);
+        assert.equal(gui.model.terrainSelected('grid', 2, 7), true);
+        assert.equal(gui.model.terrainSelected('rows', 2, 0), true);
+        assert.equal(gui.model.terrainSelected('grid', 2, 6), false);
+        assert.equal(gui.model.terrainDraft.value.rows[2], 'Normal');
+        gui.model.terrainPointerUp(to);
+        for (let r = 0; r < 6; r++) {
+            for (let c = 0; c < 9; c++) {
+                assert.equal(gui.model.terrainDraft.value.grid[r][c], r >= 1 && r <= 4 && c >= 7 ? 'Pool' : r === 5 ? 'Dirt' : 'Grass');
+            }
+            assert.equal(gui.model.terrainDraft.value.rows[r], r >= 1 && r <= 4 ? 'Pool' : r === 5 ? 'Dirt' : 'Normal');
+        }
+        assert.equal(gui.sockets[0].sent.length, 0);
+    }
+});
+
+test('terrain selection gap does not start a drag or select the other panel early', () => {
+    const gui = loadGui();
+    const target = terrainPointerTarget();
+    const event = x => ({ currentTarget: target, clientX: x, clientY: 150, button: 0, pointerId: 3, preventDefault() {} });
+    gui.model.terrainBrush.value = 'HighGround';
+    gui.model.terrainPointerDown(event(950));
+    assert.equal(gui.model.terrainSelection.value, null);
+    gui.model.terrainPointerDown(event(850));
+    gui.model.terrainPointerUp(event(950));
+    assert.equal(gui.model.terrainDraft.value.grid[1][8], 'HighGround');
+    assert.equal(gui.model.terrainDraft.value.rows[1], 'Normal');
+    gui.model.terrainPointerDown(event(1050));
+    gui.model.terrainPointerMove(event(950));
+    assert.equal(gui.model.terrainSelected('grid', 1, 8), false);
+    assert.equal(gui.model.terrainSelected('rows', 1, 0), true);
+    gui.model.terrainPointerUp(event(950));
+    assert.equal(gui.model.terrainDraft.value.rows[1], 'HighGround');
+    assert.equal(gui.model.terrainDraft.value.grid[1][7], 'Grass');
+});
+
 function loadGui({ mobile = false, saved = {} } = {}) {
     const sockets = [], errors = [], timers = new Map(), listeners = {}, mounted = [], watchers = [], nextTicks = [];
     const storage = new Map([[storageKey, JSON.stringify(saved)]]);

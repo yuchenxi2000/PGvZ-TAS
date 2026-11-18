@@ -1,4 +1,20 @@
 window.PGvZData = (() => {
+    const terrainBackgrounds = [
+        { value: 'Num1Day', label: '白天', en: 'Day' },
+        { value: 'Num2Night', label: '黑夜', en: 'Night' },
+        { value: 'Num3Pool', label: '泳池', en: 'Pool' },
+        { value: 'Num4Fog', label: '雾夜', en: 'Fog' },
+        { value: 'Num5Roof', label: '屋顶', en: 'Roof' },
+        { value: 'Num6Boss', label: '月夜', en: 'Moon' },
+        { value: 'MushroomGarden', label: '蘑菇园', en: 'Mushroom Garden' },
+        { value: 'Greenhouse', label: '温室', en: 'Greenhouse' },
+        { value: 'Zombiquarium', label: '水族馆', en: 'Aquarium' },
+        { value: 'TreeOfWisdom', label: '智慧树', en: 'Tree of Wisdom' },
+        { value: 'GreenhouseNight', label: '夜间温室', en: 'Night Greenhouse' },
+        { value: 'ShallowDay', label: '浅水白天', en: 'Shallow Day' },
+        { value: 'HighGround', label: '高地', en: 'High Ground' },
+        { value: 'BigPool', label: '大泳池', en: 'Big Pool' },
+    ];
     const seedTypes = [
         { label: '豌豆射手', value: 'Peashooter', en: 'Peashooter' },
         { label: '向日葵', value: 'Sunflower', en: 'Sunflower' },
@@ -775,6 +791,7 @@ window.PGvZData = (() => {
 
 
     return {
+        terrainBackgrounds,
         seedTypes,
         zombieTypes,
         setZombieTypes,

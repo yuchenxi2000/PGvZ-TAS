@@ -390,6 +390,48 @@ class CheatActions:
             return
         SetZombies(zb_list, internal_spawn)
 
+    def GetTerrain(self):
+        board = GetBoard()
+        if board is None:
+            return {
+                'background': 'Num1Day',
+                'grid': [['Grass'] * 9 for _ in range(5)] + [['Dirt'] * 9],
+                'rows': ['Normal'] * 5 + ['Dirt'],
+            }
+        return {
+            'background': str(board.mBackground),
+            # 网页使用行优先的 6×9 数组；游戏数组使用 [col, row]。
+            'grid': [[str(board.mGridSquareType[col, row]) for col in range(9)] for row in range(6)],
+            'rows': [str(board.mPlantRow[row]) for row in range(6)],
+        }
+
+    def ApplyTerrain(self, background, grid, rows):
+        board = self._Board()
+        old_background = board.mBackground
+        if background != old_background:
+            board.mBackground = background
+            try:
+                # 与月夜无尽相同，切换背景后加载相应图片，下一次绘制使用新背景。
+                board.LoadBackgroundImages()
+            except Exception:
+                board.mBackground = old_background
+                raise
+        for row in range(6):
+            board.mPlantRow[row] = rows[row]
+            for col in range(9):
+                board.mGridSquareType[col, row] = grid[row][col]
+        # 按新地形原地重定位，保留血量和攻击状态；不重建植物或推进动画。
+        # 保龄球植物沿场地滚动，不能重新吸附到其最初的格子。
+        if not board.mApp.IsWallnutBowlingLevel():
+            for i in range(board.mPlants.Count):
+                plant = board.mPlants[i]
+                if plant.mDead or plant.NotOnGround():
+                    continue
+                col, row = plant.mPlantCol, plant.mRow
+                if 0 <= col < 9 and 0 <= row < 6:
+                    board.mChallenge.MovePlant(plant, col, row)
+        return self.GetTerrain()
+
     def LineUpOnBoard(self, linup_code_b64: str):
         board = GetBoard()
         if board is None:
