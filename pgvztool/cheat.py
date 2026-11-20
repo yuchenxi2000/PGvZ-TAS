@@ -60,6 +60,7 @@ class CheatOption(Serializable):
         self.drawPlantCooldown = False
         self.drawSunProductionCooldown = False
         self.drawZombieHp = False
+        self.verticalZombieHp = False
         self.selectZombieHp = False
         self.shovelNoReset = False
         self.showShovel = False

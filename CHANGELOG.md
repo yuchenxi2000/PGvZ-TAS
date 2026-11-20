@@ -1,5 +1,15 @@
 # 更新日志
 
+## [unreleased]
+
+### 新增
+
+- “场景显示”新增“僵尸血条纵向”开关。血条居中绘制，高度随碰撞箱变化且最多一格，剩余血量从下往上填充。有盾牌时，任一条扣血就同时显示两条，盾牌血条在上，主血条在下，各占总高度的一半。
+
+### 改进
+
+- 补充 PGvZ 1.4.3 实测记录，确认旗帜僵尸卡和魅惑旗帜僵尸卡查询费用时仍会数组越界。
+
 ## [1.18.0] - 2026-11-18
 
 ### 新增
@@ -488,6 +498,7 @@
 - 修复安卓部分区域无法自动收集、移除天尸诅咒不完整，以及过长命令结果挤出网页界面的问题。
 - 进入月夜无尽前检查屋顶无尽存档，避免未经提示直接覆盖。
 
+[unreleased]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.18.0...HEAD
 [1.18.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.18.0
 [1.17.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.17.1
 [1.17.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.17.0

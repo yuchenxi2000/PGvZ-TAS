@@ -13,6 +13,7 @@ from .tas import tas_manager
 
 # 显示植物/僵尸血量
 
+ZOMBIE_HP_BAR_THICKNESS = 5
 # 潜水僵尸入水时的血条 Y 轴补偿；正数向下。
 # 入水动画的可视位置不会写回 GetZombieRect，需要在游戏内调整此值。
 SNORKEL_IN_POOL_HP_OFFSET_Y = 90
@@ -153,69 +154,100 @@ def DrawPlantCooldowns(board: Lawn.Board, g: Sexy.Graphics, show_plant: bool, sh
         g.DrawRect(x, y, width, 5)
     g.SetColorizeImages(False)
 
-def DrawZombieHp(zombie: Lawn.Zombie, g: Sexy.Graphics, marginX: int, offsetY: int, color1, color2, color3, color4):
+def DrawZombieHp(zombie: Lawn.Zombie, g: Sexy.Graphics, marginX: int, offsetY: int,
+                 color1, color2, color3, color4, max_vertical_height: 'int | None'):
     rect = zombie.GetZombieRect()
-    totalWidth = rect.mWidth
-    x = rect.mX + marginX
-    y = rect.mY + offsetY + 20
-    # 对一些僵尸的特殊状态修正y轴偏移，使血条位置和视觉一致
-    if zombie.mZombieType == Lawn.ZombieType.Snorkel:
-        if zombie.mInPool and zombie.mIsEating:
-            y += SNORKEL_EATING_IN_POOL_HP_OFFSET_Y
-        elif zombie.mZombiePhase == Lawn.ZombiePhase.SnorkelIntoPool or zombie.mInPool:
-            y += SNORKEL_IN_POOL_HP_OFFSET_Y
-    elif zombie.mZombieType == Lawn.ZombieType.DolphinRider:
-        if zombie.mZombiePhase == Lawn.ZombiePhase.DolphinWalkingInPool:
-            y += DOLPHIN_WALKING_IN_POOL_HP_OFFSET_Y
-        elif zombie.mZombiePhase == Lawn.ZombiePhase.DolphinRiding:
-            y += DOLPHIN_RIDING_HP_OFFSET_Y
-    # 两类血量
-    hpWidth = 0
-    hpWidth2 = 0
-    plotHp1 = False
-    plotHp2 = False
+    vertical = max_vertical_height is not None
+    if vertical:
+        height = min(rect.mHeight, max_vertical_height)
+        if rect.mWidth <= 0 or height <= 0:
+            return
+        # DrawRect 包含末端像素，横条连边框实占 6 像素。
+        width = ZOMBIE_HP_BAR_THICKNESS + 1
+        x = rect.mX + (rect.mWidth - width) // 2
+        y = rect.mY + (rect.mHeight - height) // 2
+        primary_size = height
+    else:
+        x = rect.mX + marginX
+        y = rect.mY + offsetY + 20
+        width, height = rect.mWidth, ZOMBIE_HP_BAR_THICKNESS
+        primary_size = width
+        # 横向血条按特殊状态修正 Y 轴偏移，使位置和视觉一致。
+        if zombie.mZombieType == Lawn.ZombieType.Snorkel:
+            if zombie.mInPool and zombie.mIsEating:
+                y += SNORKEL_EATING_IN_POOL_HP_OFFSET_Y
+            elif zombie.mZombiePhase == Lawn.ZombiePhase.SnorkelIntoPool or zombie.mInPool:
+                y += SNORKEL_IN_POOL_HP_OFFSET_Y
+        elif zombie.mZombieType == Lawn.ZombieType.DolphinRider:
+            if zombie.mZombiePhase == Lawn.ZombiePhase.DolphinWalkingInPool:
+                y += DOLPHIN_WALKING_IN_POOL_HP_OFFSET_Y
+            elif zombie.mZombiePhase == Lawn.ZombiePhase.DolphinRiding:
+                y += DOLPHIN_RIDING_HP_OFFSET_Y
+
+    # 无盾僵尸也可能保留 mHasShield，盾牌血量上限为正才有第二条。
+    dual_vertical = vertical and zombie.mHasShield and zombie.mShieldMaxHealth > 0
+    secondary_size = primary_size
+    if dual_vertical:
+        secondary_size = height // 2
+        primary_size = height - secondary_size
+
+    primary_length = None
+    secondary_length = None
     # 画头盔/本体
-    if zombie.mBodyHealth < zombie.mBodyMaxHealth:
+    if zombie.mHasHead and zombie.mBodyHealth < zombie.mBodyMaxHealth:
         # 考虑血量临界值
         if zombie.CanLoseBodyParts():
             threshold = int(zombie.mBodyMaxHealth / 3)
         else:
             threshold = 0
-        hpWidth = totalWidth * (zombie.mBodyHealth - threshold) / (zombie.mBodyMaxHealth - threshold)
-        hpWidth = 0 if hpWidth < 0 else hpWidth
-        if zombie.mHasHead:
-            plotHp1 = True
+        body_health = zombie.mBodyHealth - threshold
+        primary_length = max(0, primary_size * body_health / (zombie.mBodyMaxHealth - threshold))
     if zombie.mHasHelm and zombie.mHelmHealth < zombie.mHelmMaxHealth:
-        if zombie.mZombieType == Lawn.ZombieType.Monk:  # 特殊处理武僧僵尸
-            hpWidth2 = totalWidth * zombie.mHelmHealth / zombie.mHelmMaxHealth
-            plotHp2 = True
+        if not vertical and zombie.mZombieType == Lawn.ZombieType.Monk:
+            secondary_length = secondary_size * zombie.mHelmHealth / zombie.mHelmMaxHealth
         else:
-            hpWidth = totalWidth * zombie.mHelmHealth / zombie.mHelmMaxHealth
-            plotHp1 = True
+            primary_length = primary_size * zombie.mHelmHealth / zombie.mHelmMaxHealth
     # 画飞行物
     if zombie.IsFlying() and zombie.mFlyingHealth < zombie.mFlyingMaxHealth:
-        hpWidth = totalWidth * zombie.mFlyingHealth / zombie.mFlyingMaxHealth
-        plotHp1 = True
-    # 如果有铁门、梯子等画下面
+        primary_length = primary_size * zombie.mFlyingHealth / zombie.mFlyingMaxHealth
+    # 铁门、梯子等护具用第二条血条。
     if zombie.mHasShield and zombie.mShieldHealth < zombie.mShieldMaxHealth:
-        hpWidth2 = totalWidth * zombie.mShieldHealth / zombie.mShieldMaxHealth
-        plotHp2 = True
-    color_black = Sexy.SexyColor(0, 0, 0, 255).Color
-    # 开始绘制
-    if plotHp1:
-        g.SetColor(color2)
-        g.FillRect(x, y, totalWidth, 5)
-        g.SetColor(color1)
-        g.FillRect(x, y, int(hpWidth), 5)
-        g.SetColor(color_black)
-        g.DrawRect(x, y, totalWidth, 5)
-    if plotHp2:
-        g.SetColor(color4)
-        g.FillRect(x, y + 10, totalWidth, 5)
-        g.SetColor(color3)
-        g.FillRect(x, y + 10, int(hpWidth2), 5)
-        g.SetColor(color_black)
-        g.DrawRect(x, y + 10, totalWidth, 5)
+        secondary_length = secondary_size * zombie.mShieldHealth / zombie.mShieldMaxHealth
+    if primary_length is None and secondary_length is None:
+        return
+    if dual_vertical:
+        if primary_length is None:
+            primary_length = primary_size
+        if secondary_length is None:
+            secondary_length = secondary_size
+
+    bars = ((primary_length, primary_size, color1, color2),
+            (secondary_length, secondary_size, color3, color4))
+    black = Sexy.SexyColor(0, 0, 0, 255).Color
+    for index, (length, size, color, background) in enumerate(bars):
+        if length is None:
+            continue
+        length = int(length)
+        if vertical:
+            bar_height = size
+            if bar_height == 0:
+                continue
+            bar_y = y + secondary_size if dual_vertical and index == 0 else y
+            fill = (x, bar_y + bar_height - length, width, length)
+        else:
+            bar_height = height
+            bar_y = y + index * 2 * height
+            fill = (x, bar_y, length, height)
+        g.SetColor(background)
+        g.FillRect(x, bar_y, width, bar_height)
+        g.SetColor(color)
+        g.FillRect(*fill)
+        if not vertical:
+            g.SetColor(black)
+            g.DrawRect(x, bar_y, width, height)
+    if vertical and height > 2:
+        g.SetColor(black)
+        g.DrawRect(x, y, width - 1, height - 1)
 
 selectZbList = [
     Lawn.ZombieType.Football,
@@ -230,6 +262,13 @@ selectZbList = [
 ]
 
 def DrawZombieHpAll(board: Lawn.Board, g: Sexy.Graphics):
+    max_vertical_height = None
+    if cheat_option.verticalZombieHp:
+        grid = Sexy.Constants.New
+        if board.StageHasRoof() or board.StageHas6Rows():
+            max_vertical_height = grid.Board_GridCellSizeY_6Rows
+        else:
+            max_vertical_height = grid.Board_GridCellSizeY_5Rows
     g.SetColorizeImages(True)
     color5 = Sexy.SexyColor(255, 51, 255, 255).Color
     color6 = Sexy.SexyColor(127, 0, 255, 255).Color
@@ -247,9 +286,9 @@ def DrawZombieHpAll(board: Lawn.Board, g: Sexy.Graphics):
         if cheat_option.selectZombieHp and zombie.mZombieType not in selectZbList:
             continue
         if zombie.mMindControlled:
-            DrawZombieHp(zombie, g, 0, 0, mind_color1, mind_color2, mind_color3, mind_color4)
+            DrawZombieHp(zombie, g, 0, 0, mind_color1, mind_color2, mind_color3, mind_color4, max_vertical_height)
         else:
-            DrawZombieHp(zombie, g, 0, 0, color5, color6, color7, color8)
+            DrawZombieHp(zombie, g, 0, 0, color5, color6, color7, color8, max_vertical_height)
     g.SetColorizeImages(False)
 
 CRATER_COOLDOWN_BAR_WIDTH = 60

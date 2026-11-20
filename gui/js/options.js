@@ -91,6 +91,7 @@ window.PGvZOptions = (() => {
                 'drawPlantCooldown',
                 'drawSunProductionCooldown',
                 'drawZombieHp',
+                'verticalZombieHp',
                 'selectZombieHp',
                 'drawSquirrel',
             ],

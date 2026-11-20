@@ -4,6 +4,7 @@
 `Lawn.SeedType.ZombieCardFlag` 和 `Lawn.SeedType.MindControlledCardFlag` 的表示方式、
 原生放置路径、1.3.1 对 `SeedType.None` 误判的修复，以及 PGvZ-TAS/PGvZTool
 调用相关内部方法时的安全边界。
+第 5 节另核对了 PGvZ 1.4.3 的卡槽费用路径。
 
 ## 1. 结论
 
@@ -205,6 +206,10 @@ Zamboni, Pogo, Dancer, Gargantuar, Imp
 这个问题不仅在点击卡片时触发。`SeedPacket.GetGraynessAndDarkness` 每次绘制种子包都会调用
 `Board.GetCurrentPlantCost`，`SeedPacket.CanPickUp` 和 `MouseDown` 也会再次取费用。因此给
 卡槽设置一张不在上述列表内的僵尸卡后，可能立刻在绘制阶段报错。
+
+PGvZ 1.4.3 实测确认此问题仍存在。旗帜僵尸卡（`20001`）和魅惑旗帜僵尸卡（`30001`）
+调用 `Board.GetCurrentPlantCost` 时均抛出数组越界异常。费用查询会将带 flag 的值传入
+`Plant.GetPlantDefinition`，并用它索引植物定义数组。
 
 `CoinType.UsableSeedPacket` 不走这套费用查询：掉落物绘制时关闭费用显示，拾取后光标类型是
 `PlantFromUsableCoin`，`IZombieMouseDownWithZombie` 也只对 `PlantFromBank` 扣费。因此可用
