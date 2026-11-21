@@ -3,6 +3,7 @@
 """
 import Lawn
 import Lawn.Creative
+import Sexy
 from pgvz import *
 from .sync import Serializable
 
@@ -108,7 +109,7 @@ class CheatOption(Serializable):
         self.selectZombieHp = False
         self.shovelNoReset = False
         self.showShovel = False
-        self.runBackground = False
+        self._runBackground = False
         self.skipLevelIntro = False
         self.gloveNoCooling = False
         self.enableTrashcan = False
@@ -138,6 +139,14 @@ class CheatOption(Serializable):
     @autoCollect.setter
     def autoCollect(self, value):
         auto_collector.On() if value else auto_collector.Off()
+
+    @property
+    def runBackground(self):
+        return self._runBackground
+    @runBackground.setter
+    def runBackground(self, value):
+        Sexy.Main.RunWhenLocked = value
+        self._runBackground = value
 
     @property
     def unlockBannedSeeds(self):

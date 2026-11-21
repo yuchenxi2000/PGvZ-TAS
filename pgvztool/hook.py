@@ -7,6 +7,11 @@ import Lawn.Creative
 import LawnMod
 import Sexy
 import Sexy.TodLib
+import System
+import clr
+import MonoMod.Cil
+from Mono.Cecil.Cil import OpCodes
+from MonoMod.RuntimeDetour import ILHook
 from pgvz import *
 from pgvz.rng import rng_manip
 from .cheat import ApplyEasterEggModesToBoard, GetEasterEggModes, RestoreNormalMowerAnimation, cheat_option, weather
@@ -21,10 +26,114 @@ from .overlay import (
     DrawTasButtons, DrawTasFrameCounter,
 )
 
+_BUILTIN_CHEAT_FIELDS = {5: 'autoCollect', 8: 'wontLose', 11: 'runBackground'}
+_builtin_cheat_hooks = None
+
+
+def _install_builtin_cheat_menu_hooks():
+    # ZBCheatDialog 和 Checkbox 都是 internal。用 ILHook 和反射访问，
+    # 避免依赖 IronPython 的类型绑定或短方法的 JIT 内联行为。
+    assembly = clr.GetClrType(Lawn.LawnApp).Assembly
+    menu_type = assembly.GetType('Lawn.ZBCheatDialog', True)
+    checkbox_type = assembly.GetType('Sexy.Checkbox', True)
+    panel_field = menu_type.GetField('mPanel')
+    id_field = checkbox_type.GetField('mId')
+    checked_field = checkbox_type.GetField('mChecked')
+    set_checked = checkbox_type.GetMethod('SetChecked', (System.Boolean, System.Boolean))
+    native_auto_collect = menu_type.GetProperty('EnableCoinAutoCollect')
+    native_wont_lose = menu_type.GetProperty('EnableNoZombieInHouse')
+
+    last_menu = None
+    last_values = None
+
+    def apply_checkbox(checkbox_id, enabled):
+        field = _BUILTIN_CHEAT_FIELDS.get(checkbox_id)
+        if field is None:
+            return False
+        sync_reg.set_local_state('cheat', field, enabled)
+        return True
+
+    def refresh_checkboxes(menu):
+        nonlocal last_menu, last_values
+        values = {key: getattr(cheat_option, field) for key, field in _BUILTIN_CHEAT_FIELDS.items()}
+        if values == last_values and System.Object.ReferenceEquals(last_menu.Target, menu):
+            return
+        for row in panel_field.GetValue(menu).mWidgets:
+            for widget in row.mWidgets:
+                if not checkbox_type.IsInstanceOfType(widget):
+                    continue
+                checkbox_id = id_field.GetValue(widget)
+                if checkbox_id in values and checked_field.GetValue(widget) != values[checkbox_id]:
+                    set_checked.Invoke(widget, System.Array[System.Object]([values[checkbox_id], False]))
+        last_menu = System.WeakReference(menu)
+        last_values = values
+
+    click_type = System.Func[System.Int32, System.Boolean, System.Boolean]
+    click_callback = click_type(apply_checkbox)
+    refresh_type = System.Action[System.Object]
+    refresh_callback = refresh_type(refresh_checkboxes)
+
+    def route_checkbox_click(il):
+        cursor = MonoMod.Cil.ILCursor(il)
+        # 保留按钮音效。未接管的复选框继续执行原生 switch。
+        play_sample = next(ins for ins in il.Body.Instructions
+                           if ins.OpCode == OpCodes.Callvirt and ins.Operand.Name == 'PlaySample')
+        cursor.Goto(play_sample, MonoMod.Cil.MoveType.After)
+        original_switch = cursor.DefineLabel()
+        cursor.Emit(OpCodes.Ldarg_1)
+        cursor.Emit(OpCodes.Ldarg_2)
+        cursor.EmitDelegate[click_type](click_callback)
+        cursor.Emit(OpCodes.Brfalse, original_switch)
+        cursor.Emit(OpCodes.Ret)
+        cursor.MarkLabel(original_switch)
+
+    def replace_checkbox_refresh(il):
+        cursor = MonoMod.Cil.ILCursor(il)
+        # Update 的前半段维护放大模式的按钮和可见性。后半段只刷新旧开关。
+        set_disabled = next(ins for ins in il.Body.Instructions
+                            if ins.OpCode == OpCodes.Stfld and ins.Operand.Name == 'mDisabled')
+        cursor.Goto(set_disabled, MonoMod.Cil.MoveType.After)
+        cursor.Emit(OpCodes.Ldarg_0)
+        cursor.EmitDelegate[refresh_type](refresh_callback)
+        cursor.Emit(OpCodes.Ret)
+
+    def allow_native_auto_collect_disable_only(il):
+        cursor = MonoMod.Cil.ILCursor(il)
+        # 切换玩家资料时仍会调用原生 setter。允许关闭以卸掉已有的钩子。
+        original_setter = cursor.DefineLabel()
+        cursor.Emit(OpCodes.Ldarg_0)
+        cursor.Emit(OpCodes.Brfalse, original_setter)
+        cursor.Emit(OpCodes.Ret)
+        cursor.MarkLabel(original_setter)
+
+    hooks = []
+    try:
+        for method, edit in (
+            (menu_type.GetMethod('CheckboxChecked'), route_checkbox_click),
+            (menu_type.GetMethod('Update'), replace_checkbox_refresh),
+            (native_auto_collect.GetSetMethod(), allow_native_auto_collect_disable_only),
+        ):
+            hooks.append(ILHook(method, MonoMod.Cil.ILContext.Manipulator(edit)))
+        native_auto_collect.SetValue(None, False)
+        native_wont_lose.SetValue(None, False)
+    except Exception:
+        for hook in reversed(hooks):
+            hook.Dispose()
+        raise
+    return hooks
+
+
 # 在 Board 暂停、尚无 Board 或全局慢速跳过逻辑更新时，也处理网页动作。
 # 选择包含加载收尾逻辑的基类实现，避免较短的 LawnApp.DoUpdateFrames 被内联。
 @LawnMod.MonoModUtils.HookTo(Sexy.SexyAppBase.DoUpdateFrames)
 def SexyAppBase__DoUpdateFrames(orig, app: Sexy.SexyAppBase):
+    global _builtin_cheat_hooks
+    if _builtin_cheat_hooks is None:
+        _builtin_cheat_hooks = ()
+        try:
+            _builtin_cheat_hooks = _install_builtin_cheat_menu_hooks()
+        except Exception as error:
+            Sexy.Debug.Log(Sexy.DebugType.Error, '[pgvztool] cannot hook built-in cheat menu: {}'.format(error))
     gui_dispatcher.run_pending()
     return orig(app)
 

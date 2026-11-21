@@ -9,11 +9,13 @@ from .cheat_actions import cheat_actions
 from .placer import placer
 from .sync import sync_reg
 from .dispatcher import gui_dispatcher
-from . import hook
 
 sync_reg.register('cheat', cheat_option)
 sync_reg.register('placer', placer)
 sync_reg.register('weather', weather)
+
+# 正式入口在后台导入，先注册状态，再开放游戏主线程的钩子入口。
+from . import hook
 
 __version__ = MOD_VERSION
 __supported_game_versions__ = SUPPORTED_GAME_VERSIONS

@@ -308,6 +308,14 @@ sync_reg.push_state(cheat=('daisyMode', 'danceMode'), weather=None)
 
 推送不触发额外轮询，网页更新也不回发 `apply`。PC 按现有规则保存收到的复选框状态，手机只更新当前页面。
 
+### 内置作弊菜单同步
+
+PGvZ-TAS 在游戏主线程安装 `ZBCheatDialog` 的 IL 钩子。复选框 5（自动收集资源）、8（房主无敌）和 11（后台运行）分别写入 `cheat.autoCollect`、`cheat.wontLose` 和 `cheat.runBackground`，在状态生效后推送该字段。菜单刷新时也从 `CheatOption` 读取这三个状态，设置复选框时关闭监听回调。
+
+接管时关闭已有的原生自动收集、房主无敌钩子。玩家资料载入时尝试重新开启原生自动收集的调用也会被拦截。后台运行字段立即写入 `Main.RunWhenLocked`，失焦时仍通过现有钩子应用。三个内置复选框沿用 PGvZ-TAS 的同步和保存规则，PC 由网页保存收到的状态。
+
+`SyncRegistry.set_local_state()` 记录本次游戏进程中经内置菜单操作过的字段。网页第一次连接时，恢复的本地设置跳过这些字段，快照返回游戏中的实际值。之后网页主动发送的 `apply` 照常生效。
+
 ### 彩蛋状态
 
 “关卡与显示”的六个彩蛋开关以 `cheat` 属性同步。`cheat_option` 读取 `LawnApp` 的全局字段，网页写入时同时应用到当前 `Board`，无需通过键盘口令的智慧树高度检查。`Board.LoadGame()` 成功后，挂钩用当前 `cheat_option` 恢复关卡的彩蛋状态，并在应用期间暂时静音。音效按钮使用独立的 `playKonamiSound` 动作，由主线程调用 `LawnApp.PlayFoley(FoleyType.Drop)`。

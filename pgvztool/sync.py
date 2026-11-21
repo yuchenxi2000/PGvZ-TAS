@@ -121,6 +121,7 @@ class SyncRegistry:
         # 游戏进程内保留；断线、release 和结果缓存清理都不能重新触发恢复。
         self._initialized_clients = set()
         self._revoked_clients = set()
+        self._local_fields = set()
 
     def register(self, name, obj):
         self._objects[name] = obj
@@ -164,6 +165,12 @@ class SyncRegistry:
             # 推送失败不应中断游戏主线程的调用者。
             Sexy.Debug.Log(Sexy.DebugType.Error, '[pgvztool.sync] push failed: ' + traceback.format_exc())
 
+    def set_local_state(self, name, field, value):
+        """应用游戏内的手动修改，并保护该字段免受网页的首次恢复覆盖。"""
+        setattr(self._objects[name], field, value)
+        self._local_fields.add((name, field))
+        self.push_state(**{name: field})
+
     def connect(self, client_id, json_str=None, takeover=False):
         """占用官方 GUI 会话；已有活动页面时拒绝第二个页面。"""
         if not client_id or (not takeover and (
@@ -183,7 +190,7 @@ class SyncRegistry:
 
         try:
             if client_id not in self._initialized_clients and json_str is not None:
-                self.apply(json_str)
+                self.apply(json_str, restoring=True)
             result = self.serialize()
         except Exception:
             self._active_client_id = previous
@@ -205,7 +212,7 @@ class SyncRegistry:
         if client_id == self._active_client_id:
             self._active_client_id = None
 
-    def apply(self, json_str, *, return_sync=False):
+    def apply(self, json_str, *, return_sync=False, restoring=False):
         name = field = client_id = None
         try:
             msg = json.loads(json_str)
@@ -216,6 +223,8 @@ class SyncRegistry:
                 data = msg.get(name)
                 if isinstance(data, dict):
                     for field, value in data.items():
+                        if restoring and (name, field) in self._local_fields:
+                            continue
                         obj.from_dict({field: value})
                     groups[name] = data
             if return_sync:

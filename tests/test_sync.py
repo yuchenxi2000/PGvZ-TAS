@@ -118,6 +118,25 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(result['action'], 'sync')
         self.assertEqual(result['state'], {'first': {'guarded': 5, 'choice': 'A'}, 'second': {'flag': True}})
 
+    def test_local_change_pushes_and_has_priority_over_initial_restore_only(self):
+        self.registry.release('client')
+        with patch.object(self.module, '_broadcast_execution_result') as broadcast:
+            self.registry.set_local_state('first', 'flag', True)
+            broadcast.assert_not_called()
+            payload = json.dumps({'_clientId': 'pc', 'first': {'flag': False, 'count': 8}})
+            snapshot = json.loads(self.registry.connect('pc', payload))
+            self.assertTrue(snapshot['state']['first']['flag'])
+            self.assertEqual(self.state.count, 8)
+
+            self.registry.apply(payload)
+            self.assertFalse(self.state.flag)
+            self.registry.set_local_state('first', 'flag', True)
+
+        broadcast.assert_called_once()
+        update = json.loads(broadcast.call_args.args[0])
+        self.assertEqual(update['_clientId'], 'pc')
+        self.assertEqual(update['state'], {'first': {'flag': True}})
+
     def test_simple_fields_have_no_extra_type_or_range_validation(self):
         self.apply(first={'flag': 'direct assignment', 'count': -1})
         self.assertEqual(self.state.flag, 'direct assignment')

@@ -392,7 +392,18 @@ class GuiDispatcherTests(unittest.TestCase):
         hook = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
                     and node.name == 'SexyAppBase__DoUpdateFrames')
         hook.decorator_list = []
-        namespace = {'gui_dispatcher': self.dispatcher, 'Sexy': types.SimpleNamespace(SexyAppBase=object)}
+        installations = []
+
+        def install_hooks():
+            self.assertTrue(self.main_thread)
+            self.assertNotEqual(self.board.mSunMoney, 456)
+            installations.append('installed')
+            return tuple(installations)
+
+        namespace = {
+            'gui_dispatcher': self.dispatcher, 'Sexy': types.SimpleNamespace(SexyAppBase=object),
+            '_builtin_cheat_hooks': None, '_install_builtin_cheat_menu_hooks': install_hooks,
+        }
         exec(compile(ast.Module(body=[hook], type_ignores=[]), 'gui-action-hook', 'exec'), namespace)
 
         def original(app):
@@ -405,8 +416,10 @@ class GuiDispatcherTests(unittest.TestCase):
         self.main_thread = True
         try:
             self.assertIs(namespace['SexyAppBase__DoUpdateFrames'](original, self.app), False)
+            self.assertIs(namespace['SexyAppBase__DoUpdateFrames'](original, self.app), False)
         finally:
             self.main_thread = False
+        self.assertEqual(installations, ['installed'])
 
     def test_only_named_enum_members_are_accepted(self):
         for value in ('NotAZombie', '__class__', 'name', 0):
