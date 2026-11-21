@@ -31,6 +31,8 @@ window.PGvZConnection = (() => {
         let requestCounter = 0;
         let resultPollTimer = null;
         let resultPollInFlight = false;
+        const stateRevisions = new Map();
+        let initialSyncState = Object.create(null);
         const pendingRequests = new Map();
 
         function showSessionRejected(showToast = true) {
@@ -38,6 +40,8 @@ window.PGvZConnection = (() => {
             stopConnectionAttempt();
             stopBootstrapProbe();
             sessionRejected.value = true;
+            stateRevisions.clear();
+            initialSyncState = Object.create(null);
             connected.value = false;
             connectionState.value = 'occupied';
             stopResultPolling();
@@ -156,12 +160,36 @@ window.PGvZConnection = (() => {
             }, 100);
         }
 
+        function receiveSync(message) {
+            const { state, revision } = message;
+            if (!Number.isSafeInteger(revision) || revision < 1 || !state
+                || typeof state !== 'object' || Array.isArray(state)) return false;
+
+            // 较新的消息可能只包含部分字段，按字段比较版本。初始化期间先合并，再一次性应用。
+            const changes = connected.value ? Object.create(null) : initialSyncState;
+            for (const [group, fields] of Object.entries(state)) {
+                if (!fields || typeof fields !== 'object' || Array.isArray(fields)) continue;
+                if (!stateRevisions.has(group)) stateRevisions.set(group, new Map());
+                const revisions = stateRevisions.get(group);
+                for (const [key, value] of Object.entries(fields)) {
+                    if (revision <= (revisions.get(key) ?? 0)) continue;
+                    revisions.set(key, revision);
+                    (changes[group] ??= Object.create(null))[key] = value;
+                }
+            }
+            if (connected.value && Object.keys(changes).length) applySyncState(changes);
+            return true;
+        }
+
         function applyStateMessage(message) {
             if (message.action === 'sessionRejected') {
                 showSessionRejected();
-            } else if (message.action === 'sync' && message.state) {
+            } else if (message.action === 'sync' && receiveSync(message)) {
                 setResult(true, 'messages.syncOk');
-                applySyncState(message.state);
+                if (!connected.value) {
+                    applySyncState(initialSyncState);
+                    initialSyncState = Object.create(null);
+                }
                 markConnected();
             }
         }
@@ -190,6 +218,9 @@ window.PGvZConnection = (() => {
                     lineupCode.value = result.value;
                     setResult(true, 'messages.lineupOk');
                 } else {
+                    if (result.kind === 'apply' && result.value?.action === 'sync') {
+                        receiveSync(result.value);
+                    }
                     setResult(true, 'messages.success');
                 }
             }
@@ -316,6 +347,8 @@ window.PGvZConnection = (() => {
             if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
             stopReconnect();
             stopConnectionAttempt();
+            stateRevisions.clear();
+            initialSyncState = Object.create(null);
             const socket = new WebSocket(SERVER_URL);
             ws = socket;
             connectionState.value = 'connecting';
@@ -342,6 +375,7 @@ window.PGvZConnection = (() => {
                 if (ws !== socket || leavingPage) return;
                 try {
                     const data = JSON.parse(event.data);
+                    if (data.eventtype === 'output') return;
                     if (data.statuscode === 0) {
                         const message = PGvZProtocol.parseResultMessage(data.result);
                         if (message && message.action === 'bootstrapReady') {
@@ -363,6 +397,8 @@ window.PGvZConnection = (() => {
                         } else if (message && message.action === 'results') {
                             resultPollInFlight = false;
                             applyRequestResults(message.results);
+                        } else if (message?.action === 'sync' && typeof message._clientId === 'string') {
+                            if (!sessionRejected.value && message._clientId === clientId) receiveSync(message);
                         } else {
                             setResult(true, data.result ? '' : 'messages.success', data.result || '');
                         }

@@ -36,7 +36,7 @@ class GuiDispatcherTests(unittest.TestCase):
             'PlantRowType': {'Dirt': 0, 'Normal': 1, 'Pool': 2, 'HighGround': 3, 'Shallow': 4},
         }.items():
             setattr(self.lawn, name, enum.Enum(name, members))
-        self.lawn.LawnApp = self.lawn.Board = self.lawn.PlayerInfo = self.lawn.GardenType = object
+        self.lawn.LawnApp = self.lawn.Board = self.lawn.PlayerInfo = self.lawn.GardenType = self.lawn.GameSelector = object
         self.lawn.PottedPlant = types.SimpleNamespace(FacingDirection=object)
         test = self
 
@@ -68,8 +68,13 @@ class GuiDispatcherTests(unittest.TestCase):
             return True, value
 
         self.placer = FakePlacer()
+        self.sexy = types.ModuleType('Sexy')
+        self.sexy.TodLib = types.SimpleNamespace(FoleyType=types.SimpleNamespace(Drop='Drop'))
+        self.sexy.KeyCode = object
+        self.sexy.Debug = types.SimpleNamespace(Log=lambda *args: None)
+        self.sexy.DebugType = types.SimpleNamespace(Error='error')
         namespace = {
-            'Lawn': self.lawn, 'GetBoard': get_board, 'GetLawnApp': get_app,
+            'Lawn': self.lawn, 'Sexy': self.sexy, 'GetBoard': get_board, 'GetLawnApp': get_app,
             'LineUp': types.SimpleNamespace(from_board=lambda board: types.SimpleNamespace(to_str=lambda: 'lineup-code')),
             'SetZombies': lambda *args: self.calls.append(('CheatSetZombies', args)),
             'none_of': lambda enum_type: getattr(enum_type, 'None'),
@@ -90,14 +95,11 @@ class GuiDispatcherTests(unittest.TestCase):
         pgvz.__game_version__ = '1.3.4'
         version = types.ModuleType('pgvz.version')
         version.MOD_VERSION = 'test'
-        sexy = types.ModuleType('Sexy')
-        sexy.Debug = types.SimpleNamespace(Log=lambda *args: None)
-        sexy.DebugType = types.SimpleNamespace(Error='error')
         package_name = 'test_dispatcher_pgvztool'
         package = types.ModuleType(package_name)
         package.__path__ = [str(ROOT / 'pgvztool')]
         modules = {'Lawn': self.lawn, 'pgvz': pgvz, 'pgvz.version': version,
-                   'Sexy': sexy, 'System': types.ModuleType('System'), package_name: package}
+                   'Sexy': self.sexy, 'System': types.ModuleType('System'), package_name: package}
         for suffix, key, value in (
             ('cheat_actions', 'cheat_actions', self.operations), ('placer', 'placer', self.placer),
         ):
@@ -109,7 +111,9 @@ class GuiDispatcherTests(unittest.TestCase):
             sync = importlib.util.module_from_spec(spec)
             sys.modules[spec.name] = sync
             spec.loader.exec_module(sync)
+            self.sync_module = sync
             self.registry = sync.sync_reg
+            self.option_namespace = dict(namespace, Serializable=sync.Serializable)
 
             class State(sync.Serializable):
                 def __init__(self):
@@ -513,6 +517,127 @@ class GuiDispatcherTests(unittest.TestCase):
         self.submit('connect', client_id='mobile', takeover=True, request_id='mobile')
         self.run_tasks()
         self.assertTrue(self.results('mobile')[0]['value']['state']['cheat']['noCooldown'])
+
+    def prepare_easter_egg_options(self):
+        tree = ast.parse((ROOT / 'pgvztool/cheat.py').read_text(encoding='utf-8'))
+        names = {'_get_easter_egg_mode', '_set_easter_egg_mode', '_apply_easter_egg_mode',
+                 'RestoreNormalMowerAnimation', 'CheatOption', 'GetEasterEggModes', 'ApplyEasterEggModesToBoard'}
+        nodes = [node for node in tree.body if getattr(node, 'name', None) in names or (
+            isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id in ('EASTER_EGG_MODES', 'cheat_option'))]
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), 'cheat-options', 'exec'), self.option_namespace)
+        self.registry.register('cheat', self.option_namespace['cheat_option'])
+        self.app.mEasyPlantingCheat = False
+        self.app.mMuteSoundsForCutscene = False
+        self.board.mApp = self.app
+        self.board.mLawnMowers = []
+        self.lawn.LawnMowerType = types.SimpleNamespace(Lawn='lawn')
+        self.lawn.GlobalMembersReanimIds = types.SimpleNamespace(ReanimTrackId_anim_normal='anim_normal')
+        for name in ('auto_collector', 'script_inf_sun', 'script_skill_nocooling', 'script_mushroom_awake',
+                     'script_auto_restock', 'script_freeze_portal'):
+            self.option_namespace[name] = types.SimpleNamespace(enabled=False)
+
+        modes = ('DaisyMode', 'DanceMode', 'PinataMode', 'MustacheMode', 'SuperMowerMode', 'FutureMode')
+
+        def native_setter(mode):
+            def set_mode(enabled):
+                self.assertTrue(self.main_thread)
+                self.calls.append(('Set' + mode, enabled))
+                setattr(self.board, 'm' + mode, enabled)
+                setattr(self.app, 'm' + mode, enabled)
+                if mode == 'SuperMowerMode':
+                    self.mower_animation = 'anim_tricked'
+            return set_mode
+
+        for mode in modes:
+            setattr(self.app, 'm' + mode, False)
+            setattr(self.board, 'm' + mode, False)
+            setattr(self.board, 'Set' + mode, native_setter(mode))
+        return modes
+
+    def test_easter_egg_options_read_native_modes_and_restore_mower_animation(self):
+        modes = self.prepare_easter_egg_options()
+        keys = self.option_namespace['EASTER_EGG_MODES']
+        self.app.mBoard = None
+        self.submit('apply', state={'cheat': {'danceMode': True}})
+        self.submit('snapshot')
+        self.run_tasks()
+        applied, snapshot = [result['value'] for result in self.results()]
+        self.assertEqual(applied['state'], {'cheat': {'danceMode': True}})
+        self.assertLess(applied['revision'], snapshot['revision'])
+        self.assertEqual(self.calls, [])
+
+        self.app.mBoard = self.board
+        self.submit('apply', state={'cheat': dict.fromkeys(keys, True)})
+        self.submit('snapshot')
+        self.run_tasks()
+        self.assertEqual(self.calls, [('Set' + mode, True) for mode in modes])
+        snapshot = self.results()[1]['value']['state']['cheat']
+        self.assertTrue(all(snapshot[key] for key in keys))
+
+        self.board.mLawnMowers = [types.SimpleNamespace(mDead=False, mMowerType='lawn', mReanimID=1)]
+
+        def set_frames(layer):
+            self.calls.append((1, layer))
+            self.mower_animation = layer
+
+        self.app.ReanimationTryToGet = lambda anim_id: types.SimpleNamespace(SetFramesForLayer=set_frames,
+            IsAnimPlaying=lambda layer: self.mower_animation == layer)
+        self.submit('apply', state={'cheat': {'superMowerMode': False}})
+        self.submit('apply', state={'cheat': {'superMowerMode': False}})
+        self.run_tasks()
+        self.assertTrue(all(result['ok'] for result in self.results()))
+        self.assertEqual(self.calls[len(modes):], [('SetSuperMowerMode', False), (1, 'anim_normal')])
+
+    def test_easter_egg_hooks_preserve_option_state_on_load_and_push_keyboard_changes(self):
+        self.prepare_easter_egg_options()
+        tree = ast.parse((ROOT / 'pgvztool/hook.py').read_text(encoding='utf-8'))
+        names = {'_sync_easter_eggs_after_key', 'Board__DoTypingCheck', 'GameSelector__KeyDown', 'Board__LoadGame'}
+        nodes = [node for node in tree.body if getattr(node, 'name', None) in names]
+        for node in nodes:
+            node.decorator_list = []
+        hooks = dict(self.option_namespace, sync_reg=self.registry)
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), 'easter-egg-hooks', 'exec'), hooks)
+        self.main_thread = True
+        options = hooks['cheat_option']
+        self.app.mDanceMode = True
+
+        def read_old_save(board, path):
+            board.mDanceMode = False
+            board.mFutureMode = True
+            return True
+
+        self.assertTrue(hooks['Board__LoadGame'](read_old_save, self.board, 'old.dat'))
+        self.assertTrue(self.board.mDanceMode)
+        self.assertFalse(self.board.mFutureMode)
+        self.assertTrue(options.danceMode)
+        self.assertFalse(options.futureMode)
+        self.assertFalse(self.app.mMuteSoundsForCutscene)
+        self.assertEqual(self.calls, [('SetDanceMode', True), ('SetFutureMode', False)])
+        self.board.mDanceMode = False
+        self.assertFalse(hooks['Board__LoadGame'](lambda board, path: False, self.board, 'bad.dat'))
+        self.assertFalse(self.board.mDanceMode)
+
+        with patch.object(self.sync_module, '_broadcast_execution_result') as broadcast:
+            hooks['Board__DoTypingCheck'](lambda board, key: None, self.board, 'X')
+            hooks['Board__DoTypingCheck'](lambda board, key: board.SetFutureMode(True), self.board, 'E')
+            hooks['GameSelector__KeyDown'](lambda selector, key: setattr(self.app, 'mDaisyMode', True), object(), 'S')
+        self.assertEqual(broadcast.call_count, 2)
+        first, second = [json.loads(call.args[0]) for call in broadcast.call_args_list]
+        self.assertEqual((second['action'], second['_clientId']), ('sync', 'client-1'))
+        self.assertLess(first['revision'], second['revision'])
+        self.assertTrue(options.futureMode and options.daisyMode)
+        self.assertEqual(first['state'], {'cheat': {'futureMode': True}})
+        self.assertEqual(second['state'], {'cheat': {'daisyMode': True}})
+
+    def test_konami_action_plays_native_sound_without_a_board(self):
+        self.app.mBoard = None
+        self.app.PlayFoley = self.calls.append
+        self.dispatch('playKonamiSound')
+        self.assertEqual(self.calls, [])
+        self.run_tasks()
+        self.assertTrue(self.results()[0]['ok'])
+        self.assertEqual(self.calls, ['Drop'])
 
     def test_rejected_connect_is_delivered_without_touching_state(self):
         self.submit('connect', client_id='other', state={'cheat': {'noCooldown': True}})

@@ -123,6 +123,7 @@ class GuiDispatcher:
             'setGameMode': (cheat_actions.SetGameMode, (('mode', mode),)),
             'setSurvivalStage': (cheat_actions.SetSurvivalStage, (('value', _integer),)),
             'enterMoonEndless': (cheat_actions.EnterMoonEndless, ()),
+            'playKonamiSound': (cheat_actions.PlayKonamiSound, ()),
             'setZombies': (cheat_actions.CheatSetZombies, (('types', _zombie_list), ('natural', _boolean))),
             'applyLineup': (cheat_actions.LineUpOnBoard, (('code', _string),)),
             'getLineup': (cheat_actions.GetLineup, ()),
@@ -283,7 +284,7 @@ class GuiDispatcher:
             state = request.get('state')
             if not isinstance(state, dict):
                 raise TypeError('state must be an object')
-            return sync_reg.apply(json.dumps(dict(state, _clientId=client_id)))
+            return sync_reg.apply(json.dumps(dict(state, _clientId=client_id)), return_sync=True)
         if kind == 'snapshot':
             return json.loads(sync_reg.serialize())
 

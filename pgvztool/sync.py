@@ -56,25 +56,39 @@ def _serialize(v):
     return None              # 不序列化的类型
 
 
+def _broadcast_execution_result(value):
+    from System.Reflection import Assembly, BindingFlags
+
+    assembly = Assembly.GetAssembly(Sexy.SexyAppBase)
+    interactive = assembly.GetType('LawnMod.IronPyInteractive', True)
+    server = interactive.GetField('mWS', BindingFlags.NonPublic | BindingFlags.Static).GetValue(None)
+    if server is None or not server.IsListening:
+        return
+
+    # 与 PyHub.OnMessage 一样，用原生序列化器包装 Python repr，再发给 /Py 的连接。
+    serialize = interactive.GetNestedType('PyHub').GetMethod('ExecutionEventJSON')
+    status = System.Enum.Parse(serialize.GetParameters()[0].ParameterType, 'executed')
+    message = serialize.Invoke(None, System.Array[System.Object]([status, repr(value), None]))
+    server.WebSocketServices['/Py'].Sessions.BroadcastAsync(message, None)
+
+
 class Serializable:
-    def to_dict(self) -> dict:
+    def to_dict(self, fields=None) -> dict:
+        attributes = vars(self)
+        cls = type(self)
+        if fields is None:
+            fields = list(attributes)
+            fields.extend(k for k in dir(cls) if isinstance(getattr(cls, k, None), property))
         result = {}
-        # 实例属性
-        for k, v in vars(self).items():
-            if k.startswith('_') or callable(v):
-                continue
-            val = _serialize(v)
-            if val is not None:
-                result[k] = val
-        # @property（类级别定义的属性描述符）
-        for k in dir(type(self)):
+        for k in fields:
             if k.startswith('_'):
                 continue
-            attr = getattr(type(self), k, None)
-            if isinstance(attr, property) and attr.fget is not None:
-                val = _serialize(getattr(self, k))
-                if val is not None:
-                    result[k] = val
+            descriptor = getattr(cls, k, None)
+            if k not in attributes and not (isinstance(descriptor, property) and descriptor.fget is not None):
+                continue
+            value = _serialize(getattr(self, k))
+            if value is not None:
+                result[k] = value
         return result
 
     def from_dict(self, data):
@@ -99,10 +113,11 @@ class Serializable:
 
 
 class SyncRegistry:
-    """同步状态与 GUI 会话。除初始化注册外，运行时方法均由主线程分发器调用。"""
+    """同步状态与 GUI 会话。除初始化注册外，运行时方法均在游戏主线程调用。"""
     def __init__(self):
         self._objects = {}
         self._active_client_id = None
+        self._revision = 0
         # 游戏进程内保留；断线、release 和结果缓存清理都不能重新触发恢复。
         self._initialized_clients = set()
         self._revoked_clients = set()
@@ -110,14 +125,44 @@ class SyncRegistry:
     def register(self, name, obj):
         self._objects[name] = obj
 
+    def _sync_message(self, state):
+        self._revision += 1
+        return {
+            'action': 'sync', 'state': state, 'revision': self._revision,
+            'modVersion': MOD_VERSION, 'gameVersion': __game_version__,
+        }
+
     def serialize(self) -> str:
-        data = {}
-        for name, obj in self._objects.items():
-            data[name] = obj.to_dict()
-        return json.dumps({
-            "action": "sync", "state": data,
-            "modVersion": MOD_VERSION, "gameVersion": __game_version__,
-        })
+        data = {name: obj.to_dict() for name, obj in self._objects.items()}
+        return json.dumps(self._sync_message(data))
+
+    def _read_fields(self, groups):
+        patch = {}
+        for name, fields in groups.items():
+            obj = self._objects.get(name)
+            if obj is None:
+                continue
+            if isinstance(fields, str):
+                fields = (fields,)
+            values = obj.to_dict() if fields is None else obj.to_dict(fields)
+            if values:
+                patch[name] = values
+        return patch
+
+    def push_state(self, **groups):
+        """在游戏主线程向活动网页推送指定组和字段的当前值，None 表示整组。"""
+        if self._active_client_id is None:
+            return
+        try:
+            state = self._read_fields(groups)
+            if not state:
+                return
+            message = self._sync_message(state)
+            message['_clientId'] = self._active_client_id
+            _broadcast_execution_result(json.dumps(message))
+        except Exception:
+            # 推送失败不应中断游戏主线程的调用者。
+            Sexy.Debug.Log(Sexy.DebugType.Error, '[pgvztool.sync] push failed: ' + traceback.format_exc())
 
     def connect(self, client_id, json_str=None, takeover=False):
         """占用官方 GUI 会话；已有活动页面时拒绝第二个页面。"""
@@ -160,17 +205,23 @@ class SyncRegistry:
         if client_id == self._active_client_id:
             self._active_client_id = None
 
-    def apply(self, json_str):
+    def apply(self, json_str, *, return_sync=False):
         name = field = client_id = None
         try:
             msg = json.loads(json_str)
             client_id = msg.get('_clientId')
             self.require_client(client_id)
+            groups = {}
             for name, obj in self._objects.items():
                 data = msg.get(name)
                 if isinstance(data, dict):
                     for field, value in data.items():
                         obj.from_dict({field: value})
+                    groups[name] = data
+            if return_sync:
+                state = self._read_fields(groups)
+                if state:
+                    return self._sync_message(state)
         except Exception:
             _log_apply_error(json_str, name, field, client_id)
             raise

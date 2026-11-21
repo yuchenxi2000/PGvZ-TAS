@@ -88,6 +88,36 @@ class SyncTests(unittest.TestCase):
         self.assertIs(self.state.choice, self.Choice.B)
         self.assertEqual(self.state.guarded, 5)
 
+    def test_push_reads_current_selected_fields_from_registered_groups(self):
+        class OnDemand(self.module.Serializable):
+            def __init__(self):
+                self.status = 'available'
+
+            @property
+            def unrelated(self):
+                raise AssertionError('unselected property was read')
+
+        self.registry.register('demand', OnDemand())
+        self.state.choice = self.Choice.B
+        with patch.object(self.module, '_broadcast_execution_result') as broadcast:
+            self.registry.push_state(first=('choice', '_private', 'unknown'), demand='status', second=None)
+            self.registry.push_state(unknown=None)
+            self.registry.release('client')
+            self.registry.push_state(demand=None)
+        broadcast.assert_called_once()
+        event = json.loads(broadcast.call_args.args[0])
+        self.assertEqual((event['action'], event['_clientId']), ('sync', 'client'))
+        self.assertEqual(event['state'], {
+            'first': {'choice': 'B'}, 'demand': {'status': 'available'}, 'second': self.other.to_dict(),
+        })
+
+    def test_apply_returns_current_values_only_for_requested_fields(self):
+        message = json.dumps({'_clientId': 'client', 'first': {'guarded': '5', 'choice': 'Missing'},
+                              'second': {'flag': True}, 'unknown': {'count': 4}})
+        result = self.registry.apply(message, return_sync=True)
+        self.assertEqual(result['action'], 'sync')
+        self.assertEqual(result['state'], {'first': {'guarded': 5, 'choice': 'A'}, 'second': {'flag': True}})
+
     def test_simple_fields_have_no_extra_type_or_range_validation(self):
         self.apply(first={'flag': 'direct assignment', 'count': -1})
         self.assertEqual(self.state.flag, 'direct assignment')

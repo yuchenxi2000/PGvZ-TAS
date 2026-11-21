@@ -15,6 +15,50 @@ class WeatherControl(Serializable):
 
 weather = WeatherControl()
 
+
+EASTER_EGG_MODES = {
+    'daisyMode': ('mDaisyMode', 'SetDaisyMode'),
+    'danceMode': ('mDanceMode', 'SetDanceMode'),
+    'pinataMode': ('mPinataMode', 'SetPinataMode'),
+    'mustacheMode': ('mMustacheMode', 'SetMustacheMode'),
+    'superMowerMode': ('mSuperMowerMode', 'SetSuperMowerMode'),
+    'futureMode': ('mFutureMode', 'SetFutureMode'),
+}
+
+
+def _get_easter_egg_mode(key):
+    field, _ = EASTER_EGG_MODES[key]
+    return getattr(GetLawnApp(), field)
+
+
+def _set_easter_egg_mode(key, enabled):
+    if not isinstance(enabled, bool):
+        raise TypeError('expected an Easter egg mode boolean')
+    field, _ = EASTER_EGG_MODES[key]
+    app = GetLawnApp()
+    if app.mBoard is not None:
+        _apply_easter_egg_mode(app.mBoard, key, enabled)
+    setattr(app, field, enabled)
+
+
+def _apply_easter_egg_mode(board, key, enabled):
+    field, setter = EASTER_EGG_MODES[key]
+    if getattr(board, field) != enabled:
+        getattr(board, setter)(enabled)
+    if key == 'superMowerMode' and not enabled:
+        RestoreNormalMowerAnimation(board)
+
+
+def RestoreNormalMowerAnimation(board):
+    # 原生 EnableSuperMower(false) 仍使用改装动画。
+    normal = Lawn.GlobalMembersReanimIds.ReanimTrackId_anim_normal
+    for mower in board.mLawnMowers:
+        if not mower.mDead and mower.mMowerType == Lawn.LawnMowerType.Lawn:
+            reanimation = board.mApp.ReanimationTryToGet(mower.mReanimID)
+            if reanimation is not None and not reanimation.IsAnimPlaying(normal):
+                reanimation.SetFramesForLayer(normal)
+
+
 # 持续作弊选项；一次性操作见 cheat_actions.py。
 class CheatOption(Serializable):
     def __init__(self) -> None:
@@ -146,7 +190,72 @@ class CheatOption(Serializable):
     def noCooldown(self, value):
         GetLawnApp().mEasyPlantingCheat = value
 
+    @property
+    def daisyMode(self):
+        return _get_easter_egg_mode('daisyMode')
+
+    @daisyMode.setter
+    def daisyMode(self, value):
+        _set_easter_egg_mode('daisyMode', value)
+
+    @property
+    def danceMode(self):
+        return _get_easter_egg_mode('danceMode')
+
+    @danceMode.setter
+    def danceMode(self, value):
+        _set_easter_egg_mode('danceMode', value)
+
+    @property
+    def pinataMode(self):
+        return _get_easter_egg_mode('pinataMode')
+
+    @pinataMode.setter
+    def pinataMode(self, value):
+        _set_easter_egg_mode('pinataMode', value)
+
+    @property
+    def mustacheMode(self):
+        return _get_easter_egg_mode('mustacheMode')
+
+    @mustacheMode.setter
+    def mustacheMode(self, value):
+        _set_easter_egg_mode('mustacheMode', value)
+
+    @property
+    def superMowerMode(self):
+        return _get_easter_egg_mode('superMowerMode')
+
+    @superMowerMode.setter
+    def superMowerMode(self, value):
+        _set_easter_egg_mode('superMowerMode', value)
+
+    @property
+    def futureMode(self):
+        return _get_easter_egg_mode('futureMode')
+
+    @futureMode.setter
+    def futureMode(self, value):
+        _set_easter_egg_mode('futureMode', value)
+
 cheat_option = CheatOption()
+
+
+def GetEasterEggModes():
+    return {key: getattr(cheat_option, key) for key in EASTER_EGG_MODES}
+
+
+def ApplyEasterEggModesToBoard(board):
+    modes = GetEasterEggModes()
+    app = board.mApp
+    was_muted = app.mMuteSoundsForCutscene
+    app.mMuteSoundsForCutscene = True
+    try:
+        for key, enabled in modes.items():
+            _apply_easter_egg_mode(board, key, enabled)
+    finally:
+        app.mMuteSoundsForCutscene = was_muted
+
 
 # 跳过关卡入场动画。脚本始终运行并记录场景边沿，以支持修改器晚连接、
 # 开关动态启用和同一 Board 的生存模式换轮。
@@ -210,10 +319,10 @@ script_inf_sun.Off()
 # auto_collector.Off()
 
 # 技能无冷却
-def ScriptKillNoCooling():
+def ScriptSkillNoCooling():
     GetBoard().mAgavePowerfulCountdown = 0
     GetBoard().mEndoflamePowerfulCountdown = 0
-script_skill_nocooling = script_manager.Register(ScriptKillNoCooling, runmode=ScriptRunMode.FOREVER)
+script_skill_nocooling = script_manager.Register(ScriptSkillNoCooling, runmode=ScriptRunMode.FOREVER)
 script_skill_nocooling.Off()
 
 # 蘑菇清醒

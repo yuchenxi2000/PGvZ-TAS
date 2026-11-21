@@ -38,15 +38,18 @@ const CheckGroupCard = {
     template: `
         <el-card shadow="never" class="tool-card">
             <template #header>{{ title }}</template>
-            <div class="option-check-grid">
-                <el-checkbox
-                    v-for="key in items"
-                    :key="key"
-                    :model-value="model[key]"
-                    @update:model-value="model[key] = $event"
-                >
-                    {{ label(key) }}
-                </el-checkbox>
+            <div class="form-stack">
+                <div class="option-check-grid">
+                    <el-checkbox
+                        v-for="key in items"
+                        :key="key"
+                        :model-value="model[key]"
+                        @update:model-value="model[key] = $event"
+                    >
+                        {{ label(key) }}
+                    </el-checkbox>
+                </div>
+                <slot></slot>
             </div>
         </el-card>
     `,
@@ -148,6 +151,7 @@ const app = createApp({
         const currentLineupList = computed(() => lineupCodeMap[selectedScene.value] || []);
 
         let applyingRemoteState = false;
+        let syncedWeather = { enabled: false, rain: false, storm: false };
         const terrain = PGvZTerrain.create({ sendAction: (...args) => sendAction(...args) });
         const {
             connected, sessionRejected, unsupportedGameVersion, supportedGameVersions,
@@ -272,7 +276,7 @@ const app = createApp({
             applyingRemoteState = true;
             if (state.cheat) {
                 Object.keys(state.cheat).forEach(k => {
-                    if (k in cheatOption) cheatOption[k] = state.cheat[k];
+                    if (Object.prototype.hasOwnProperty.call(cheatOption, k)) cheatOption[k] = state.cheat[k];
                 });
             }
             if (state.placer) {
@@ -290,7 +294,8 @@ const app = createApp({
                 if (p.easyPlaceEnabled !== undefined) easyPlaceEnabled.value = p.easyPlaceEnabled;
             }
             if (state.weather) {
-                const w = state.weather;
+                syncedWeather = { ...syncedWeather, ...state.weather };
+                const w = syncedWeather;
                 if (!w.enabled) weather.value = 'default';
                 else if (w.rain && w.storm) weather.value = 'rainStorm';
                 else if (w.rain) weather.value = 'rain';
@@ -299,7 +304,7 @@ const app = createApp({
             }
             nextTick(() => {
                 applyingRemoteState = false;
-                // 仅成功的 sync 回包能更新保存状态；watch 不把远端同步当成本地操作。
+                // 保存收到的状态，watch 不把远端同步当成本地操作。
                 saveCheckboxState();
             });
         }

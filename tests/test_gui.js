@@ -288,7 +288,7 @@ function loadGui({ mobile = false, saved = {} } = {}) {
         ws.message({ action: 'queued', id: request.id });
         runTimer(100);
         ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
-            action: 'sync', modVersion: '1.15.1', gameVersion: '1.3.4', state,
+            action: 'sync', revision: 1, modVersion: '1.15.1', gameVersion: '1.3.4', state,
         } }] });
         flush();
         return ws;
@@ -386,7 +386,7 @@ test('PC restores its saved options; mobile connects without pushing them', () =
         gui.runTimer(100);
         assert.equal(decodeCall(ws.sent.at(-1)).name, 'poll');
         ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
-            action: 'sync', gameVersion: '1.3.0', modVersion: '1.15.1', state: {},
+            action: 'sync', revision: 1, gameVersion: '1.3.0', modVersion: '1.15.1', state: {},
         } }] });
         assert.equal(gui.model.connected.value, true);
         assert.equal(gui.model.gameVersion.value, gameVersionProbe.version);
@@ -466,13 +466,115 @@ test('aquarium brain limit toggle is bilingual, persists, and synchronizes', () 
     assert.equal(mobileWs.sent.length, count);
 });
 
+test('stage easter eggs use bilingual native-mode settings and one sound action', () => {
+    const gui = loadGui();
+    const ws = gui.bootstrap();
+    const options = {
+        daisyMode: ['Daisies', '雏菊'],
+        danceMode: ['Dancing', '跳舞'],
+        pinataMode: ['Candy', '糖果'],
+        mustacheMode: ['Mustaches', '胡子'],
+        superMowerMode: ['Mower Appearance', '割草机外观'],
+        futureMode: ['Sunglasses', '墨镜'],
+    };
+    assert.deepEqual(Array.from(gui.model.switchGroups.easterEggs), Object.keys(options));
+    assert.equal(gui.model.t('tabs.stage'), 'Stage & Display');
+    for (const [key, [english]] of Object.entries(options)) {
+        assert.equal(gui.model.optionLabel(key), english);
+    }
+    gui.model.setLanguage('zh');
+    assert.equal(gui.model.t('tabs.stage'), '关卡与显示');
+    for (const [key, [, chinese]] of Object.entries(options)) {
+        assert.equal(gui.model.optionLabel(key), chinese);
+        gui.model.cheatOption[key] = true;
+        gui.flush();
+        const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+        assert.deepEqual(request.state, { cheat: { [key]: true } });
+    }
+    const saved = JSON.parse(gui.storage.get(storageKey));
+    assert.ok(Object.keys(options).every(key => saved.cheat[key] === true));
+
+    const stage = html.split('name="stage">')[1].split('</el-tab-pane>')[0];
+    assert.match(stage, /panel-grid three[\s\S]+sections\.sceneCheats[\s\S]+sections\.stageControl[\s\S]+switchGroups\.easterEggs[\s\S]+sections\.level/);
+    const sound = stage.match(/@click="([^"]+)"[^>]*>↑ ↑ ↓ ↓ ← → ← → B A/)[1];
+    vm.runInNewContext(sound, { sendAction: gui.model.sendAction });
+    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    assert.equal(request.kind, 'action');
+    assert.equal(request.name, 'playKonamiSound');
+    assert.deepEqual(request.args, {});
+});
+
+test('sync merges startup pushes and orders each field across snapshots, pushes and apply results', () => {
+    const gui = loadGui();
+    const ws = gui.sockets[0];
+    const connect = gui.startInitialization(ws);
+    const sync = (revision, state) => ({ action: 'sync', revision, state });
+    const sendOutput = (msg, name = 'stdout') => ws.onmessage({
+        data: JSON.stringify({ eventtype: 'output', name, msg, timestamp: 123 }),
+    });
+    const push = (revision, state, clientId = 'client-1') => ws.onmessage({
+        data: JSON.stringify({ eventtype: 'execution', statuscode: 0, errortype: null, timestamp: 123,
+            result: reprString(JSON.stringify({ ...sync(revision, state), _clientId: clientId })) }),
+    });
+
+    sendOutput('ordinary game log\n');
+    assert.equal(gui.model.connectionState.value, 'initializing');
+    push(2, { cheat: { daisyMode: true }, weather: { rain: true } });
+    push(3, { placer: { imitater: true } });
+    assert.equal(gui.model.cheatOption.daisyMode, false);
+    assert.equal(gui.model.isImitater.value, false);
+    ws.message({ action: 'results', results: [{ ...connect, ok: true,
+        value: sync(1, { cheat: { daisyMode: false, freePlant: true }, placer: { imitater: false },
+            weather: { enabled: true, rain: false, storm: false } }) }] });
+    gui.flush();
+    assert.equal(gui.model.cheatOption.daisyMode, true);
+    assert.equal(gui.model.cheatOption.freePlant, true);
+    assert.equal(gui.model.isImitater.value, true);
+    assert.equal(gui.model.weather.value, 'rain');
+
+    const sent = ws.sent.length;
+    push(9, { cheat: { daisyMode: false } }, 'other-page');
+    sendOutput(JSON.stringify({ ...sync(9, { cheat: { daisyMode: false } }), _clientId: 'client-1' }));
+    push(1, { cheat: { daisyMode: false } });
+    push(5, { weather: { storm: true } });
+    push(4, { cheat: { freePlant: false } });
+    gui.flush();
+    assert.equal(gui.model.cheatOption.daisyMode, true);
+    assert.equal(gui.model.cheatOption.freePlant, false);
+    assert.equal(gui.model.weather.value, 'rainStorm');
+    assert.equal(ws.sent.length, sent);
+    assert.equal(JSON.parse(gui.storage.get(storageKey)).cheat.daisyMode, true);
+
+    gui.model.cheatOption.danceMode = true;
+    gui.flush();
+    const apply = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    push(7, { cheat: { danceMode: false, futureMode: true } });
+    ws.message({ action: 'results', results: [{ ...apply, ok: true,
+        value: sync(6, { cheat: { danceMode: true } }) }] });
+    gui.flush();
+    assert.equal(gui.model.cheatOption.danceMode, false);
+    assert.equal(gui.model.cheatOption.futureMode, true);
+    assert.equal(gui.model.cheatOption.freePlant, false);
+    assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
+
+    gui.model.cheatOption.danceMode = true;
+    gui.flush();
+    const laterApply = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    ws.message({ action: 'results', results: [{ ...laterApply, ok: true,
+        value: sync(8, { cheat: { danceMode: true } }) }] });
+    push(7, { cheat: { danceMode: false } });
+    gui.flush();
+    assert.equal(gui.model.cheatOption.danceMode, true);
+    assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
+});
+
 test('remote synchronization updates UI without echoing its changes', () => {
     const gui = loadGui({ mobile: true });
     const ws = gui.bootstrap();
     gui.connection.refreshState();
     const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
     const count = ws.sent.length;
-    ws.message({ action: 'results', results: [{ ...request, ok: true, value: { action: 'sync', state: {
+    ws.message({ action: 'results', results: [{ ...request, ok: true, value: { action: 'sync', revision: 2, state: {
         cheat: {
             freePlant: true, noSunLimit: true, disableTachieCensor: true, marigoldAlwaysThreeDiamonds: true,
         }, placer: {
@@ -498,7 +600,7 @@ test('remote synchronization updates UI without echoing its changes', () => {
     const disable = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
     const beforeDisable = ws.sent.length;
     ws.message({ action: 'results', results: [{ ...disable, ok: true, value: {
-        action: 'sync', state: { cheat: { noSunLimit: false } },
+        action: 'sync', revision: 3, state: { cheat: { noSunLimit: false } },
     } }] });
     gui.flush();
     assert.equal(gui.model.cheatOption.noSunLimit, false);
@@ -539,7 +641,7 @@ test('easy-place zoom mode has bilingual labels and uses existing state synchron
     gui.connection.refreshState();
     const snapshot = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
     ws.message({ action: 'results', results: [{ ...snapshot, ok: true, value: {
-        action: 'sync', state: { placer: { easyPlaceMode: 'zoom', active: false } },
+        action: 'sync', revision: 2, state: { placer: { easyPlaceMode: 'zoom', active: false } },
     } }] });
     gui.flush();
     assert.equal(gui.model.easyPlaceMode.value, 'zoom');
@@ -845,7 +947,7 @@ test('only the WebSocket handshake has a timeout; bootstrap probes can wait inde
         if (blockedStage !== 'connect') ws.message(gameVersionProbe);
         const connect = JSON.parse(decodeCall(ws.sent.findLast(code => code.includes('gui_dispatcher.submit')).split('\n').at(-1)).args[0]);
         ws.message({ action: 'results', results: [{ ...connect, ok: true, value: {
-            action: 'sync', state: { cheat: { freePlant: true } },
+            action: 'sync', revision: 1, state: { cheat: { freePlant: true } },
         } }] });
         gui.flush();
         assert.equal(gui.model.connected.value, true);
@@ -921,7 +1023,7 @@ test('explicit takeover works on an open or closed occupied socket and uses bili
         const takeover = JSON.parse(decodeCall(ws.sent.at(-1).split('\n').at(-1)).args[0]);
         assert.equal(takeover.kind, 'connect');
         assert.equal(takeover.takeover, true);
-        ws.message({ action: 'results', results: [{ ...takeover, ok: true, value: { action: 'sync', state: {} } }] });
+        ws.message({ action: 'results', results: [{ ...takeover, ok: true, value: { action: 'sync', revision: 1, state: {} } }] });
         assert.equal(gui.model.connected.value, true);
         assert.equal(gui.model.sessionRejected.value, false);
         gui.model.setLanguage('zh');
@@ -939,7 +1041,7 @@ test('remote PC snapshots save only after successful synchronization and never e
     const request = gui.startInitialization();
     const ws = gui.sockets[0];
     ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
-        action: 'sync', state: { cheat: { freePlant: false }, placer: { imitater: true } },
+        action: 'sync', revision: 1, state: { cheat: { freePlant: false }, placer: { imitater: true } },
     } }] });
     assert.deepEqual(JSON.parse(gui.storage.get(storageKey)), saved);
     const sent = ws.sent.length;

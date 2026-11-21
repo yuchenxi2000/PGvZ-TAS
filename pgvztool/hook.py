@@ -9,11 +9,12 @@ import Sexy
 import Sexy.TodLib
 from pgvz import *
 from pgvz.rng import rng_manip
-from .cheat import cheat_option, weather
+from .cheat import ApplyEasterEggModesToBoard, GetEasterEggModes, RestoreNormalMowerAnimation, cheat_option, weather
 from .placer import placer
 from .tas import tas_manager
 from .keybinds import KeybindHandler
 from .dispatcher import gui_dispatcher
+from .sync import sync_reg
 from .overlay import (
     DrawPlantHpAll, DrawPlantCooldowns, DrawZombieHpAll, DrawCraterCooldowns,
     DrawEasyPlaceUI, DrawSeedPacketNumbers, DrawWaveInfo, DrawSquirrel,
@@ -852,6 +853,31 @@ def WidgetManager__GotFocus(orig, widget_manager: Sexy.WidgetManager):
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.KeyDown)
 def Board__KeyDown(orig, board: Lawn.Board, theKey: Sexy.KeyCode):
     keybind_handler.key_down(orig, board, theKey)
+
+def _sync_easter_eggs_after_key(orig, widget, theKey, board=None):
+    previous = GetEasterEggModes()
+    orig(widget, theKey)
+    current = GetEasterEggModes()
+    changed = tuple(key for key in current if current[key] != previous[key])
+    if changed:
+        if board is not None and previous['superMowerMode'] and not current['superMowerMode']:
+            RestoreNormalMowerAnimation(board)
+        sync_reg.push_state(cheat=changed)
+
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.DoTypingCheck)
+def Board__DoTypingCheck(orig, board: Lawn.Board, theKey: Sexy.KeyCode):
+    _sync_easter_eggs_after_key(orig, board, theKey, board)
+
+@LawnMod.MonoModUtils.HookTo(Lawn.GameSelector.KeyDown)
+def GameSelector__KeyDown(orig, selector: Lawn.GameSelector, theKey: Sexy.KeyCode):
+    _sync_easter_eggs_after_key(orig, selector, theKey)
+
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.LoadGame)
+def Board__LoadGame(orig, board: Lawn.Board, path: str):
+    loaded = orig(board, path)
+    if loaded:
+        ApplyEasterEggModesToBoard(board)
+    return loaded
 
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.KeyChar)
 def Board__KeyChar(orig, board: Lawn.Board, theChar: Sexy.SexyChar):

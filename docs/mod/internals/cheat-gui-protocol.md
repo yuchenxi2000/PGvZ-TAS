@@ -57,17 +57,17 @@ PC 初始化携带本地设置，游戏端保证同一页面在一个游戏进�
 - **表达式**（如 `1+1`、`gui_dispatcher.poll(client_id)`）：执行后返回 `repr()` 的字符串结果
 - **语句**（如 `cheat_option.xxx = True`）：执行后无返回值
 
-服务端响应是统一的 JSON 格式：
+执行结果使用 `eventtype: "execution"`。以下示例省略 `timestamp`：
 
 ```json
 // 表达式有返回值
-{"statuscode": 0, "result": "'repr-string'"}
+{"eventtype": "execution", "statuscode": 0, "result": "'repr-string'", "errortype": null}
 
 // 语句无返回值
-{"statuscode": 0}
+{"eventtype": "execution", "statuscode": 0, "result": null, "errortype": null}
 
 // 异常
-{"statuscode": 1, "result": "error message", "errortype": "ExceptionType"}
+{"eventtype": "execution", "statuscode": -1, "result": "error message", "errortype": "ExceptionType"}
 ```
 
 PGvZ 1.4.3 的原始执行异常正文位于 `result`，不是应用层请求结果中的 `error`。
@@ -78,6 +78,8 @@ PGvZ 1.4.3 的原始执行异常正文位于 `result`，不是应用层请求结
 连接完成后的普通调试代码异常仍不取消其他业务请求。
 
 `PyHub` 允许多个 WebSocket 同时连接，所有连接共用同一个 IronPython `ScriptScope`。它本身没有客户端身份、认证或独占机制，因此直接连接 `/Py` 的其他程序可以执行任意 Python，也可以绕过下述 GUI 会话协议。若要拒绝所有来源的第二个 WebSocket 连接，需要修改游戏的 C# `PyHub` 服务端。
+
+`PyHub.OnOpen()` 还会为连接订阅 IronPython 的标准输出和标准错误。输出缓冲刷新时，游戏主动发送 `eventtype: "output"` 事件，其中包含 `name`、`msg` 和 `timestamp`。网页忽略这类日志事件。
 
 ### 启动就绪探测
 
@@ -181,7 +183,7 @@ ready = app is not None and app.mLoadingThreadStarted
 | kind | 附加数据 | 主线程处理 |
 |---|---|---|
 | `connect` | PC 每次携带 `state`，手机省略；显式接管带 `takeover: true` | 申请或接管会话，仅首次成功初始化应用恢复选项，返回状态快照或会话拒绝 |
-| `apply` | `state` | 验证会话并应用开关、放置器或天气状态 |
+| `apply` | `state` | 验证会话并应用选项，返回请求字段的实际状态 |
 | `snapshot` | 无 | 验证会话并读取完整状态 |
 | `action` | `name`、`args` | 按白名单转换参数，同步调用业务方法 |
 | `release` | 无 | 释放会话并清理该页面未领取的结果，不等待完成回包 |
@@ -261,13 +263,14 @@ Python，业务请求通过分发器转入主线程；`Sexy/Main.cs` 的 `Update
 这些操作都在主线程完成，包括 `noCooldown` 对游戏字段的读写和脚本开关的启停。
 会话校验保持不变；其他游戏运行时异常仍按请求 ID 回传。
 
-`connect` 和 `snapshot` 请求的 `value` 是以下消息；连接模块据此更新界面：
+`connect` 和 `snapshot` 请求的 `value` 是完整的 `sync` 消息。`apply` 返回相同结构，`state` 仅含请求涉及的可序列化字段，字段值在全部写入完成后从游戏重新读取。没有可返回的字段时，`apply` 的 `value` 为 `null`。
 
 ```json
 {
   "action": "sync",
-  "modVersion": "1.15.1",
-  "gameVersion": "1.3.4",
+  "revision": 1,
+  "modVersion": "1.18.0",
+  "gameVersion": "1.4.3",
   "state": {
     "cheat": {"freePlant": false, "autoCollect": true, "noCooldown": false},
     "placer": {"seedType": "Peashooter", "easyPlaceEnabled": true},
@@ -279,6 +282,32 @@ Python，业务请求通过分发器转入主线程；`Sexy/Main.cs` 的 `Update
 天气的五档前端选项映射为 `enabled`、`rain` 和 `storm`；`enabled` 为 false 时使用关卡
 默认天气。界面通过 `applyState({ cheat: { [key]: value } })` 或
 `applyState({ placer: { [key]: value } })` 提交修改，分发器加入会话 ID 后交给同步注册表。
+
+### 模组主动推送状态
+
+游戏主线程中，模组修改已注册状态后调用 `sync_reg.push_state(**groups)`。形参名是注册的状态组，字符串选一个字段，字段名序列选多个字段，`None` 读取整组：
+
+```python
+from pgvztool import cheat_option, sync_reg
+
+cheat_option.freePlant = True
+sync_reg.push_state(cheat='freePlant')
+
+# 同一条消息可包含多个组，由 API 读取它们在游戏里的当前值。
+sync_reg.push_state(cheat=('daisyMode', 'danceMode'), weather=None)
+```
+
+未注册的组，以及未知、私有或不可序列化的字段自动跳过。没有活动网页会话时不读取状态，也不缓存推送。已有网页重新连接时，会通过 `connect` 取得完整快照。新增组可沿用 `SyncRegistry.register()`，若要影响官方网页的控件，还需在 `applySyncState()` 接入相应的界面状态。
+
+推送通过游戏的 `/Py` 广播，复用 `PyHub.ExecutionEventJSON()` 和网页的 `parseResultMessage()`。载荷沿用 `sync` 结构，额外带活动页面的 `_clientId`。网页检查页面 ID 后按组、按字段比较 `revision`，使乱序的完整快照、推送和 `apply` 回包可以合并。首次同步期间收到的推送暂存，网页收到连接快照后再应用合并结果。部分天气字段会与上一次收到的天气字段合并。
+
+推送不触发额外轮询，网页更新也不回发 `apply`。PC 按现有规则保存收到的复选框状态，手机只更新当前页面。
+
+### 彩蛋状态
+
+“关卡与显示”的六个彩蛋开关以 `cheat` 属性同步。`cheat_option` 读取 `LawnApp` 的全局字段，网页写入时同时应用到当前 `Board`，无需通过键盘口令的智慧树高度检查。`Board.LoadGame()` 成功后，挂钩用当前 `cheat_option` 恢复关卡的彩蛋状态，并在应用期间暂时静音。音效按钮使用独立的 `playKonamiSound` 动作，由主线程调用 `LawnApp.PlayFoley(FoleyType.Drop)`。
+
+`Board.DoTypingCheck()` 和 `GameSelector.KeyDown()` 对比原生按键处理前后的彩蛋状态，通过 `push_state()` 发送实际变化的字段。
 
 ### 布阵码
 
@@ -343,8 +372,8 @@ PC 页面启动时先读取保存值；缺失字段使用代码默认值。每�
 页面 ID 只在该游戏进程内首次成功初始化时应用它们，随后重复连接只读取游戏当前状态。
 因此首次初始化前长期暂停或断线不会丢失恢复设置，回包丢失也不会导致重复覆盖。
 
-用户修改需要持久化的开关时立即保存，不等待游戏执行。`applySyncState()` 仅处理成功的
-同步结果；远端更新期间 watcher 不保存或发回设置，待 Vue 更新完成后统一保存同步状态。
+用户修改需要持久化的开关时立即保存，不等待游戏执行。`applySyncState()` 处理成功的
+同步结果和有效的推送；远端更新期间 watcher 不保存或发回设置，待 Vue 更新完成后统一保存同步状态。
 因此不存在用初始化失败、拒绝或迟到旧连接的快照覆盖 localStorage 的路径。
 
 用户勾选复选框时，`watch(cheatOption)` 检测变化，通过 `setCheatOption(key, value)` 发送：

@@ -42,6 +42,9 @@ class CheatActions:
     def ToggleFullscreen(self):
         GetLawnApp().ToggleFullscreen()
 
+    def PlayKonamiSound(self):
+        GetLawnApp().PlayFoley(Sexy.TodLib.FoleyType.Drop)
+
     def _WinLevel(self, lawnApp: Lawn.LawnApp, board: Lawn.Board):
         if lawnApp.mSeedChooserScreen is not None:
             # StartLevelIntro 不会清除旧的选卡标志，换轮前必须先结束选卡。

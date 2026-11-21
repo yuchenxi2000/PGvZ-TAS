@@ -95,6 +95,7 @@ window.PGvZOptions = (() => {
                 'selectZombieHp',
                 'drawSquirrel',
             ],
+            easterEggs: ['daisyMode', 'danceMode', 'pinataMode', 'mustacheMode', 'superMowerMode', 'futureMode'],
         };
 
         const optionConfig = [...new Set(Object.values(switchGroups).flat())];
