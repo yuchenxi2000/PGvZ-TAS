@@ -4,7 +4,7 @@
 
 ## 原生入口与行为
 
-内置修改器 `Lawn/ZBCheatDialog.cs` 的按钮 13 为“放大模式”。它检查 `Board.CanSelectGridFocus`，调用 `Board.SelectGridFocus()` 后关闭修改器对话框，将焦点交还 Board。
+[内置作弊菜单](built-in-cheat-menu.md) `Lawn/ZBCheatDialog.cs` 的按钮 13 为“放大模式”。它检查 `Board.CanSelectGridFocus`，将全局游戏速度恢复为 1×，调用 `Board.SelectGridFocus()`，再将菜单最小化并把焦点交还 `Board`。放大及恢复镜头期间，悬浮菜单隐藏。退出时恢复相机位置和缩放，全局速度保持 1×。
 
 `CanSelectGridFocus` 要求正在游戏中、不是禅境花园或智慧树、相机已启用且存在、没有处于放大状态，并且 `CanInteractWithBoardButtons()` 允许交互。
 

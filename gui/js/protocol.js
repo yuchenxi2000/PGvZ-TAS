@@ -1,10 +1,15 @@
 window.PGvZProtocol = (() => {
     const BOOTSTRAP_READY_PROBE_CODE = [
-        'import Sexy',
-        "'{\"action\":\"bootstrapReady\",\"ready\":' + ('true' if Sexy.GlobalStaticVars.gSexyAppBase is not None and Sexy.GlobalStaticVars.gSexyAppBase.mLoadingThreadStarted else 'false') + '}'",
+        'import sys',
+        '_pgvz_bootstrap_ready = sys.modules["cheat-gui"].bootstrap_status()[0]',
+        "'{\"action\":\"bootstrapReady\",\"ready\":' + ('true' if _pgvz_bootstrap_ready else 'false') + '}'",
     ].join('\n');
 
     const BOOTSTRAP_CODE = [
+        'import sys',
+        '_pgvz_bootstrap_error = sys.modules["cheat-gui"].bootstrap_status()[1]',
+        'if _pgvz_bootstrap_error is not None:',
+        '    raise RuntimeError(_pgvz_bootstrap_error)',
         'try:',
         '    from pgvz import *',
         '    from pgvztool import *',
@@ -21,26 +26,28 @@ window.PGvZProtocol = (() => {
     const GAME_VERSION_PROBE_CODE = [
         'def _pgvz_gui_probe_game_version():',
         '    import json',
+        '    import sys',
         '    version = ""',
-        '    mod_version = ""',
-        '    supported = []',
         '    try:',
         '        import Lawn',
         '        version = Lawn.LawnApp.AppVersionNumber.split()[1]',
         '    except (ImportError, AttributeError, IndexError):',
         '        pass',
-        // 直接执行纯版本声明文件，避免触发 pgvz/__init__.py。
-        '    try:',
-        '        path = "mods/pgvz/version.py"',
+        '    version_module = sys.modules.get("pgvz.version")',
+        '    if version_module is not None:',
+        '        metadata = vars(version_module)',
+        '    else:',
+        // 后台加载失败或调试入口尚未导入时，单独读取版本声明。
         '        metadata = {}',
-        '        with open(path, "rb") as source:',
-        '            exec(compile(source.read(), path, "exec"), metadata)',
-        '        mod_version = metadata.get("MOD_VERSION", "")',
-        '        supported = metadata.get("SUPPORTED_GAME_VERSIONS", [])',
-        '    except (OSError, ValueError, SyntaxError):',
-        '        pass',
+        '        try:',
+        '            path = "mods/pgvz/version.py"',
+        '            with open(path, "rb") as source:',
+        '                exec(compile(source.read(), path, "exec"), metadata)',
+        '        except (OSError, ValueError, SyntaxError):',
+        '            pass',
         '    return json.dumps({"action": "gameVersion", "version": version,',
-        '                       "modVersion": mod_version, "supportedVersions": supported})',
+        '                       "modVersion": metadata.get("MOD_VERSION", ""),',
+        '                       "supportedVersions": metadata.get("SUPPORTED_GAME_VERSIONS", [])})',
         '_pgvz_gui_probe_game_version()',
     ].join('\n');
 

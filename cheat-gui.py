@@ -22,9 +22,37 @@ import http.server
 import socketserver
 import os
 import threading
+import time
 import urllib.parse
 
 _GUI_PORT = 58080
+_bootstrap_done = threading.Event()
+_bootstrap_error = None
+
+
+def bootstrap_status():
+    if _bootstrap_done.is_set():
+        return True, _bootstrap_error
+    return False, None
+
+
+def _load_mod():
+    global _bootstrap_error
+    try:
+        import Sexy
+        while True:
+            app = Sexy.GlobalStaticVars.gSexyAppBase
+            # StartLoadingThread 在场地尺寸常量完成初始化后才置位。
+            if app is not None and app.mLoadingThreadStarted:
+                break
+            time.sleep(0.1)
+        import pgvztool  # 导入包会加载 pgvz 并安装 Hook。
+    except Exception:
+        import traceback
+        _bootstrap_error = traceback.format_exc()
+    finally:
+        _bootstrap_done.set()
+
 
 class _GUIHandler(http.server.SimpleHTTPRequestHandler):
     def translate_path(self, path):
@@ -58,5 +86,6 @@ class _GUIHandler(http.server.SimpleHTTPRequestHandler):
 class _ThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
 
+threading.Thread(target=_load_mod, daemon=True).start()
 _server = _ThreadingServer(('127.0.0.1', _GUI_PORT), _GUIHandler)
 threading.Thread(target=_server.serve_forever, daemon=True).start()

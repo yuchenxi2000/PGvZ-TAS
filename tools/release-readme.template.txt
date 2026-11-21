@@ -80,7 +80,7 @@ Adv：逐帧，运行一帧后暂停
 seed_1 = Q
 pause = Enter
 
-修改后需重启游戏，并打开网页连接修改器后才能生效。
+修改后重启游戏应用该按键映射。
 已适配中文等常见非英文输入法下的字母和数字快捷键，桌面版还会自动关闭输入法选词框。
 完整配置说明：https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/mod/user-guide/keybinds.md
 
@@ -131,7 +131,7 @@ pause = Enter
    仍然异常时，按下方“使用调试入口”操作，查看 pgvz、pgvztool 和 gui 文件检查结果。
 
 7. 自定义快捷键无效
-   修改 keybinds.txt 后请重启游戏，并打开网页连接修改器。
+   修改 keybinds.txt 后请重启游戏。
    本修改器已适配常见非英文输入法；如果当前输入法仍然拦截快捷键，请切换到英文输入法后再试。
 
 8. 提示“另一个修改器页面已连接”
@@ -282,7 +282,7 @@ Create keybinds.txt next to user_config.json and add one "action = key" entry pe
 seed_1 = Q
 pause = Enter
 
-Restart the game after editing the file, then open and connect the web console to load the keybinds.
+Restart the game after editing the file. The mod reads the keybinds during background loading.
 Letter and number shortcuts support common non-English input methods. On desktop, IME candidate windows are also dismissed automatically.
 Full configuration guide: https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/mod/user-guide/keybinds.md
 
@@ -333,7 +333,7 @@ Project source: https://github.com/yuchenxi2000/PGvZ-TAS
    If the problem remains, follow “Using the Debug Entry” below and inspect the pgvz, pgvztool, and gui file checks.
 
 7. Custom keybinds do not work
-   Restart the game after editing keybinds.txt, then open and connect the web console.
+   Restart the game after editing keybinds.txt.
    Common non-English input methods are supported. If the current input method still intercepts shortcuts, switch to an English input method and try again.
 
 8. The page says another mod page is connected

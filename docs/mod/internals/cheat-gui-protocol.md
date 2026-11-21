@@ -40,13 +40,13 @@ PC 初始化携带本地设置，游戏端保证同一页面在一个游戏进�
 
 `CheatActions` 和 `Placer` 的方法都同步执行，不带调度装饰器。游戏钩子和主线程脚本可
 直接调用；WebSocket 代码必须通过分发器提交请求。调试区仍允许发送任意 Python，调用者
-同样需要遵守主线程约束。启动就绪与版本探测发生在分发器导入前，仍留在协议模块。
+同样需要遵守主线程约束。网页通过协议模块查询后台加载结果和版本，再使用分发器。
 
 ## HTTP 服务器 (cheat-gui.py)
 
 位于 `cheat-gui.py`，使用 Python 标准库 `http.server`。启动时自动挂在 `localhost:58080`，将所有请求路由到 `gui/` 目录下的文件。根路径 `/` 返回 `gui/index.html`。
 
-游戏启动时只自动扫描 `mods/` 顶层的 `.py` 文件，因此此时执行的是 `cheat-gui.py`，它只配置模块搜索路径并启动 HTTP 服务。`pgvz/` 和 `pgvztool/` 是 Python 包，不会被游戏自动扫描；网页建立 WebSocket 连接并确认游戏同步初始化完成后，`gui/js/protocol.js` 中的 `BOOTSTRAP_CODE` 才会导入它们并注册相关钩子。
+游戏在启动时执行 `mods/` 顶层的 `cheat-gui.py`。正式入口配置模块搜索路径、启动 HTTP 服务，并启动后台线程等待游戏就绪后导入 `pgvztool`。包导入时也加载 `pgvz` 并注册钩子，逐帧脚本和 GUI 请求仍由游戏主线程处理。
 
 `Cache-Control: no-store, no-cache, must-revalidate` 等响应头用于防止之后的页面加载复用缓存。它不能停止已经在页面内存中运行的旧 JavaScript、重连定时器或 WebSocket；通过 `file://` 直接打开文件时也不存在这些 HTTP 响应头。仍在运行的旧页面由下述 GUI 会话协议拦截。
 
@@ -72,24 +72,25 @@ PC 初始化携带本地设置，游戏端保证同一页面在一个游戏进�
 
 PGvZ 1.4.3 的原始执行异常正文位于 `result`，不是应用层请求结果中的 `error`。
 网页读取原始执行异常时依次使用 `error`、`result`，避免只显示异常类型。
-`BOOTSTRAP_CODE` 在首次导入失败时通过 `traceback.format_exc()` 保留 Python 调用栈。
+后台加载失败时，入口通过 `traceback.format_exc()` 保存 Python 调用栈，`BOOTSTRAP_CODE` 将其作为执行错误返回。调试入口中的首次导入错误也保留调用栈。
 此时分发器可能尚未导入，网页清理本地待处理请求和轮询，不发送 `cancel` 或继续
 调用 `poll`，以免 `gui_dispatcher` 未定义的二次错误覆盖原始导入错误。
 连接完成后的普通调试代码异常仍不取消其他业务请求。
 
 `PyHub` 允许多个 WebSocket 同时连接，所有连接共用同一个 IronPython `ScriptScope`。它本身没有客户端身份、认证或独占机制，因此直接连接 `/Py` 的其他程序可以执行任意 Python，也可以绕过下述 GUI 会话协议。若要拒绝所有来源的第二个 WebSocket 连接，需要修改游戏的 C# `PyHub` 服务端。
 
+PGvZ 1.4.3 的 `RunAllModules()` 在启动线程上用 `mPyEnj.CreateModule()` 为每个顶层模组创建独立的模块作用域。`PyHub.OnMessage()` 在 WebSocket 消息回调中用同一个 `mPyEnj` 执行代码，使用交互专用的 `mPyScope`。两条路径共享 Python 模块缓存 `sys.modules`，交互代码可通过导入顶层模组访问其中定义的变量。
+
 `PyHub.OnOpen()` 还会为连接订阅 IronPython 的标准输出和标准错误。输出缓冲刷新时，游戏主动发送 `eventtype: "output"` 事件，其中包含 `name`、`msg` 和 `timestamp`。网页忽略这类日志事件。
 
 ### 启动就绪探测
 
-游戏在 `Main.Initialize()` 中先启动 IronPython WebSocket 并执行顶层模组，随后才通过
+游戏在 `Main.Initialize()` 中先执行顶层模组，再启动 IronPython WebSocket，随后通过
 `base.Initialize()` 进入 `Main.LoadContent()`。场地尺寸等运行时常量由
 `SetupForResolution()` 中的 `Constants.Load*()` 设置，因此 WebSocket 可以在这些常量尚未
 完成初始化时就接受连接。
 
-GUI 建立 WebSocket 后不会立即发送 `BOOTSTRAP_CODE`，而是先发送只导入 `Sexy` 的
-`BOOTSTRAP_READY_PROBE_CODE`，检查：
+正式入口的后台线程每 100 毫秒检查一次：
 
 ```python
 app = Sexy.GlobalStaticVars.gSexyAppBase
@@ -97,22 +98,26 @@ ready = app is not None and app.mLoadingThreadStarted
 ```
 
 `mLoadingThreadStarted` 由 `Main.LoadContent()` 最后的 `StartLoadingThread()` 设置，晚于
-`Constants.Load*()`、`GlobalStaticVars.initialize()` 和 `LawnApp.Init()/Start()`。探测未就绪
-时网页每 100 毫秒重试；就绪后才导入 `pgvz` 和 `pgvztool` 并申请 GUI 会话。不能使用
+`Constants.Load*()`、`GlobalStaticVars.initialize()` 和 `LawnApp.Init()/Start()`。线程在就绪后
+导入 `pgvztool`，记录成功或失败，然后通过 `threading.Event` 发布结果。不能使用
 `Constants.Loaded` 作为标志，因为各 `Constants.Load*()` 会在函数前段设置它，后续仍有
 大量字段尚未赋值。
 
 完整的异常表现、静态初始化根因、历史版本差异和修复边界见
 [启动阶段 `Board` 静态初始化与墓碑关卡数组越界](startup-board-static-initialization.md)。
 
-就绪响应使用 `{"action":"bootstrapReady","ready":...}` 与普通执行结果和状态同步
-区分。自定义代码仍允许在引导失败时直接发送，以便调试。
+网页建立 WebSocket 后，通过 `sys.modules["cheat-gui"].bootstrap_status()` 查询同一次加载，
+收到 `{"action":"bootstrapReady","ready":false}` 时每 100 毫秒重试。`ready:true` 表示尝试已结束。
+网页完成版本探测后，成功时将已缓存的模块导入交互作用域并申请 GUI 会话，失败时显示原始调用栈。
+调试入口在同一接口中报告游戏就绪状态，由网页触发首次导入，便于排查启动故障。
+自定义代码仍允许在引导失败时直接发送，以便调试。
 
 ### 游戏版本警告
 
-启动就绪后，GUI 通过 `Lawn.LawnApp.AppVersionNumber` 获取游戏版本，并单独执行
-`mods/pgvz/version.py` 读取 `MOD_VERSION` 和 `SUPPORTED_GAME_VERSIONS`。版本文件只声明
-常量，在独立的命名空间执行时不会触发 `pgvz/__init__.py`。探测返回 `gameVersion` 消息，
+启动就绪后，GUI 通过 `Lawn.LawnApp.AppVersionNumber` 获取游戏版本，再从 IronPython
+已缓存的 `pgvz.version` 读取 `MOD_VERSION` 和 `SUPPORTED_GAME_VERSIONS`。如果模块尚未缓存，
+例如启动导入提前失败或使用调试入口，探测会在独立命名空间执行纯常量文件 `mods/pgvz/version.py`，
+以便在包初始化前显示版本信息。探测返回 `gameVersion` 消息，
 包含实际游戏版本 `version`、修改器版本 `modVersion` 和支持列表 `supportedVersions`。
 
 网页页眉的两个版本号均来自探测。实际游戏版本不在列表中时，网页显示警告并列出受支持

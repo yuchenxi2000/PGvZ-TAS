@@ -27,9 +27,9 @@ System.IndexOutOfRangeException: Index was outside the bounds of the array.
 ```text
 Main.Initialize()
 ├─ IronPyInteractive.Serve()
-│  └─ PyHub.Initialize()
-│     ├─ 启动 localhost:8080/Py WebSocket
-│     └─ RunAllModules()                 执行 mods/ 顶层 .py 文件
+│  ├─ PyHub.Initialize()
+│  │  └─ RunAllModules()                 执行 mods/ 顶层 .py 文件
+│  └─ mWS.Start()                        开始接受 /Py WebSocket 连接
 └─ base.Initialize()
    └─ Main.LoadContent()
       ├─ SetupForResolution()
@@ -59,8 +59,8 @@ Main.Initialize()
 `Board` 的 Hook。游戏扫描模组时就会执行这些语句，因此可能在
 `Main.LoadContent()` 之前触发 `Board` 静态初始化。
 
-当前结构只让游戏自动加载顶层 `cheat-gui.py`。它负责配置路径和启动静态文件 HTTP 服务，
-`pgvz/` 与 `pgvztool/` 包改由网页连接后的引导代码导入。这避免了顶层模组必然提前访问
+后来改用顶层 `cheat-gui.py` 配置路径和启动静态文件 HTTP 服务，
+`pgvz/` 与 `pgvztool/` 包由网页连接后的引导代码导入。这避免了顶层模组必然提前访问
 `Board`，但还存在一个较小的时间窗口：`IronPyInteractive.Serve()` 已经接受 WebSocket
 连接，而 `Main.LoadContent()` 尚未配置常量；如果网页此时立刻执行引导代码，同样可能重现
 问题。
@@ -97,25 +97,14 @@ Main.Initialize()
 
 ## 当前修改器的规避流程
 
-网页建立 WebSocket 后不立即导入框架，而按以下步骤执行：
-
-1. 发送 `BOOTSTRAP_READY_PROBE_CODE`，只导入 `Sexy`；
-2. 检查 `Sexy.GlobalStaticVars.gSexyAppBase` 已创建且
-   `mLoadingThreadStarted` 为 `true`；
-3. 未就绪时每 100 毫秒重试；
-4. 就绪后才执行原有 `BOOTSTRAP_CODE`，导入 `pgvz`、`pgvztool`，注册 Hook 并建立 GUI
-   会话；
-5. WebSocket 关闭时停止探测并清除本次连接的引导状态。
-
-探测结果带有 `bootstrapReady` 动作标签，以免和普通 Python 执行结果、状态同步及心跳响应
-混淆。探测代码不导入 `Lawn`、`pgvz` 或 `pgvztool`，也不触碰 `Board`。
-
-这不是依赖概率的固定延时：对官方 GUI 的引导路径而言，框架导入与
-`StartLoadingThread()` 之间建立了明确的先后关系。
+正式入口启动后台线程，只导入 `Sexy` 并每 100 毫秒检查游戏就绪标志。观察到
+`gSexyAppBase` 已创建且 `mLoadingThreadStarted` 为 `true` 后，后台线程才导入 `pgvztool`，
+加载 `pgvz` 并注册 Hook。浏览器稍后连接时查询这次加载的结果。调试入口在网页连接时使用
+相同的游戏就绪条件，再由 WebSocket 回调导入。协议详见 [启动就绪探测](cheat-gui-protocol.md#启动就绪探测)。
 
 ## 修复边界
 
-当前方案能根除**本修改器官方网页引导路径**造成的提前初始化，但不能修改游戏已经创建的
+当前方案保护正式入口和调试网页引导的初始化顺序，但不能修改游戏已经创建的
 错误静态数组，也不能约束其他代码：
 
 - 如果仍安装旧的顶层 `cheat.py`，它会在网页探测之前执行；
@@ -138,11 +127,7 @@ PC 自动安装脚本会检测这个旧版 `cheat.py`，并将其改名为以 `.
 
 由于错误静态状态会保持到进程结束，每轮验证都应从彻底退出并重新启动游戏开始：
 
-1. 游戏启动后立即打开网页，使 WebSocket 尽可能在加载早期连接；
-2. 确认进度条仍显示时修改器即可完成连接，而不是一直等到全部资源加载结束；
-3. 进入会调用 `PickSpecialGraveStone()` 的墓碑关卡并重复冷启动测试；
-4. 确认没有上述 `IndexOutOfRangeException`；
-5. 如需验证探测本身，观察就绪前只出现 `bootstrapReady: false`，就绪后才发生框架导入和
-   GUI 状态同步。
-
-本问题修复后已按上述方式人工测试，未再发现异常。
+1. 冷启动游戏，进入关卡并观察自动收集是否在打开网页前生效；
+2. 另一次冷启动后立即打开网页，确认页面等到加载完成后可操作；
+3. 进入会调用 `PickSpecialGraveStone()` 的墓碑关卡，检查有无上述 `IndexOutOfRangeException`；
+4. 如需验证探测本身，观察后台加载途中返回 `bootstrapReady: false`，结束后返回 `true`。

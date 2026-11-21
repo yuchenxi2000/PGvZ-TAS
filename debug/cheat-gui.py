@@ -33,6 +33,13 @@ sys.path.append(pyLibPath)
 sys.path.append(modsDirPath)
 
 
+def bootstrap_status():
+    # 调试入口等网页触发导入，以便区分游戏启动问题和修改器导入问题。
+    import Sexy
+    app = Sexy.GlobalStaticVars.gSexyAppBase
+    return app is not None and app.mLoadingThreadStarted, None
+
+
 # 先启动 HTTP 服务，再访问任何游戏类型。Android 上游戏类型或弹窗不可用时，
 # 诊断页面仍应当可访问。
 try:
