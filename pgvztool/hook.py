@@ -24,6 +24,7 @@ from .overlay import (
     DrawPlantHpAll, DrawPlantCooldowns, DrawZombieHpAll, DrawCraterCooldowns,
     DrawEasyPlaceUI, DrawSeedPacketNumbers, DrawWaveInfo, DrawSquirrel,
     DrawTasButtons, DrawTasFrameCounter,
+    GetCombatToolRects, GetEasyPlaceRect, IsNativeBattleButtonAt,
 )
 
 _BUILTIN_CHEAT_FIELDS = {5: 'autoCollect', 8: 'wontLose', 11: 'runBackground'}
@@ -838,6 +839,22 @@ def Board__HasShovel(orig, board: Lawn.Board):
         return True
     return orig(board)
 
+# 战斗道具的原生绘制和命中共用矩形入口。
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.GetShovelButtonRect)
+def Board__GetShovelButtonRect(orig, board: Lawn.Board):
+    rects = GetCombatToolRects(board)
+    if rects is not None and 'shovel' in rects:
+        return rects['shovel']
+    return orig(board)
+
+@LawnMod.MonoModUtils.HookTo(Lawn.Board.GetZenButtonRect)
+def Board__GetZenButtonRect(orig, board: Lawn.Board, object_type: Lawn.GameObjectType):
+    if object_type == Lawn.GameObjectType.Glove:
+        rects = GetCombatToolRects(board)
+        if rects is not None and 'glove' in rects:
+            return rects['glove']
+    return orig(board, object_type)
+
 # 连续铲子
 @LawnMod.MonoModUtils.HookTo(Lawn.Board.MouseDownWithTool)
 def Board__MouseDownWithTool(orig, board: Lawn.Board, x: int, y: int, clickCnt: int, cursorType: Lawn.CursorType, posScaled: bool, isTouch: bool):
@@ -866,18 +883,20 @@ def Board__MouseDownInternal(orig, board: Lawn.Board, x: int, y: int, theClickCo
     if placer.active and theClickCount < 0:
         placer.active = False
         return
-    if placer._ep_rect.Contains(x, y) and placer.can_toggle(board):
+    combat_tool_rects = GetCombatToolRects(board)
+    easy_place_rect = GetEasyPlaceRect(board, combat_tool_rects)
+    if easy_place_rect is not None and easy_place_rect.Contains(x, y) and placer.can_toggle(board):
         placer.toggle()
         return
-    if placer.active and theClickCount >= 0:
+    if placer.active and theClickCount >= 0 and not IsNativeBattleButtonAt(board, combat_tool_rects, x, y):
         if placer.easyPlaceMode == 'zoom':
             if placer.begin_grid_focus(board):
                 # 原生入口接收屏幕坐标，由 HandleGridFocusClick 自己换算一次。
                 return orig(board, x, y, theClickCount, isTouch)
             return
         # 没有这一行手机会出问题
-        x, y = board.mCamera.ScreenToBoardReplace(x, y)  # type: ignore
-        if placer.try_place(board, x, y):
+        board_x, board_y = board.mCamera.ScreenToBoardReplace(x, y)  # type: ignore
+        if placer.try_place(board, board_x, board_y):
             return
     # TAS 按钮点击
     if tas_manager.can_use(board, cheat_option.tasEnabled) and theClickCount >= 0:

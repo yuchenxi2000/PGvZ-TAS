@@ -1,6 +1,6 @@
 """修改器叠加绘制：血量、冷却、场地提示、轻松放置和 TAS UI。
 
-挂钩注册和 Camera 变换仍由 hook.py 负责；本模块仅提供绘制辅助函数。
+挂钩注册和 Camera 变换由 hook.py 负责；本模块提供布局和绘制辅助函数。
 """
 import Lawn
 import Sexy
@@ -324,52 +324,110 @@ def DrawCraterCooldowns(board: Lawn.Board, g: Sexy.Graphics):
         g.SetColorizeImages(False)
 
 EASY_PLACE_UI_SCALE = 0.7
+COMBAT_TOOL_GAP = 6
+
+def _is_battle_ui_scene(board: Lawn.Board):
+    return board.mApp.mGameScene == Lawn.GameScenes.Playing and board.mApp.mGameMode not in (
+        Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom,
+        Lawn.GameMode.Upsell, Lawn.GameMode.Intro,
+    )
+
+def GetCombatToolRects(board: Lawn.Board):
+    if (not _is_battle_ui_scene(board) or board.mApp.mPlayerInfo.mClassicSeedChooser
+            or board.mCutScene.IsInShovelTutorial()):
+        return None
+
+    images = Sexy.AtlasResources
+    constants = Sexy.Constants
+    base = images.IMAGE_SHOVELBANK_ZEN
+    width, height = base.mWidth, base.mHeight
+    y = constants.UIShovelButtonPosition.Y
+    # 相对底座的左右绘制边界。手套图标比底座宽，拿起道具时仍为图标保留位置。
+    middle = []
+    if board.IsCombatToolVisible(Lawn.GameObjectType.Shovel):
+        middle.append(('shovel', -7, max(width, images.IMAGE_SHOVEL_PLANTGIRL.mWidth - 7)))
+    if board.IsCombatToolVisible(Lawn.GameObjectType.Glove):
+        glove_x = constants.ZenGardenButton_Glove_Offset.X
+        middle.append(('glove', min(0, glove_x), max(width, glove_x + images.IMAGE_GLOVE_PLANTGIRL.mWidth)))
+    easy_place_visible = placer.easyPlaceEnabled and not placer.is_grid_focus_active(board)
+    easy_place_on_right = easy_place_visible and len(middle) == 2
+    if easy_place_visible and not easy_place_on_right:
+        middle.append(('easy_place', 0, width))
+
+    rects = {}
+    if middle:
+        # 保留阳光栏和进度条的常规位置，避免传送带或进度条出现时道具跳位。
+        offset = constants.Board_Offset_AspectRatio_Correction
+        left = constants.UISunBankPositionX - offset + images.IMAGE_DAN_SUNBANK.mWidth
+        right = constants.UIProgressMeterPosition.X - offset
+        group_width = sum(end - start for _, start, end in middle) + COMBAT_TOOL_GAP * (len(middle) - 1)
+        x = (left + right - group_width) // 2
+        for tool, start, end in middle:
+            rects[tool] = Sexy.TRect(x - start, y, width, height)
+            x += end - start + COMBAT_TOOL_GAP
+
+    if easy_place_on_right:
+        menu = board.mMenuButton
+        left = menu.mX + menu.mWidth
+        right = constants.BackBufferSize.Y - board.mX
+        rects['easy_place'] = Sexy.TRect((left + right - width) // 2, y, width, height)
+    return rects
+
+def GetEasyPlaceRect(board: Lawn.Board, combat_tool_rects):
+    if combat_tool_rects is not None:
+        return combat_tool_rects.get('easy_place')
+    if not placer.easyPlaceEnabled or placer.is_grid_focus_active(board) or not _is_battle_ui_scene(board):
+        return None
+
+    # 统一排版只用于非经典战斗界面，其他场景沿用原先的位置。
+    shovel_rect = board.GetShovelButtonRect()
+    visible_rects = []
+    if board.IsCombatToolVisible(Lawn.GameObjectType.Shovel):
+        visible_rects.append(shovel_rect)
+    if board.IsCombatToolVisible(Lawn.GameObjectType.Glove):
+        visible_rects.append(board.GetZenButtonRect(Lawn.GameObjectType.Glove))
+    x = shovel_rect.mX
+    if visible_rects:
+        x = max(rect.mX + rect.mWidth for rect in visible_rects) + max(0, 90 - shovel_rect.mWidth)
+    return Sexy.TRect(x, shovel_rect.mY, shovel_rect.mWidth, shovel_rect.mHeight)
+
+def IsNativeBattleButtonAt(board: Lawn.Board, rects, x: int, y: int):
+    if rects is None:
+        return False
+    for tool in ('shovel', 'glove'):
+        rect = rects.get(tool)
+        if rect is not None and rect.Contains(x, y):
+            return True
+    for button in (board.mMenuButton, board.mPauseButton, board.mAccelerateButton):
+        if (button is not None and not button.mBtnNoDraw
+                and button.mX <= x < button.mX + button.mWidth and button.mY <= y < button.mY + button.mHeight):
+            return True
+    return False
 
 def DrawEasyPlaceUI(board: Lawn.Board, g: Sexy.Graphics):
-    if placer.is_grid_focus_active(board):
+    rect = GetEasyPlaceRect(board, GetCombatToolRects(board))
+    if rect is None:
         return
-    if board.mApp.mGameScene == Lawn.GameScenes.Playing and board.mApp.mGameMode not in (Lawn.GameMode.ChallengeZenGarden, Lawn.GameMode.TreeOfWisdom, Lawn.GameMode.Upsell, Lawn.GameMode.Intro):
-        shovel_rect = board.GetShovelButtonRect()
-        glove_rect = board.GetZenButtonRect(Lawn.GameObjectType.Glove)
-        btn_w = shovel_rect.mWidth
-        btn_h = shovel_rect.mHeight
-        btn_y = shovel_rect.mY
-        visible_tool_rects = []
-        if board.IsCombatToolVisible(Lawn.GameObjectType.Shovel):
-            visible_tool_rects.append(shovel_rect)
-        if board.IsCombatToolVisible(Lawn.GameObjectType.Glove):
-            visible_tool_rects.append(glove_rect)
-        if visible_tool_rects:
-            slot_gap = max(0, 90 - btn_w)
-            btn_x = max(rect.mX + rect.mWidth for rect in visible_tool_rects) + slot_gap
-        else:
-            btn_x = shovel_rect.mX
 
-        g.DrawImage(Sexy.AtlasResources.IMAGE_SHOVELBANK_ZEN, btn_x, btn_y)
-        if placer.active:
-            g.SetColorizeImages(True)
-            g.SetColor(Sexy.SexyColor(200, 200, 200).Color)
-        taco_image = Sexy.AtlasResources.IMAGE_TACO
-        taco_x = btn_x - 7
-        taco_y = btn_y - 3
-        Sexy.TodLib.TodCommon.TodDrawImageCenterScaledF(
-            g,
-            taco_image,
-            float(taco_x),
-            float(taco_y),
-            EASY_PLACE_UI_SCALE,
-            EASY_PLACE_UI_SCALE,
-        )
+    g.DrawImage(Sexy.AtlasResources.IMAGE_SHOVELBANK_ZEN, rect.mX, rect.mY)
+    if placer.active:
+        g.SetColorizeImages(True)
+        g.SetColor(Sexy.SexyColor(200, 200, 200).Color)
+    Sexy.TodLib.TodCommon.TodDrawImageCenterScaledF(
+        g,
+        Sexy.AtlasResources.IMAGE_TACO,
+        float(rect.mX - 7),
+        float(rect.mY - 3),
+        EASY_PLACE_UI_SCALE,
+        EASY_PLACE_UI_SCALE,
+    )
+    g.SetColorizeImages(False)
+
+    if placer.easyPlaceMode == 'portal' and placer.portal_placer.isSelected():
+        g.SetColorizeImages(True)
+        g.SetColor(Sexy.SexyColor(255, 0, 0).Color)
+        g.DrawRect(placer.portal_placer.select_portal_rect)
         g.SetColorizeImages(False)
-
-        placer._ep_rect = Sexy.TRect(btn_x, btn_y, btn_w, btn_h)
-
-        # draw selected portal
-        if placer.easyPlaceMode == 'portal' and placer.portal_placer.isSelected():
-            g.SetColorizeImages(True)
-            g.SetColor(Sexy.SexyColor(255, 0, 0).Color)
-            g.DrawRect(placer.portal_placer.select_portal_rect)
-            g.SetColorizeImages(False)
 
 def DrawSeedPacketNumbers(seedbank: Lawn.SeedBank, g: Sexy.Graphics):
     board = seedbank.mBoard

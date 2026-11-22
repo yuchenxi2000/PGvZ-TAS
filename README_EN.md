@@ -25,7 +25,7 @@ See [docs/mod/user-guide/install.md](docs/mod/user-guide/install.md) (Chinese) f
 
 - **Common cheats**: Free plants, plant anywhere, plant/zombie invincibility, stop spawning, and dozens more toggles
 - **Item placement**: Select plant/zombie/item types and properties in the web UI, then click to place them on the field
-- **Quick place**: Check "轻松放置", choose a placement mode, click the Taco icon (to the right of the shovel) in-game to activate, left-click to place, right-click to exit
+- **Quick place**: Turn on “Enable Easy Place,” choose a mode, and click the Taco icon at the top of the board. When both the shovel and glove are visible, the icon sits to the right of the menu. Left-click to place and right-click to exit.
 - **TAS tool**: Check "启用 TAS" in "常用修改". Four buttons appear in the bottom-right corner — Save, Undo (go back to previous save; auto-saves current state first when live), Redo (go forward to next save), Adv (advance one frame then pause). A frame counter is also displayed. Use these for frame-precise control, similar to emulator TAS tools
 - **Custom keybinds**: Rebind seed packet selection, shovel, glove, quick place, TAS actions, pause and other keys. Common non-English input methods are supported. See [docs/mod/user-guide/keybinds.md](docs/mod/user-guide/keybinds.md)
 

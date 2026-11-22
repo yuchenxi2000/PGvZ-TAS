@@ -79,7 +79,6 @@ class Placer(Serializable):
         self.mindCtrl = False
         self.potReverse = False
         self.imitater = False
-        self._ep_rect = Sexy.TRect(0, 0, 0, 0)
         self.portal_placer = PortalPlacer()
     
     @property
