@@ -36,6 +36,7 @@ PC 初始化携带本地设置，游戏端保证同一页面在一个游戏进�
 - `placer.py`：同步放置、移除和场地交互，包括罐子内容的换算。
 - `sync.py`：状态序列化、状态应用和 GUI 会话，运行时只由主线程访问。
 - `dispatcher.py`：`GuiDispatcher` 请求协议、动作映射、跨线程队列和结果交接。
+- `speed.py`：全局与关卡速度动作、只读状态和 Board 标识。
 - `hook.py`：调用分发器的主线程入口，集中声明所有修改器挂钩。
 
 `CheatActions` 和 `Placer` 的方法都同步执行，不带调度装饰器。游戏钩子和主线程脚本可
@@ -258,8 +259,8 @@ Python，业务请求通过分发器转入主线程；`Sexy/Main.cs` 的 `Update
 
 ### 状态快照和选项应用
 
-`SyncRegistry` 注册 `cheat`（`CheatOption`）、`placer`（`Placer`）和 `weather`
-（`WeatherControl`）。`Serializable.to_dict()` 自动读取公开的简单实例属性和 `@property`，
+`SyncRegistry` 注册 `cheat`（`CheatOption`）、`placer`（`Placer`）、`weather`
+（`WeatherControl`）和只读的 `speed`。`Serializable.to_dict()` 自动读取公开的简单实例属性和 `@property`，
 不需要登记字段表。`from_dict()` 按现有属性逐项应用：简单属性直接赋值，.NET 枚举通过
 `System.Enum.Parse()` 转换，不额外校验类型或范围。不存在、私有或不支持的属性会跳过；
 枚举转换失败、属性只读或赋值时出现类型转换错误，也跳过该项并继续处理其余选项。
@@ -321,6 +322,22 @@ PGvZ-TAS 在游戏主线程安装 `ZBCheatDialog` 的 IL 钩子。复选框 5（
 “关卡与显示”的六个彩蛋开关以 `cheat` 属性同步。`cheat_option` 读取 `LawnApp` 的全局字段，网页写入时同时应用到当前 `Board`，无需通过键盘口令的智慧树高度检查。`Board.LoadGame()` 成功后，挂钩用当前 `cheat_option` 恢复关卡的彩蛋状态，并在应用期间暂时静音。音效按钮使用独立的 `playKonamiSound` 动作，由主线程调用 `LawnApp.PlayFoley(FoleyType.Drop)`。
 
 `Board.DoTypingCheck()` 和 `GameSelector.KeyDown()` 对比原生按键处理前后的彩蛋状态，通过 `push_state()` 发送实际变化的字段。
+
+### 速度控制
+
+连接快照包含只读的 `speed` 组。`global` 和 `board` 各自以 `{numerator, denominator}`
+表示实际速度，`board` 另带当前 Board 的 `id`。没有 Board 时 `board` 为 `null`，全局速度字段
+无法表示有效值时 `global` 为 `null`。每个比例作为一个字段参与版本合并，分子和分母始终一起更新。
+速度使用当前游戏状态，PC 和手机均不保存或恢复这些字段。
+
+`setGlobalSpeed` 接收 `{value}`，`setBoardSpeed` 接收 `{boardId, value}`，其中 `value` 为整数、
+小数或分数字符串。全局入口只接受可精确表达的整数倍和整数倒数倍。关卡入口原样写入分数，
+小数则通过框架的连分数转换。关卡动作在执行时核对 Board 标识，换关后返回 `SpeedBoardChanged`，
+无效速度返回 `InvalidSpeed`。成功回包携带对应字段的 `sync` 消息，沿用推送的版本顺序。
+
+有活动网页时，`DoUpdateFrames()` 在原方法返回后比较两项实际速度与最近发送的状态，按变化字段
+推送。原生按钮、脚本和直接写游戏字段的调试代码都通过这条路径更新网页。网页更新当前值和快捷档，
+输入草稿由用户编辑，提交中的动作由对应回包确认。相关底层限制见[游戏速度控制机制](../../game-mechanics/other/speed-control.md)。
 
 ### 布阵码
 

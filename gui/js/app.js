@@ -89,8 +89,10 @@ const app = createApp({
         ]);
 
         const activeTab = ref('player');
-        const speed = ref(1);
-        const speedOptions = [0.1, 0.2, 0.5, 1, 2, 5, 10];
+        const speedControls = reactive([
+            { scope: 'global', action: 'setGlobalSpeed', presets: ['0.1', '0.2', '0.5', '1', '2', '5', '10'] },
+            { scope: 'board', action: 'setBoardSpeed', presets: ['0.5', '1', '2', '3'] },
+        ].map(control => ({ ...control, current: null, draft: '', pending: null, errorKey: '' })));
         const weather = ref('default');
         const weatherOptions = computed(() => [
             { label: t('weather.default'), value: 'default' },
@@ -160,11 +162,72 @@ const app = createApp({
             send, sendAction, applyState, connect, releaseSession, takeoverSession,
         } = PGvZConnection.create({
             isMobile, t, setResult, getInitialState, applySyncState, lineupCode,
-            onActionResult: terrain.receive,
+            onActionResult,
         });
         watch(() => connected.value, ready => {
-            if (!ready) terrain.reset();
+            if (ready) return;
+            terrain.reset();
+            for (const control of speedControls) {
+                control.current = null;
+                control.pending = null;
+                control.errorKey = '';
+            }
         });
+
+        function speedIsValid(speed) {
+            return speed && speed.numerator >= 0 && speed.denominator > 0;
+        }
+
+        function currentSpeedLabel(control) {
+            const speed = control.current;
+            if (!connected.value) return '—';
+            if (control.scope === 'board' && !speed) return t('speed.noBoard');
+            if (!speedIsValid(speed)) return t('speed.unavailable');
+            const { numerator, denominator } = speed;
+            return numerator === 0 || denominator === 1 ? `${numerator}×` : `${numerator}/${denominator}×`;
+        }
+
+        function speedPresetSelected(control, preset) {
+            const speed = control.current;
+            return Boolean(speedIsValid(speed) && speed.numerator / speed.denominator === Number(preset));
+        }
+
+        const combinedSpeed = computed(() => {
+            const [global, board] = speedControls.map(control => control.current);
+            if (!connected.value || !speedIsValid(global) || !speedIsValid(board)) return '';
+            const product = (global.numerator * board.numerator) / (global.denominator * board.denominator);
+            const displayed = Number(product.toPrecision(7));
+            return `${product === displayed ? '' : '≈'}${displayed}×`;
+        });
+
+        function speedControlDisabled(control) {
+            return !connected.value || Boolean(control.pending) || (control.scope === 'board' && !control.current);
+        }
+
+        function applySpeed(control, preset) {
+            const value = preset ?? control.draft.trim();
+            if (speedControlDisabled(control) || !value) return;
+            if (preset !== undefined && speedPresetSelected(control, preset)) return;
+            const args = control.scope === 'board' ? { value, boardId: control.current.id } : { value };
+            control.errorKey = '';
+            control.pending = { draft: preset === undefined ? control.draft : null };
+            if (!sendAction(control.action, args)) control.pending = null;
+        }
+
+        function onActionResult(result) {
+            terrain.receive(result);
+            const control = speedControls.find(item => item.action === result.name);
+            if (!control?.pending) return;
+            if (result.ok && control.draft === control.pending.draft) control.draft = '';
+            control.pending = null;
+            if (result.ok || result.errortype === 'SessionRejected') return;
+            const errorKey = {
+                InvalidSpeed: `speed.${control.scope}.invalid`,
+                SpeedBoardChanged: 'speed.board.changed',
+            }[result.errortype];
+            control.errorKey = errorKey ?? 'speed.failed';
+            return errorKey;
+        }
 
         function terrainTypeShort(kind, value) {
             const item = terrain.typeInfo(kind, value);
@@ -273,6 +336,14 @@ const app = createApp({
         );
 
         function applySyncState(state) {
+            if (state.speed) {
+                for (const control of speedControls) {
+                    if (Object.prototype.hasOwnProperty.call(state.speed, control.scope)) {
+                        control.current = state.speed[control.scope];
+                    }
+                }
+            }
+            if (!state.cheat && !state.placer && !state.weather) return;
             applyingRemoteState = true;
             if (state.cheat) {
                 Object.keys(state.cheat).forEach(k => {
@@ -388,8 +459,12 @@ const app = createApp({
             modVersion,
             statusText,
             activeTab,
-            speed,
-            speedOptions,
+            speedControls,
+            currentSpeedLabel,
+            speedPresetSelected,
+            combinedSpeed,
+            speedControlDisabled,
+            applySpeed,
             weather,
             weatherOptions,
             sunValue,

@@ -24,7 +24,8 @@ window.PGvZI18n = (() => {
                 place: '场地放置',
                 remove: '场地移除',
                 sceneCheats: '场景显示',
-                stageControl: '关卡控制',
+                weatherControl: '天气控制',
+                speedControl: '速度控制',
                 easterEggs: '彩蛋',
                 level: '关卡修改',
                 zombieSpawn: '出怪',
@@ -56,7 +57,6 @@ window.PGvZI18n = (() => {
                 level: '关卡',
                 survivalStage: '生存模式轮数',
                 weather: '天气',
-                speed: '速度',
             },
             placeholders: {
                 seed: '选择植物',
@@ -151,6 +151,21 @@ window.PGvZI18n = (() => {
                 rain: '下雨',
                 storm: '打雷',
                 rainStorm: '下雨打雷',
+            },
+            speed: {
+                global: {
+                    title: '全局速度', current: '当前全局速度', scope: '包括菜单，换关后保留',
+                    presets: '全局速度快捷档', custom: '自定义全局速度', placeholder: '整数或 1/N',
+                    invalid: '请输入 0.01× 至 100× 范围内的整数倍或整数倒数倍。',
+                },
+                board: {
+                    title: '关卡速度', current: '当前关卡速度', scope: '只影响当前关卡的游戏逻辑',
+                    presets: '关卡速度快捷档', custom: '自定义关卡速度', placeholder: '例如 1.5 或 2/3',
+                    invalid: '请输入 0.01× 至 100× 范围内可表示的小数或分数。',
+                    changed: '关卡已切换，此次设置未应用。',
+                },
+                combined: '关卡逻辑合计', noBoard: '未进入关卡', unavailable: '速度值无效',
+                pending: '等待游戏执行', failed: '无法设置速度',
             },
             messages: {
                 waiting: '等待指令...',
@@ -266,7 +281,8 @@ window.PGvZI18n = (() => {
                 place: 'Place',
                 remove: 'Remove',
                 sceneCheats: 'Scene Display',
-                stageControl: 'Stage Control',
+                weatherControl: 'Weather Control',
+                speedControl: 'Speed Control',
                 easterEggs: 'Easter Eggs',
                 level: 'Level Changes',
                 zombieSpawn: 'Zombie Spawn',
@@ -298,7 +314,6 @@ window.PGvZI18n = (() => {
                 level: 'Level',
                 survivalStage: 'Survival Stage',
                 weather: 'Weather',
-                speed: 'Speed',
             },
             placeholders: {
                 seed: 'Choose plant',
@@ -393,6 +408,21 @@ window.PGvZI18n = (() => {
                 rain: 'Rain',
                 storm: 'Thunder',
                 rainStorm: 'Rain & Thunder',
+            },
+            speed: {
+                global: {
+                    title: 'Global Speed', current: 'Current global speed', scope: 'Includes menus and persists across levels',
+                    presets: 'Global speed presets', custom: 'Custom global speed', placeholder: 'Integer or 1/N',
+                    invalid: 'Enter an integer or its reciprocal between 0.01× and 100×.',
+                },
+                board: {
+                    title: 'Level Speed', current: 'Current level speed', scope: 'Affects the current level’s game logic',
+                    presets: 'Level speed presets', custom: 'Custom level speed', placeholder: 'e.g. 1.5 or 2/3',
+                    invalid: 'Enter a representable decimal or fraction between 0.01× and 100×.',
+                    changed: 'The level changed before the speed could be applied.',
+                },
+                combined: 'Combined Level Speed', noBoard: 'No active level', unavailable: 'Invalid speed',
+                pending: 'Waiting for the game', failed: 'Could not set speed',
             },
             messages: {
                 waiting: 'Waiting for a command...',

@@ -20,7 +20,10 @@ class GuiDispatcherTests(unittest.TestCase):
         self.request_counter = 0
         self.main_thread = False
         self.owner_thread = threading.get_ident()
-        self.board = types.SimpleNamespace(mSunMoney=0, mChallenge=types.SimpleNamespace(mSurvivalStage=0))
+        self.board = types.SimpleNamespace(
+            mSunMoney=0, mChallenge=types.SimpleNamespace(mSurvivalStage=0),
+            mAccelerationNumerator=1, mAccelerationDenominator=1, mAccelerationFrameIndex=0,
+        )
         self.app = types.SimpleNamespace(mPlayerInfo=types.SimpleNamespace(mCoins=0), mBoard=self.board)
         self.lawn = types.ModuleType('Lawn')
         for name, members in {
@@ -73,6 +76,9 @@ class GuiDispatcherTests(unittest.TestCase):
         self.sexy.KeyCode = object
         self.sexy.Debug = types.SimpleNamespace(Log=lambda *args: None)
         self.sexy.DebugType = types.SimpleNamespace(Error='error')
+        self.sexy.GlobalStaticVars = types.SimpleNamespace(
+            gFastMo=False, gSlowMo=False, gFastSlowMoNum=0, gSlowMoCounter=0,
+        )
         namespace = {
             'Lawn': self.lawn, 'Sexy': self.sexy, 'GetBoard': get_board, 'GetLawnApp': get_app,
             'LineUp': types.SimpleNamespace(from_board=lambda board: types.SimpleNamespace(to_str=lambda: 'lineup-code')),
@@ -91,15 +97,22 @@ class GuiDispatcherTests(unittest.TestCase):
         self.placer.PlaceGridItem = types.MethodType(namespace['PlaceGridItem'], self.placer)
 
         pgvz = types.ModuleType('pgvz')
+        pgvz.__path__ = [str(ROOT / 'pgvz')]
+        pgvz.GetLawnApp = get_app
         pgvz.SetGlobalSpeed = set_speed
         pgvz.__game_version__ = '1.3.4'
+        util = types.ModuleType('pgvz.util')
+        util.GetBoard = get_board
         version = types.ModuleType('pgvz.version')
         version.MOD_VERSION = 'test'
         package_name = 'test_dispatcher_pgvztool'
         package = types.ModuleType(package_name)
         package.__path__ = [str(ROOT / 'pgvztool')]
-        modules = {'Lawn': self.lawn, 'pgvz': pgvz, 'pgvz.version': version,
-                   'Sexy': self.sexy, 'System': types.ModuleType('System'), package_name: package}
+        system = types.ModuleType('System')
+        system.Object = types.SimpleNamespace(ReferenceEquals=lambda left, right: left is right)
+        system.WeakReference = lambda target: types.SimpleNamespace(Target=target)
+        modules = {'Lawn': self.lawn, 'pgvz': pgvz, 'pgvz.util': util, 'pgvz.version': version,
+                   'Sexy': self.sexy, 'System': system, package_name: package}
         for suffix, key, value in (
             ('cheat_actions', 'cheat_actions', self.operations), ('placer', 'placer', self.placer),
         ):
@@ -107,6 +120,10 @@ class GuiDispatcherTests(unittest.TestCase):
             setattr(module, key, value)
             modules[module.__name__] = module
         with patch.dict(sys.modules, modules):
+            from pgvz import speed
+            for name in speed.__all__:
+                if name != 'SetGlobalSpeed':
+                    setattr(pgvz, name, getattr(speed, name))
             spec = importlib.util.spec_from_file_location(package_name + '.sync', ROOT / 'pgvztool/sync.py')
             sync = importlib.util.module_from_spec(spec)
             sys.modules[spec.name] = sync
@@ -137,6 +154,8 @@ class GuiDispatcherTests(unittest.TestCase):
             self.dispatcher_module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(self.dispatcher_module)
             self.dispatcher = self.dispatcher_module.gui_dispatcher
+            self.speed_control = self.dispatcher_module.speed_control
+            self.registry.register('speed', self.speed_control, read_only=True)
         self.main_thread = True
         self.registry.connect('client-1')
         self.main_thread = False
@@ -402,6 +421,7 @@ class GuiDispatcherTests(unittest.TestCase):
 
         namespace = {
             'gui_dispatcher': self.dispatcher, 'Sexy': types.SimpleNamespace(SexyAppBase=object),
+            'speed_control': self.speed_control, 'sync_reg': self.registry,
             '_builtin_cheat_hooks': None, '_install_builtin_cheat_menu_hooks': install_hooks,
         }
         exec(compile(ast.Module(body=[hook], type_ignores=[]), 'gui-action-hook', 'exec'), namespace)
@@ -415,11 +435,16 @@ class GuiDispatcherTests(unittest.TestCase):
 
         self.main_thread = True
         try:
-            self.assertIs(namespace['SexyAppBase__DoUpdateFrames'](original, self.app), False)
-            self.assertIs(namespace['SexyAppBase__DoUpdateFrames'](original, self.app), False)
+            with patch.object(self.sync_module, '_broadcast_execution_result') as broadcast:
+                self.assertIs(namespace['SexyAppBase__DoUpdateFrames'](original, self.app), False)
+                self.assertIs(namespace['SexyAppBase__DoUpdateFrames'](original, self.app), False)
         finally:
             self.main_thread = False
         self.assertEqual(installations, ['installed'])
+        broadcast.assert_called_once()
+        state = json.loads(broadcast.call_args.args[0])['state']
+        self.assertEqual(tuple(state['speed']), ('board',))
+        self.assertEqual(state['speed']['board']['numerator'], 0)
 
     def test_only_named_enum_members_are_accepted(self):
         for value in ('NotAZombie', '__class__', 'name', 0):
@@ -475,6 +500,43 @@ class GuiDispatcherTests(unittest.TestCase):
         results = self.results()
         self.assertEqual(results[0]['value'], 'lineup-code')
         self.assertEqual(results[1]['value'], [True, 2])
+
+    def test_speed_actions_return_exact_state_and_reject_unrepresentable_global_values(self):
+        self.submit('snapshot')
+        self.run_tasks()
+        board_id = self.results()[0]['value']['state']['speed']['board']['id']
+        self.dispatch('setGlobalSpeed', {'value': '1/4'})
+        self.dispatch('setGlobalSpeed', {'value': '1.5'})
+        self.dispatch('setBoardSpeed', {'boardId': board_id, 'value': '1.5'})
+        self.dispatch('setBoardSpeed', {'boardId': board_id, 'value': '6/4'})
+        self.run_tasks()
+        global_result, invalid, board_decimal, board_fraction = self.results()
+        self.assertEqual(global_result['value']['state']['speed']['global'], {'numerator': 1, 'denominator': 4})
+        self.assertEqual((self.sexy.GlobalStaticVars.gSlowMo, self.sexy.GlobalStaticVars.gFastSlowMoNum), (True, 4))
+        self.assertEqual(invalid['errortype'], 'InvalidSpeed')
+        self.assertEqual(board_decimal['value']['state']['speed']['board'],
+                         {'id': board_id, 'numerator': 3, 'denominator': 2})
+        self.assertEqual(board_fraction['value']['state']['speed']['board'],
+                         {'id': board_id, 'numerator': 6, 'denominator': 4})
+
+    def test_speed_snapshot_tracks_board_changes_and_ignores_restore_writes(self):
+        self.submit('snapshot')
+        self.run_tasks()
+        board_id = self.results()[0]['value']['state']['speed']['board']['id']
+        self.dispatch('setBoardSpeed', {'boardId': board_id, 'value': '3'})
+        self.app.mBoard = types.SimpleNamespace(mAccelerationNumerator=1, mAccelerationDenominator=1)
+        self.submit('connect', client_id='other', takeover=True, state={'speed': {'global': 8, 'board': 9}})
+        self.run_tasks()
+        self.assertEqual(self.results()[0]['errortype'], 'SpeedBoardChanged')
+        new_speed = self.results('other')[0]['value']['state']['speed']
+        self.assertNotEqual(new_speed['board']['id'], board_id)
+        self.assertEqual(new_speed['board']['numerator'], 1)
+        self.assertEqual(new_speed['global'], {'numerator': 1, 'denominator': 1})
+
+        self.app.mBoard = None
+        self.submit('snapshot', client_id='other')
+        self.run_tasks()
+        self.assertIsNone(self.results('other')[0]['value']['state']['speed']['board'])
 
     def test_missing_board_returns_error_without_stopping_other_actions(self):
         self.board = None

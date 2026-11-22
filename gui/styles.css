@@ -167,6 +167,61 @@ body {
     flex-wrap: wrap;
 }
 
+.speed-control {
+    display: grid;
+    gap: 6px;
+}
+
+.speed-control + .speed-control,
+.speed-total {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-soft);
+}
+
+.speed-heading,
+.speed-presets {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.speed-heading {
+    justify-content: space-between;
+}
+
+.speed-heading h3 {
+    margin: 0;
+    font-size: 14px;
+}
+
+.speed-heading output {
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+}
+
+.speed-scope,
+.speed-error {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.speed-error {
+    color: var(--el-color-danger-dark-2);
+}
+
+.speed-presets .el-button + .el-button {
+    margin-left: 0;
+}
+
+.speed-input {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+}
+
 .split-row {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

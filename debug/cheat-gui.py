@@ -135,6 +135,7 @@ _pgvztool_files = (
     'pgvztool/keybinds.py',
     'pgvztool/overlay.py',
     'pgvztool/placer.py',
+    'pgvztool/speed.py',
     'pgvztool/sync.py',
     'pgvztool/tas.py',
 )

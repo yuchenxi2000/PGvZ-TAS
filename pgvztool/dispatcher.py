@@ -7,6 +7,7 @@ import Lawn
 from pgvz import SetGlobalSpeed
 from .cheat_actions import cheat_actions
 from .placer import placer
+from .speed import speed_control
 from .sync import sync_reg
 
 
@@ -119,6 +120,8 @@ class GuiDispatcher:
             'removeMowers': (placer.RemoveLawnMower, ()),
             'openScaryPots': (placer.OpenScaryPotterOnBoard, ()),
             'setSpeed': (SetGlobalSpeed, (('value', lambda value: value),)),
+            'setGlobalSpeed': (self._set_global_speed, (('value', _string),)),
+            'setBoardSpeed': (self._set_board_speed, (('boardId', _integer), ('value', _string))),
             'enterLevel': (cheat_actions.EnterNewGame, (('mode', mode),)),
             'setGameMode': (cheat_actions.SetGameMode, (('mode', mode),)),
             'setSurvivalStage': (cheat_actions.SetSurvivalStage, (('value', _integer),)),
@@ -168,6 +171,14 @@ class GuiDispatcher:
     def _error_result(self, request, error_type, message):
         return {'id': request['id'], 'kind': request['kind'], 'name': request.get('name'),
                 'ok': False, 'errortype': error_type, 'error': message}
+
+    def _set_global_speed(self, value):
+        speed_control.set_global(value)
+        return sync_reg.read_state(speed='global')
+
+    def _set_board_speed(self, board_id, value):
+        speed_control.set_board(board_id, value)
+        return sync_reg.read_state(speed='board')
 
     def _finish_locked(self, record, result):
         record['status'] = 'done'

@@ -479,11 +479,13 @@ test('stage easter eggs use bilingual native-mode settings and one sound action'
     };
     assert.deepEqual(Array.from(gui.model.switchGroups.easterEggs), Object.keys(options));
     assert.equal(gui.model.t('tabs.stage'), 'Stage & Display');
+    assert.equal(gui.model.t('sections.weatherControl'), 'Weather Control');
     for (const [key, [english]] of Object.entries(options)) {
         assert.equal(gui.model.optionLabel(key), english);
     }
     gui.model.setLanguage('zh');
     assert.equal(gui.model.t('tabs.stage'), '关卡与显示');
+    assert.equal(gui.model.t('sections.weatherControl'), '天气控制');
     for (const [key, [, chinese]] of Object.entries(options)) {
         assert.equal(gui.model.optionLabel(key), chinese);
         gui.model.cheatOption[key] = true;
@@ -495,7 +497,11 @@ test('stage easter eggs use bilingual native-mode settings and one sound action'
     assert.ok(Object.keys(options).every(key => saved.cheat[key] === true));
 
     const stage = html.split('name="stage">')[1].split('</el-tab-pane>')[0];
-    assert.match(stage, /panel-grid three[\s\S]+sections\.sceneCheats[\s\S]+sections\.stageControl[\s\S]+switchGroups\.easterEggs[\s\S]+sections\.level/);
+    const columns = stage.split('<div class="card-stack">');
+    assert.equal(columns.length, 3);
+    assert.match(columns[0], /panel-grid three/);
+    assert.match(columns[1], /sections\.sceneCheats[\s\S]+sections\.weatherControl[\s\S]+<\/el-card>\s*<\/div>\s*<el-card[^>]+>\s*<template #header>.*sections\.speedControl/);
+    assert.match(columns[2], /sections\.level[\s\S]+switchGroups\.easterEggs[\s\S]+<\/check-group-card>\s*<\/div>\s*<\/section>/);
     const sound = stage.match(/@click="([^"]+)"[^>]*>↑ ↑ ↓ ↓ ← → ← → B A/)[1];
     vm.runInNewContext(sound, { sendAction: gui.model.sendAction });
     const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
@@ -607,6 +613,87 @@ test('remote synchronization updates UI without echoing its changes', () => {
     assert.equal(gui.model.sunValue.value, 9990);
     assert.equal(ws.sent.length, beforeDisable + 1);
     assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
+});
+
+test('speed controls display actual custom ratios and preserve drafts during external updates', () => {
+    const gui = loadGui();
+    const model = gui.model;
+    const [global, board] = model.speedControls;
+    assert.equal(model.currentSpeedLabel(global), '—');
+    const ws = gui.bootstrap({ speed: {
+        global: { numerator: 1, denominator: 4 }, board: { id: 1, numerator: 3, denominator: 2 },
+    } });
+    assert.equal(model.currentSpeedLabel(global), '1/4×');
+    assert.equal(model.currentSpeedLabel(board), '3/2×');
+    assert.equal(model.combinedSpeed.value, '0.375×');
+    assert.ok(global.presets.every(preset => !model.speedPresetSelected(global, preset)));
+
+    global.draft = '1/3';
+    const sent = ws.sent.length;
+    ws.message({ action: 'sync', _clientId: 'client-1', revision: 2,
+        state: { speed: { global: { numerator: 2, denominator: 1 } } } });
+    gui.flush();
+    assert.equal(model.currentSpeedLabel(global), '2×');
+    assert.equal(model.speedPresetSelected(global, '2'), true);
+    assert.equal(global.draft, '1/3');
+    assert.equal(ws.sent.length, sent);
+
+    model.applySpeed(global);
+    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    assert.equal(request.name, 'setGlobalSpeed');
+    assert.deepEqual(request.args, { value: '1/3' });
+    assert.equal(model.currentSpeedLabel(global), '2×');
+    assert.equal(model.speedControlDisabled(global), true);
+    assert.equal(model.speedControlDisabled(board), false);
+    ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
+        action: 'sync', revision: 3, state: { speed: { global: { numerator: 1, denominator: 3 } } },
+    } }] });
+    gui.flush();
+    assert.equal(model.currentSpeedLabel(global), '1/3×');
+    assert.equal(model.combinedSpeed.value, '0.5×');
+    assert.equal(global.pending, null);
+    assert.equal(global.draft, '');
+});
+
+test('level speed handles newer board pushes, failed edits and missing boards', () => {
+    const gui = loadGui();
+    const model = gui.model;
+    const [global, board] = model.speedControls;
+    model.setLanguage('zh');
+    const ws = gui.bootstrap({ speed: { global: { numerator: 1, denominator: 1 }, board: null } });
+    assert.equal(model.currentSpeedLabel(board), '未进入关卡');
+    assert.equal(model.speedControlDisabled(board), true);
+    assert.equal(model.speedControlDisabled(global), false);
+
+    const pushBoard = (revision, value) => ws.message({
+        action: 'sync', _clientId: 'client-1', revision, state: { speed: { board: value } },
+    });
+    pushBoard(2, { id: 1, numerator: 1, denominator: 1 });
+    board.draft = '2/3';
+    model.applySpeed(board);
+    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    assert.equal(request.name, 'setBoardSpeed');
+    assert.deepEqual(request.args, { value: '2/3', boardId: 1 });
+    pushBoard(4, { id: 2, numerator: 1, denominator: 1 });
+    ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
+        action: 'sync', revision: 3, state: { speed: { board: { id: 1, numerator: 2, denominator: 3 } } },
+    } }] });
+    assert.equal(model.currentSpeedLabel(board), '1×');
+    assert.equal(board.current.id, 2);
+
+    board.draft = '2/0';
+    model.applySpeed(board);
+    const invalid = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    ws.message({ action: 'results', results: [{ ...invalid, ok: false, errortype: 'InvalidSpeed', error: 'invalid' }] });
+    assert.equal(board.draft, '2/0');
+    assert.equal(board.errorKey, 'speed.board.invalid');
+    model.setLanguage('en');
+    assert.equal(model.t('sections.speedControl'), 'Speed Control');
+    assert.match(model.t(board.errorKey), /decimal or fraction/);
+    pushBoard(5, null);
+    assert.equal(model.currentSpeedLabel(board), 'No active level');
+    assert.equal(model.speedControlDisabled(board), true);
+    assert.equal(model.combinedSpeed.value, '');
 });
 
 test('vase selectors send their options to the easy placer', () => {

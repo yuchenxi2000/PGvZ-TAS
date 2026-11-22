@@ -1,6 +1,8 @@
 ## Archives
 _archive/
 
+.visualizations/
+
 ## macOS
 .DS_Store
 .localized

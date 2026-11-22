@@ -116,6 +116,7 @@ class SyncRegistry:
     """同步状态与 GUI 会话。除初始化注册外，运行时方法均在游戏主线程调用。"""
     def __init__(self):
         self._objects = {}
+        self._read_only_groups = set()
         self._active_client_id = None
         self._revision = 0
         # 游戏进程内保留；断线、release 和结果缓存清理都不能重新触发恢复。
@@ -123,8 +124,16 @@ class SyncRegistry:
         self._revoked_clients = set()
         self._local_fields = set()
 
-    def register(self, name, obj):
+    def register(self, name, obj, *, read_only=False):
         self._objects[name] = obj
+        if read_only:
+            self._read_only_groups.add(name)
+        else:
+            self._read_only_groups.discard(name)
+
+    @property
+    def has_active_client(self):
+        return self._active_client_id is not None
 
     def _sync_message(self, state):
         self._revision += 1
@@ -150,15 +159,18 @@ class SyncRegistry:
                 patch[name] = values
         return patch
 
+    def read_state(self, **groups):
+        state = self._read_fields(groups)
+        return self._sync_message(state) if state else None
+
     def push_state(self, **groups):
         """在游戏主线程向活动网页推送指定组和字段的当前值，None 表示整组。"""
         if self._active_client_id is None:
             return
         try:
-            state = self._read_fields(groups)
-            if not state:
+            message = self.read_state(**groups)
+            if message is None:
                 return
-            message = self._sync_message(state)
             message['_clientId'] = self._active_client_id
             _broadcast_execution_result(json.dumps(message))
         except Exception:
@@ -221,16 +233,14 @@ class SyncRegistry:
             groups = {}
             for name, obj in self._objects.items():
                 data = msg.get(name)
-                if isinstance(data, dict):
+                if name not in self._read_only_groups and isinstance(data, dict):
                     for field, value in data.items():
                         if restoring and (name, field) in self._local_fields:
                             continue
                         obj.from_dict({field: value})
                     groups[name] = data
             if return_sync:
-                state = self._read_fields(groups)
-                if state:
-                    return self._sync_message(state)
+                return self.read_state(**groups)
         except Exception:
             _log_apply_error(json_str, name, field, client_id)
             raise

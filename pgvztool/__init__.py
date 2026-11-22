@@ -7,12 +7,14 @@ from pgvz.version import MOD_VERSION, SUPPORTED_GAME_VERSIONS
 from .cheat import cheat_option, weather
 from .cheat_actions import cheat_actions
 from .placer import placer
+from .speed import speed_control
 from .sync import sync_reg
 from .dispatcher import gui_dispatcher
 
 sync_reg.register('cheat', cheat_option)
 sync_reg.register('placer', placer)
 sync_reg.register('weather', weather)
+sync_reg.register('speed', speed_control, read_only=True)
 
 # 正式入口在后台导入，先注册状态，再开放游戏主线程的钩子入口。
 from . import hook

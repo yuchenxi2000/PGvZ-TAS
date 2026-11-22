@@ -19,6 +19,7 @@ from .placer import placer
 from .tas import tas_manager
 from .keybinds import KeybindHandler
 from .dispatcher import gui_dispatcher
+from .speed import speed_control
 from .sync import sync_reg
 from .overlay import (
     DrawPlantHpAll, DrawPlantCooldowns, DrawZombieHpAll, DrawCraterCooldowns,
@@ -136,7 +137,12 @@ def SexyAppBase__DoUpdateFrames(orig, app: Sexy.SexyAppBase):
         except Exception as error:
             Sexy.Debug.Log(Sexy.DebugType.Error, '[pgvztool] cannot hook built-in cheat menu: {}'.format(error))
     gui_dispatcher.run_pending()
-    return orig(app)
+    result = orig(app)
+    if sync_reg.has_active_client:
+        changed = speed_control.changed_fields()
+        if changed:
+            sync_reg.push_state(speed=changed)
+    return result
 
 # 关闭assertion，不然启动带命令行的游戏（Lawn.Console.exe）在输出过多时会卡死
 @LawnMod.MonoModUtils.HookTo(Sexy.Debug.ASSERT)

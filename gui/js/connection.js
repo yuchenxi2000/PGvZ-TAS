@@ -199,13 +199,17 @@ window.PGvZConnection = (() => {
             for (const result of results) {
                 acknowledged.push(result.id);
                 if (!finishRequest(result.id)) continue;
-                if (result.kind === 'action') onActionResult(result);
+                if (result.ok && (result.kind === 'action' || result.kind === 'apply')
+                    && result.value?.action === 'sync') {
+                    receiveSync(result.value);
+                }
+                const errorKey = result.kind === 'action' ? onActionResult(result) : '';
                 if (!result.ok) {
                     if (result.errortype === 'SessionRejected') {
                         showSessionRejected();
                         break;
                     }
-                    setResult(false, '', `${result.errortype}: ${result.error}`);
+                    setResult(false, errorKey || '', `${result.errortype}: ${result.error}`);
                     if (result.kind === 'connect') {
                         stopConnectionAttempt();
                         clearRequests();
@@ -218,9 +222,6 @@ window.PGvZConnection = (() => {
                     lineupCode.value = result.value;
                     setResult(true, 'messages.lineupOk');
                 } else {
-                    if (result.kind === 'apply' && result.value?.action === 'sync') {
-                        receiveSync(result.value);
-                    }
                     setResult(true, 'messages.success');
                 }
             }

@@ -282,10 +282,10 @@
                 <el-tab-pane :label="t('tabs.stage')" name="stage">
                     <el-form :disabled="!connected" @submit.prevent>
                     <section class="panel-grid three">
-                        <check-group-card :title="t('sections.sceneCheats')" :items="switchGroups.scene" :model="cheatOption" :label="optionLabel"></check-group-card>
                         <div class="card-stack">
+                            <check-group-card :title="t('sections.sceneCheats')" :items="switchGroups.scene" :model="cheatOption" :label="optionLabel"></check-group-card>
                             <el-card shadow="never" class="tool-card">
-                                <template #header>{{ t('sections.stageControl') }}</template>
+                                <template #header>{{ t('sections.weatherControl') }}</template>
                                 <div class="form-stack">
                                     <div class="radio-control">
                                         <span>{{ t('fields.weather') }}</span>
@@ -293,42 +293,66 @@
                                             <el-radio-button v-for="item in weatherOptions" :key="item.value" :value="item.value">{{ item.label }}</el-radio-button>
                                         </el-radio-group>
                                     </div>
-                                    <div class="radio-control">
-                                        <span>{{ t('fields.speed') }}</span>
-                                        <el-radio-group v-model="speed" @change="value => sendAction('setSpeed', { value })">
-                                            <el-radio-button v-for="item in speedOptions" :key="item" :value="item">{{ item }}</el-radio-button>
-                                        </el-radio-group>
+                                </div>
+                            </el-card>
+                        </div>
+                        <el-card shadow="never" class="tool-card">
+                            <template #header>{{ t('sections.speedControl') }}</template>
+                            <div v-for="control in speedControls" :key="control.scope" class="speed-control">
+                                <div class="speed-heading">
+                                    <h3>{{ t(`speed.${control.scope}.title`) }}</h3>
+                                    <output :aria-label="t(`speed.${control.scope}.current`)">{{ currentSpeedLabel(control) }}</output>
+                                </div>
+                                <div class="speed-scope">{{ t(`speed.${control.scope}.scope`) }}</div>
+                                <div class="speed-presets" role="group" :aria-label="t(`speed.${control.scope}.presets`)">
+                                    <el-button v-for="preset in control.presets" :key="preset" size="small"
+                                        :type="speedPresetSelected(control, preset) ? 'primary' : 'default'"
+                                        :aria-pressed="speedPresetSelected(control, preset)"
+                                        :disabled="speedControlDisabled(control)" @click="applySpeed(control, preset)">{{ preset }}×</el-button>
+                                </div>
+                                <div class="speed-input">
+                                    <el-input v-model="control.draft" :disabled="speedControlDisabled(control)"
+                                        :aria-label="t(`speed.${control.scope}.custom`)" :placeholder="t(`speed.${control.scope}.placeholder`)"
+                                        @input="control.errorKey = ''" @keydown.enter.prevent="applySpeed(control)"></el-input>
+                                    <el-button :disabled="speedControlDisabled(control) || !control.draft.trim()"
+                                        type="primary" plain @click="applySpeed(control)">{{ t('actions.apply') }}</el-button>
+                                </div>
+                                <div v-if="control.pending" class="speed-scope" role="status">{{ t('speed.pending') }}</div>
+                                <div v-if="control.errorKey" class="speed-error" role="alert">{{ t(control.errorKey) }}</div>
+                            </div>
+                            <div v-if="combinedSpeed" class="speed-heading speed-total">
+                                <span>{{ t('speed.combined') }}</span><output>{{ combinedSpeed }}</output>
+                            </div>
+                        </el-card>
+                        <div class="card-stack">
+                            <el-card shadow="never" class="tool-card">
+                                <template #header>{{ t('sections.level') }}</template>
+                                <div class="form-stack">
+                                    <label class="field">
+                                        <span>{{ t('fields.level') }}</span>
+                                        <el-select v-model="selectedLevel" filterable :placeholder="t('placeholders.level')">
+                                            <el-option v-for="item in gameModes" :key="item.value" :label="dataLabel(item)" :value="item.value" />
+                                        </el-select>
+                                    </label>
+                                    <div class="button-grid two">
+                                        <el-button type="primary" @click="sendAction('enterLevel', { mode: selectedLevel })">{{ t('actions.enterLevel') }}</el-button>
+                                        <el-button @click="sendAction('setGameMode', { mode: selectedLevel })">{{ t('actions.chaosLevel') }}</el-button>
                                     </div>
+                                    <div class="resource-row">
+                                        <div class="resource-value">
+                                            <el-input-number v-model="numSurvivalStage" :min="0" :max="2147483647" size="small"></el-input-number>
+                                        </div>
+                                        <div class="resource-action">
+                                            <el-button type="success" @click="sendAction('setSurvivalStage', { value: numSurvivalStage })">{{ t('fields.survivalStage') }}</el-button>
+                                        </div>
+                                    </div>
+                                    <el-button type="primary" @click="sendAction('enterMoonEndless')">{{ t('actions.enterMoonEndless') }}</el-button>
                                 </div>
                             </el-card>
                             <check-group-card :title="t('sections.easterEggs')" :items="switchGroups.easterEggs" :model="cheatOption" :label="optionLabel">
                                 <el-button :aria-label="t('actions.playKonamiSound')" :title="t('actions.playKonamiSound')" @click="sendAction('playKonamiSound')">↑ ↑ ↓ ↓ ← → ← → B A</el-button>
                             </check-group-card>
                         </div>
-                        <el-card shadow="never" class="tool-card">
-                            <template #header>{{ t('sections.level') }}</template>
-                            <div class="form-stack">
-                                <label class="field">
-                                    <span>{{ t('fields.level') }}</span>
-                                    <el-select v-model="selectedLevel" filterable :placeholder="t('placeholders.level')">
-                                        <el-option v-for="item in gameModes" :key="item.value" :label="dataLabel(item)" :value="item.value" />
-                                    </el-select>
-                                </label>
-                                <div class="button-grid two">
-                                    <el-button type="primary" @click="sendAction('enterLevel', { mode: selectedLevel })">{{ t('actions.enterLevel') }}</el-button>
-                                    <el-button @click="sendAction('setGameMode', { mode: selectedLevel })">{{ t('actions.chaosLevel') }}</el-button>
-                                </div>
-                                <div class="resource-row">
-                                    <div class="resource-value">
-                                        <el-input-number v-model="numSurvivalStage" :min="0" :max="2147483647" size="small"></el-input-number>
-                                    </div>
-                                    <div class="resource-action">
-                                        <el-button type="success" @click="sendAction('setSurvivalStage', { value: numSurvivalStage })">{{ t('fields.survivalStage') }}</el-button>
-                                    </div>
-                                </div>
-                                <el-button type="primary" @click="sendAction('enterMoonEndless')">{{ t('actions.enterMoonEndless') }}</el-button>
-                            </div>
-                        </el-card>
                     </section>
                     </el-form>
                 </el-tab-pane>
