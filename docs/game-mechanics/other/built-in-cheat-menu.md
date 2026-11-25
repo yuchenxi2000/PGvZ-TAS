@@ -40,6 +40,8 @@ PGvZ-TAS 的同名选项 `CheatOption.noCooldown` 直接读写 `mEasyPlantingChe
 
 `ChangeGameSpeed()` 写入全局的 `gFastMo`、`gSlowMo` 和 `gFastSlowMoNum`，并更新面板文字。[`LawnApp.UpdateFrames()` 的速度控制](speed-control.md)会在慢速档按计数器跳过部分应用更新。
 
+原生速度标签在面板构造和 `ChangeGameSpeed()` 中使用 `GetGameSpeedString()` 生成文字。原生 `Update()` 不刷新这个标签。
+
 | 按钮 | 实现 |
 | --- | --- |
 | `0.25x` | 打开 `gSlowMo`，分频值设为 4，每 4 次外层更新执行 1 次应用更新。 |

@@ -385,6 +385,10 @@ pre {
     margin-bottom: 12px;
 }
 
+.debug-port {
+    max-width: 14rem;
+}
+
 .el-select,
 .el-input-number {
     width: 100%;

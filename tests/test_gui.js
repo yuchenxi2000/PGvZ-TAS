@@ -8,11 +8,9 @@ const { test } = require('node:test');
 const root = path.resolve(__dirname, '..');
 const storageKey = 'pgvz-gui-checkbox-state';
 const html = fs.readFileSync(path.join(root, 'gui/index.html'), 'utf8');
-const gameVersionProbe = { action: 'gameVersion', version: '1.3.4', modVersion: '1.16.0', supportedVersions: ['1.3.3', '1.3.4'] };
-
-function reprString(value) {
-    return "'" + value.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n') + "'";
-}
+const readyStatus = {
+    ready: true, instance: 'instance-1', version: '1.3.4', modVersion: '1.16.0', supportedVersions: ['1.3.3', '1.3.4'],
+};
 
 function terrainSnapshot() {
     return {
@@ -33,19 +31,19 @@ function terrainPointerTarget() {
 
 test('terrain edits stay local, fill reverse rectangles and rows, and submit only on apply', () => {
     const gui = loadGui();
-    const ws = gui.bootstrap();
-    const sentBeforeOpening = ws.sent.length;
+    const http = gui.bootstrap();
+    const sentBeforeOpening = http.sent.length;
     gui.model.activeTab.value = 'terrain';
     gui.flush();
-    assert.equal(ws.sent.length, sentBeforeOpening);
+    assert.equal(http.sent.length, sentBeforeOpening);
     assert.deepEqual(JSON.parse(JSON.stringify(gui.model.terrainDraft.value)), terrainSnapshot());
     gui.model.loadTerrain();
-    const read = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    const read = http.sent.at(-1);
     assert.equal(read.name, 'getTerrain');
     const original = terrainSnapshot();
-    ws.message({ action: 'results', results: [{ ...read, ok: true, value: original }] });
+    http.message({ action: 'results', results: [{ ...read, ok: true, value: original }] });
     assert.equal(gui.model.terrainLoading.value, false);
-    const sentBeforePainting = ws.sent.length;
+    const sentBeforePainting = http.sent.length;
     const target = terrainPointerTarget();
     const event = (x, y) => ({ currentTarget: target, clientX: x, clientY: y, button: 0, pointerId: 7, preventDefault() {} });
     gui.model.terrainBrush.value = 'Pool';
@@ -66,12 +64,12 @@ test('terrain edits stay local, fill reverse rectangles and rows, and submit onl
     assert.deepEqual(Array.from(gui.model.terrainDraft.value.rows), ['Normal', 'Dirt', 'Dirt', 'Dirt', 'Dirt', 'Dirt']);
     gui.model.terrainDraft.value.background = 'Num6Boss';
     assert.equal(gui.model.terrainDirty.value, true);
-    assert.equal(ws.sent.length, sentBeforePainting);
+    assert.equal(http.sent.length, sentBeforePainting);
     gui.model.applyTerrain();
-    const apply = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    const apply = http.sent.at(-1);
     assert.equal(apply.name, 'applyTerrain');
     assert.deepEqual(apply.args, JSON.parse(JSON.stringify(gui.model.terrainDraft.value)));
-    ws.message({ action: 'results', results: [{ ...apply, ok: true, value: apply.args }] });
+    http.message({ action: 'results', results: [{ ...apply, ok: true, value: apply.args }] });
     assert.equal(gui.model.terrainDirty.value, false);
     assert.equal(gui.model.terrainApplying.value, false);
     assert.equal(JSON.parse(gui.storage.get(storageKey)).terrain, undefined);
@@ -79,10 +77,10 @@ test('terrain edits stay local, fill reverse rectangles and rows, and submit onl
 
 test('terrain cancels selections, supports keyboard painting, and discards drafts on disconnect', () => {
     const gui = loadGui();
-    const ws = gui.bootstrap();
+    const http = gui.bootstrap();
     gui.model.loadTerrain();
-    const read = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    ws.message({ action: 'results', results: [{ ...read, ok: true, value: terrainSnapshot() }] });
+    const read = http.sent.at(-1);
+    http.message({ action: 'results', results: [{ ...read, ok: true, value: terrainSnapshot() }] });
     const target = terrainPointerTarget();
     const event = { currentTarget: target, clientX: 50, clientY: 50, button: 0, pointerId: 1, preventDefault() {} };
     gui.model.terrainBrush.value = 'HighGround';
@@ -92,7 +90,7 @@ test('terrain cancels selections, supports keyboard painting, and discards draft
     gui.model.terrainCellClick({ detail: 0 }, 'grid', 5, 8);
     assert.equal(gui.model.terrainDraft.value.grid[5][8], 'HighGround');
     assert.equal(gui.model.terrainDraft.value.grid[0][0], 'Grass');
-    ws.close();
+    http.fail();
     gui.flush();
     assert.deepEqual(JSON.parse(JSON.stringify(gui.model.terrainDraft.value)), terrainSnapshot());
     assert.equal(gui.model.terrainSelection.value, null);
@@ -101,21 +99,21 @@ test('terrain cancels selections, supports keyboard painting, and discards draft
 
 test('terrain action failures preserve the draft and do not retry or replay edits', () => {
     const gui = loadGui();
-    const ws = gui.bootstrap();
+    const http = gui.bootstrap();
     gui.model.loadTerrain();
-    const read = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    ws.message({ action: 'results', results: [{ ...read, ok: true, value: terrainSnapshot() }] });
+    const read = http.sent.at(-1);
+    http.message({ action: 'results', results: [{ ...read, ok: true, value: terrainSnapshot() }] });
     gui.model.terrainDraft.value.rows[0] = 'Dirt';
     gui.model.applyTerrain();
-    const apply = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    ws.message({ action: 'results', results: [{ ...apply, ok: false, errortype: 'RuntimeError', error: 'load failed' }] });
+    const apply = http.sent.at(-1);
+    http.message({ action: 'results', results: [{ ...apply, ok: false, errortype: 'RuntimeError', error: 'load failed' }] });
     assert.equal(gui.model.terrainBusy.value, false);
     assert.equal(gui.model.terrainDirty.value, true);
     assert.equal(gui.model.terrainDraft.value.rows[0], 'Dirt');
     assert.match(gui.model.resultText.value, /load failed/);
-    const sent = ws.sent.length;
+    const sent = http.sent.length;
     gui.advance(60000);
-    assert.equal(ws.sent.length, sent);
+    assert.equal(http.sent.length, sent);
 });
 
 test('terrain starts with editable defaults before connection and sends no automatic terrain actions', () => {
@@ -129,15 +127,15 @@ test('terrain starts with editable defaults before connection and sends no autom
     assert.equal(draft.grid[0][0], 'Pool');
     assert.equal(draft.grid[1][0], 'Grass');
     assert.equal(gui.model.terrainDirty.value, true);
-    assert.equal(gui.sockets[0].sent.length, 0);
-    const ws = gui.bootstrap();
+    assert.equal(gui.http.sent.length, 0);
+    const http = gui.bootstrap();
     assert.equal(gui.model.terrainDraft.value.background, 'Num6Boss');
-    const beforeOpening = ws.sent.length;
+    const beforeOpening = http.sent.length;
     gui.model.activeTab.value = 'terrain';
     gui.flush();
-    assert.equal(ws.sent.length, beforeOpening);
+    assert.equal(http.sent.length, beforeOpening);
     gui.model.applyTerrain();
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    const request = http.sent.at(-1);
     assert.equal(request.name, 'applyTerrain');
     assert.equal(request.args.background, 'Num6Boss');
     assert.equal(request.args.grid[0][0], 'Pool');
@@ -159,7 +157,7 @@ test('one terrain palette paints cells and row types with Grass mapped to Normal
     assert.equal(gui.model.terrainTypeShort('grid', 'Grass'), gui.model.terrainTypeShort('rows', 'Normal'));
     // Existing None cells remain representable without offering a None brush.
     assert.equal(gui.model.terrainTypeShort('grid', 'None'), '—');
-    assert.equal(gui.sockets[0].sent.length, 0);
+    assert.equal(gui.http.sent.length, 0);
 });
 
 test('terrain rectangles span cells and row types in either direction without sending edits', () => {
@@ -183,7 +181,7 @@ test('terrain rectangles span cells and row types in either direction without se
             }
             assert.equal(gui.model.terrainDraft.value.rows[r], r >= 1 && r <= 4 ? 'Pool' : r === 5 ? 'Dirt' : 'Normal');
         }
-        assert.equal(gui.sockets[0].sent.length, 0);
+        assert.equal(gui.http.sent.length, 0);
     }
 });
 
@@ -207,13 +205,15 @@ test('terrain selection gap does not start a drag or select the other panel earl
     assert.equal(gui.model.terrainDraft.value.grid[1][7], 'Grass');
 });
 
-function loadGui({ mobile = false, saved = {} } = {}) {
+function loadGui({ mobile = false, saved = {}, clientId = 'client-1' } = {}) {
     const sockets = [], errors = [], timers = new Map(), listeners = {}, mounted = [], watchers = [], nextTicks = [];
+    const requests = [];
+    let deferSubmit = false;
     const storage = new Map([[storageKey, JSON.stringify(saved)]]);
     let model, connection, timerId = 0, now = 0;
     const context = {
         URLSearchParams, navigator: { language: 'en', userAgent: mobile ? 'Android' : 'Windows' },
-        location: { search: '' }, crypto: { randomUUID: () => 'client-1' }, document: { documentElement: {} },
+        location: { search: '' }, crypto: { randomUUID: () => clientId }, document: { documentElement: {} },
         localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) },
         ElementPlus: { ElMessage: { error: message => errors.push(message) } },
         addEventListener: (name, handler) => { listeners[name] = handler; },
@@ -231,21 +231,45 @@ function loadGui({ mobile = false, saved = {} } = {}) {
     };
     context.WebSocket = class {
         static OPEN = 1;
-        static CONNECTING = 0;
         constructor(url) { this.url = url; this.readyState = 0; this.sent = []; sockets.push(this); }
         send(code) { this.sent.push(code); }
         open() { this.readyState = 1; this.onopen(); }
-        message(message) { this.onmessage({ data: JSON.stringify({ statuscode: 0, result: reprString(JSON.stringify(message)) }) }); }
+        message(data) { this.onmessage({ data: JSON.stringify(data) }); }
         close() { this.readyState = 3; this.onclose(); }
     };
+    context.recordRequest = (url, options, resolve, reject) => {
+        const request = {
+            url, options, payload: options.body && JSON.parse(options.body), pending: true,
+            respond(body, status = 200) {
+                this.pending = false;
+                resolve(status, body);
+            },
+            fail() {
+                this.pending = false;
+                reject();
+            },
+        };
+        requests.push(request);
+        if (url === '/api/request' && (!deferSubmit || options.keepalive)) {
+            request.respond({ action: 'queued', id: request.payload.id });
+        }
+    };
     context.window = context;
-    vm.createContext(context);
+    vm.createContext(context, { microtaskMode: 'afterEvaluate' });
+    vm.runInContext(`
+        window.fetch = (url, options) => new Promise((resolve, reject) => recordRequest(url, options,
+            (status, body) => resolve({ status, ok: status < 400, json: () => Promise.resolve(body) }),
+            () => reject(new TypeError('Failed to fetch'))));
+    `, context);
     for (const match of html.matchAll(/<script src="\.\/([^\"]+)"/g)) {
         vm.runInContext(fs.readFileSync(path.join(root, 'gui', match[1]), 'utf8'), context, { filename: match[1] });
         if (match[1] === 'js/connection.js') {
             const create = context.PGvZConnection.create;
             context.PGvZConnection.create = options => { connection = create(options); return connection; };
         }
+    }
+    function settle() {
+        vm.runInContext('', context);
     }
     function flush() {
         for (const watcher of watchers) {
@@ -257,6 +281,7 @@ function loadGui({ mobile = false, saved = {} } = {}) {
             }
         }
         nextTicks.splice(0).forEach(fn => fn());
+        settle();
     }
     function runTimer(delay, interval = false) {
         const entry = [...timers].find(([, timer]) => timer.delay === delay && timer.interval === interval);
@@ -265,6 +290,7 @@ function loadGui({ mobile = false, saved = {} } = {}) {
         if (!interval) timers.delete(entry[0]);
         else entry[1].at = now + delay;
         entry[1].fn();
+        settle();
     }
     function advance(milliseconds) {
         const target = now + milliseconds;
@@ -276,140 +302,78 @@ function loadGui({ mobile = false, saved = {} } = {}) {
         }
         now = target;
     }
-    function startInitialization(ws = sockets.at(-1)) {
-        ws.open();
-        ws.message({ action: 'bootstrapReady', ready: true });
-        ws.message(gameVersionProbe);
-        return JSON.parse(decodeCall(ws.sent.at(-1).split('\n').at(-1)).args[0]);
+    function lastRequest(endpoint, pending = false) {
+        settle();
+        const request = requests.findLast(item => item.url === '/api/' + endpoint && (!pending || item.pending));
+        assert.ok(request, `expected an HTTP request to /api/${endpoint}`);
+        return request;
+    }
+    function beginPoll() {
+        const current = requests.findLast(item => item.url === '/api/poll' && item.pending);
+        if (current) return current;
+        const delay = timers.values().next().value?.delay;
+        runTimer(delay);
+        return lastRequest('poll', true);
+    }
+    const http = {
+        get sent() {
+            settle();
+            return requests.filter(item => item.url === '/api/request').map(item => item.payload);
+        },
+        message({ action, results = [], updates = [], ...fields }) {
+            if (action === 'sync') updates = [{ action, ...fields }];
+            beginPoll().respond({ results, updates });
+            settle();
+        },
+        fail() {
+            beginPoll().fail();
+            settle();
+        },
+    };
+    function respondStatus(status = readyStatus) {
+        lastRequest('status', true).respond(status);
+        settle();
+    }
+    function startInitialization() {
+        respondStatus();
+        return http.sent.at(-1);
     }
     function bootstrap(state = {}) {
-        const ws = sockets.at(-1);
-        const request = startInitialization(ws);
-        ws.message({ action: 'queued', id: request.id });
-        runTimer(100);
-        ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
-            action: 'sync', revision: 1, modVersion: '1.15.1', gameVersion: '1.3.4', state,
+        const request = startInitialization();
+        http.message({ action: 'results', results: [{ ...request, ok: true, value: {
+            action: 'sync', revision: 1, state,
         } }] });
         flush();
-        return ws;
+        return http;
     }
-    return { model, connection, context, sockets, errors, timers, storage, listeners, flush,
-        runTimer, advance, startInitialization, bootstrap };
-}
-
-function decodeCall(code) {
-    let call;
-    const capture = name => (...args) => { call = { name, args }; };
-    const context = {
-        gui_dispatcher: { submit: capture('submit'), poll: capture('poll'), acknowledge: capture('acknowledge'), cancel: capture('cancel') },
+    return { model, connection, context, http, requests, sockets, errors, timers, storage, listeners, flush, settle,
+        runTimer, advance, startInitialization, bootstrap, respondStatus, lastRequest, beginPoll,
+        deferSubmissions: value => { deferSubmit = value; },
     };
-    // Fixed protocol calls and their quoted string arguments are valid in both languages.
-    vm.runInNewContext(code, context);
-    return call;
 }
 
 test('business UI only uses action and state APIs', () => {
     const app = fs.readFileSync(path.join(root, 'gui/js/app.js'), 'utf8');
     assert.doesNotMatch(html + app, /Lawn\.|Sexy\.|cheat_option|sync_reg\.|placer\.|pyBool/);
-    assert.equal((app.match(/\bsend\(/g) || []).length, 1); // debug console only
+    assert.equal((app.match(/\bdebug\.send\(/g) || []).length, 1);
     assert.doesNotMatch(html, /\bsend\(/);
-});
-
-test('header versions and exact support-list warning survive an import error', () => {
-    const gui = loadGui();
-    const advice = {
-        mod: { en: 'Please download a newer version of the mod.', zh: '请下载新版修改器。' },
-        game: { en: 'Please update the game.', zh: '请更新游戏。' },
-    };
-    for (const [version, supportedVersions, update] of [
-        ['1.2.6', gameVersionProbe.supportedVersions, 'game'],
-        ['1.3.10', gameVersionProbe.supportedVersions, 'mod'],
-        ['1.4.0', ['1.3.10', '1.3.4'], 'mod'],
-        ['1.3.9', ['1.3.10', '1.3.4'], 'game'],
-        ['1.3.4-beta', gameVersionProbe.supportedVersions, 'game'],
-        ['1.3.4', gameVersionProbe.supportedVersions, null],
-        ['1.3.5', [], null],
-        ['', gameVersionProbe.supportedVersions, null],
-    ]) {
-        const ws = gui.sockets.at(-1);
-        ws.open();
-        ws.message({ action: 'bootstrapReady', ready: true });
-        assert.equal(ws.sent.at(-1), gui.context.PGvZProtocol.GAME_VERSION_PROBE_CODE);
-        ws.message({ ...gameVersionProbe, version, supportedVersions });
-        assert.match(ws.sent.at(-1), /from pgvz import \*/);
-        ws.onmessage({ data: JSON.stringify({ statuscode: 1, errortype: 'ImportError', error: 'missing game API' }) });
-        assert.equal(gui.model.connected.value, false);
-        assert.equal(gui.model.gameVersion.value, version);
-        assert.equal(gui.model.modVersion.value, gameVersionProbe.modVersion);
-        assert.equal(gui.model.unsupportedGameVersion.value, Boolean(update));
-        const versions = supportedVersions.join(', ');
-        gui.model.setLanguage('en');
-        assert.equal(gui.model.unsupportedGameVersionDetail.value,
-            update ? `This mod supports game versions ${versions}. ${advice[update].en}` : '');
-        gui.model.setLanguage('zh');
-        assert.equal(gui.model.unsupportedGameVersionDetail.value,
-            update ? `此修改器支持的游戏版本为 ${versions}。${advice[update].zh}` : '');
-        ws.close();
-        assert.equal(gui.model.modVersion.value, '');
-        assert.equal(gui.model.unsupportedGameVersion.value, false);
-        gui.runTimer(3000);
-    }
-});
-
-test('PC restores its saved options; mobile connects without pushing them', () => {
-    const saved = { cheat: {
-        freePlant: true, autoCollect: false, disableTachieCensor: true, marigoldAlwaysThreeDiamonds: true,
-    }, placer: { imitater: true } };
-    for (const mobile of [false, true]) {
-        const gui = loadGui({ mobile, saved });
-        const ws = gui.sockets[0];
-        ws.open();
-        ws.message({ action: 'bootstrapReady', ready: false });
-        gui.runTimer(100);
-        ws.message({ action: 'bootstrapReady', ready: true });
-        ws.message(gameVersionProbe);
-        const call = decodeCall(ws.sent.at(-1).split('\n').at(-1));
-        assert.equal(call.name, 'submit');
-        const request = JSON.parse(call.args[0]);
-        assert.equal(request.kind, 'connect');
-        assert.equal(request._clientId, 'client-1');
-        assert.equal('state' in request, !mobile);
-        if (!mobile) {
-            assert.equal(request.state.cheat.freePlant, true);
-            assert.equal(request.state.cheat.disableTachieCensor, true);
-            assert.equal(request.state.cheat.marigoldAlwaysThreeDiamonds, true);
-            assert.equal(request.state.placer.scaryPotType, 'Seed');
-            assert.equal(request.state.placer.scaryPotAppearance, 'ScaryPotQuestion');
-        }
-        assert.equal(gui.model.connected.value, false);
-        ws.message({ action: 'queued', id: request.id });
-        gui.runTimer(100);
-        assert.equal(decodeCall(ws.sent.at(-1)).name, 'poll');
-        ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
-            action: 'sync', revision: 1, gameVersion: '1.3.0', modVersion: '1.15.1', state: {},
-        } }] });
-        assert.equal(gui.model.connected.value, true);
-        assert.equal(gui.model.gameVersion.value, gameVersionProbe.version);
-        assert.equal(gui.model.modVersion.value, gameVersionProbe.modVersion);
-        assert.equal(gui.model.cheatOption.freePlant, !mobile);
-    }
 });
 
 test('state updates do not interpolate enum members or Python booleans', () => {
     const gui = loadGui();
-    const ws = gui.bootstrap();
+    const http = gui.bootstrap();
     gui.model.setPlacerOption('seedType', 'Sunflower');
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    const request = http.sent.at(-1);
     assert.equal(request.kind, 'apply');
     assert.deepEqual(request.state, { placer: { seedType: 'Sunflower' } });
     gui.model.cheatOption.freePlant = true;
     gui.flush();
-    assert.equal(JSON.parse(decodeCall(ws.sent.at(-1)).args[0]).state.cheat.freePlant, true);
+    assert.equal(http.sent.at(-1).state.cheat.freePlant, true);
 });
 
 test('sun limit toggle persists, synchronizes, and controls the sun input range', () => {
     const gui = loadGui();
-    const ws = gui.bootstrap();
+    const http = gui.bootstrap();
     const tag = [...html.matchAll(/<el-input-number\b(?:"[^"]*"|[^">])*>/g)]
         .map(match => match[0]).find(tag => tag.includes('v-model="sunValue"'));
     const maxExpression = tag.match(/:max="([^"]+)"/)[1];
@@ -418,7 +382,7 @@ test('sun limit toggle persists, synchronizes, and controls the sun input range'
     gui.model.cheatOption.noSunLimit = true;
     gui.flush();
     assert.equal(maxSun(), 2147483647);
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    const request = http.sent.at(-1);
     assert.deepEqual(request.state, { cheat: { noSunLimit: true } });
     assert.equal(JSON.parse(gui.storage.get(storageKey)).cheat.noSunLimit, true);
 
@@ -443,7 +407,7 @@ test('sun limit toggle persists, synchronizes, and controls the sun input range'
 
 test('aquarium brain limit toggle is bilingual, persists, and synchronizes', () => {
     const gui = loadGui();
-    const ws = gui.bootstrap();
+    const http = gui.bootstrap();
     const key = 'zombiquariumNoBrainLimit';
     assert.equal(gui.model.cheatOption[key], false);
     assert.ok(gui.model.switchGroups.features.includes(key));
@@ -452,23 +416,23 @@ test('aquarium brain limit toggle is bilingual, persists, and synchronizes', () 
     assert.equal(gui.model.optionLabel(key), '水族馆脑子无上限');
     gui.model.cheatOption[key] = true;
     gui.flush();
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    const request = http.sent.at(-1);
     assert.deepEqual(request.state, { cheat: { [key]: true } });
     const saved = JSON.parse(gui.storage.get(storageKey));
     assert.equal(saved.cheat[key], true);
     assert.equal(loadGui({ saved }).model.cheatOption[key], true);
 
     const mobile = loadGui({ mobile: true });
-    const mobileWs = mobile.bootstrap({ cheat: { [key]: true } });
+    const mobileHttp = mobile.bootstrap({ cheat: { [key]: true } });
     assert.equal(mobile.model.cheatOption[key], true);
-    const count = mobileWs.sent.length;
+    const count = mobileHttp.sent.length;
     mobile.flush();
-    assert.equal(mobileWs.sent.length, count);
+    assert.equal(mobileHttp.sent.length, count);
 });
 
 test('stage easter eggs use bilingual native-mode settings and one sound action', () => {
     const gui = loadGui();
-    const ws = gui.bootstrap();
+    const http = gui.bootstrap();
     const options = {
         daisyMode: ['Daisies', '雏菊'],
         danceMode: ['Dancing', '跳舞'],
@@ -490,7 +454,7 @@ test('stage easter eggs use bilingual native-mode settings and one sound action'
         assert.equal(gui.model.optionLabel(key), chinese);
         gui.model.cheatOption[key] = true;
         gui.flush();
-        const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+        const request = http.sent.at(-1);
         assert.deepEqual(request.state, { cheat: { [key]: true } });
     }
     const saved = JSON.parse(gui.storage.get(storageKey));
@@ -504,83 +468,19 @@ test('stage easter eggs use bilingual native-mode settings and one sound action'
     assert.match(columns[2], /sections\.level[\s\S]+switchGroups\.easterEggs[\s\S]+<\/check-group-card>\s*<\/div>\s*<\/section>/);
     const sound = stage.match(/@click="([^"]+)"[^>]*>↑ ↑ ↓ ↓ ← → ← → B A/)[1];
     vm.runInNewContext(sound, { sendAction: gui.model.sendAction });
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    const request = http.sent.at(-1);
     assert.equal(request.kind, 'action');
     assert.equal(request.name, 'playKonamiSound');
     assert.deepEqual(request.args, {});
 });
 
-test('sync merges startup pushes and orders each field across snapshots, pushes and apply results', () => {
-    const gui = loadGui();
-    const ws = gui.sockets[0];
-    const connect = gui.startInitialization(ws);
-    const sync = (revision, state) => ({ action: 'sync', revision, state });
-    const sendOutput = (msg, name = 'stdout') => ws.onmessage({
-        data: JSON.stringify({ eventtype: 'output', name, msg, timestamp: 123 }),
-    });
-    const push = (revision, state, clientId = 'client-1') => ws.onmessage({
-        data: JSON.stringify({ eventtype: 'execution', statuscode: 0, errortype: null, timestamp: 123,
-            result: reprString(JSON.stringify({ ...sync(revision, state), _clientId: clientId })) }),
-    });
-
-    sendOutput('ordinary game log\n');
-    assert.equal(gui.model.connectionState.value, 'initializing');
-    push(2, { cheat: { daisyMode: true }, weather: { rain: true } });
-    push(3, { placer: { imitater: true } });
-    assert.equal(gui.model.cheatOption.daisyMode, false);
-    assert.equal(gui.model.isImitater.value, false);
-    ws.message({ action: 'results', results: [{ ...connect, ok: true,
-        value: sync(1, { cheat: { daisyMode: false, freePlant: true }, placer: { imitater: false },
-            weather: { enabled: true, rain: false, storm: false } }) }] });
-    gui.flush();
-    assert.equal(gui.model.cheatOption.daisyMode, true);
-    assert.equal(gui.model.cheatOption.freePlant, true);
-    assert.equal(gui.model.isImitater.value, true);
-    assert.equal(gui.model.weather.value, 'rain');
-
-    const sent = ws.sent.length;
-    push(9, { cheat: { daisyMode: false } }, 'other-page');
-    sendOutput(JSON.stringify({ ...sync(9, { cheat: { daisyMode: false } }), _clientId: 'client-1' }));
-    push(1, { cheat: { daisyMode: false } });
-    push(5, { weather: { storm: true } });
-    push(4, { cheat: { freePlant: false } });
-    gui.flush();
-    assert.equal(gui.model.cheatOption.daisyMode, true);
-    assert.equal(gui.model.cheatOption.freePlant, false);
-    assert.equal(gui.model.weather.value, 'rainStorm');
-    assert.equal(ws.sent.length, sent);
-    assert.equal(JSON.parse(gui.storage.get(storageKey)).cheat.daisyMode, true);
-
-    gui.model.cheatOption.danceMode = true;
-    gui.flush();
-    const apply = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    push(7, { cheat: { danceMode: false, futureMode: true } });
-    ws.message({ action: 'results', results: [{ ...apply, ok: true,
-        value: sync(6, { cheat: { danceMode: true } }) }] });
-    gui.flush();
-    assert.equal(gui.model.cheatOption.danceMode, false);
-    assert.equal(gui.model.cheatOption.futureMode, true);
-    assert.equal(gui.model.cheatOption.freePlant, false);
-    assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
-
-    gui.model.cheatOption.danceMode = true;
-    gui.flush();
-    const laterApply = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    ws.message({ action: 'results', results: [{ ...laterApply, ok: true,
-        value: sync(8, { cheat: { danceMode: true } }) }] });
-    push(7, { cheat: { danceMode: false } });
-    gui.flush();
-    assert.equal(gui.model.cheatOption.danceMode, true);
-    assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
-});
-
 test('remote synchronization updates UI without echoing its changes', () => {
     const gui = loadGui({ mobile: true });
-    const ws = gui.bootstrap();
+    const http = gui.bootstrap();
     gui.connection.refreshState();
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    const count = ws.sent.length;
-    ws.message({ action: 'results', results: [{ ...request, ok: true, value: { action: 'sync', revision: 2, state: {
+    const request = http.sent.at(-1);
+    const count = http.sent.length;
+    http.message({ action: 'results', results: [{ ...request, ok: true, value: { action: 'sync', revision: 2, state: {
         cheat: {
             freePlant: true, noSunLimit: true, disableTachieCensor: true, marigoldAlwaysThreeDiamonds: true,
         }, placer: {
@@ -598,21 +498,19 @@ test('remote synchronization updates UI without echoing its changes', () => {
     assert.equal(gui.model.selectedScaryPotType.value, 'Sun3');
     assert.equal(gui.model.selectedScaryPotAppearance.value, 'ScaryPotZombie');
     assert.equal(gui.model.weather.value, 'rain');
-    assert.equal(ws.sent.length, count + 1);
-    assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
+    assert.equal(http.sent.length, count);
 
     gui.model.sunValue.value = 20000;
     gui.connection.refreshState();
-    const disable = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    const beforeDisable = ws.sent.length;
-    ws.message({ action: 'results', results: [{ ...disable, ok: true, value: {
+    const disable = http.sent.at(-1);
+    const beforeDisable = http.sent.length;
+    http.message({ action: 'results', results: [{ ...disable, ok: true, value: {
         action: 'sync', revision: 3, state: { cheat: { noSunLimit: false } },
     } }] });
     gui.flush();
     assert.equal(gui.model.cheatOption.noSunLimit, false);
     assert.equal(gui.model.sunValue.value, 9990);
-    assert.equal(ws.sent.length, beforeDisable + 1);
-    assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
+    assert.equal(http.sent.length, beforeDisable);
 });
 
 test('speed controls display actual custom ratios and preserve drafts during external updates', () => {
@@ -620,7 +518,7 @@ test('speed controls display actual custom ratios and preserve drafts during ext
     const model = gui.model;
     const [global, board] = model.speedControls;
     assert.equal(model.currentSpeedLabel(global), '—');
-    const ws = gui.bootstrap({ speed: {
+    const http = gui.bootstrap({ speed: {
         global: { numerator: 1, denominator: 4 }, board: { id: 1, numerator: 3, denominator: 2 },
     } });
     assert.equal(model.currentSpeedLabel(global), '1/4×');
@@ -629,23 +527,23 @@ test('speed controls display actual custom ratios and preserve drafts during ext
     assert.ok(global.presets.every(preset => !model.speedPresetSelected(global, preset)));
 
     global.draft = '1/3';
-    const sent = ws.sent.length;
-    ws.message({ action: 'sync', _clientId: 'client-1', revision: 2,
+    const sent = http.sent.length;
+    http.message({ action: 'sync', _clientId: 'client-1', revision: 2,
         state: { speed: { global: { numerator: 2, denominator: 1 } } } });
     gui.flush();
     assert.equal(model.currentSpeedLabel(global), '2×');
     assert.equal(model.speedPresetSelected(global, '2'), true);
     assert.equal(global.draft, '1/3');
-    assert.equal(ws.sent.length, sent);
+    assert.equal(http.sent.length, sent);
 
     model.applySpeed(global);
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    const request = http.sent.at(-1);
     assert.equal(request.name, 'setGlobalSpeed');
     assert.deepEqual(request.args, { value: '1/3' });
     assert.equal(model.currentSpeedLabel(global), '2×');
     assert.equal(model.speedControlDisabled(global), true);
     assert.equal(model.speedControlDisabled(board), false);
-    ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
+    http.message({ action: 'results', results: [{ ...request, ok: true, value: {
         action: 'sync', revision: 3, state: { speed: { global: { numerator: 1, denominator: 3 } } },
     } }] });
     gui.flush();
@@ -660,22 +558,22 @@ test('level speed handles newer board pushes, failed edits and missing boards', 
     const model = gui.model;
     const [global, board] = model.speedControls;
     model.setLanguage('zh');
-    const ws = gui.bootstrap({ speed: { global: { numerator: 1, denominator: 1 }, board: null } });
+    const http = gui.bootstrap({ speed: { global: { numerator: 1, denominator: 1 }, board: null } });
     assert.equal(model.currentSpeedLabel(board), '未进入关卡');
     assert.equal(model.speedControlDisabled(board), true);
     assert.equal(model.speedControlDisabled(global), false);
 
-    const pushBoard = (revision, value) => ws.message({
+    const pushBoard = (revision, value) => http.message({
         action: 'sync', _clientId: 'client-1', revision, state: { speed: { board: value } },
     });
     pushBoard(2, { id: 1, numerator: 1, denominator: 1 });
     board.draft = '2/3';
     model.applySpeed(board);
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    const request = http.sent.at(-1);
     assert.equal(request.name, 'setBoardSpeed');
     assert.deepEqual(request.args, { value: '2/3', boardId: 1 });
     pushBoard(4, { id: 2, numerator: 1, denominator: 1 });
-    ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
+    http.message({ action: 'results', results: [{ ...request, ok: true, value: {
         action: 'sync', revision: 3, state: { speed: { board: { id: 1, numerator: 2, denominator: 3 } } },
     } }] });
     assert.equal(model.currentSpeedLabel(board), '1×');
@@ -683,8 +581,8 @@ test('level speed handles newer board pushes, failed edits and missing boards', 
 
     board.draft = '2/0';
     model.applySpeed(board);
-    const invalid = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    ws.message({ action: 'results', results: [{ ...invalid, ok: false, errortype: 'InvalidSpeed', error: 'invalid' }] });
+    const invalid = http.sent.at(-1);
+    http.message({ action: 'results', results: [{ ...invalid, ok: false, errortype: 'InvalidSpeed', error: 'invalid' }] });
     assert.equal(board.draft, '2/0');
     assert.equal(board.errorKey, 'speed.board.invalid');
     model.setLanguage('en');
@@ -698,7 +596,7 @@ test('level speed handles newer board pushes, failed edits and missing boards', 
 
 test('vase selectors send their options to the easy placer', () => {
     const gui = loadGui();
-    const ws = gui.bootstrap();
+    const http = gui.bootstrap();
     for (const [model, field, value] of [
         ['selectedScaryPotType', 'scaryPotType', 'Sun2'],
         ['selectedScaryPotAppearance', 'scaryPotAppearance', 'ScaryPotLeaf'],
@@ -709,7 +607,7 @@ test('vase selectors send their options to the easy placer', () => {
         vm.runInNewContext(`(${handler})(value)`, {
             setPlacerOption: gui.model.setPlacerOption, value,
         });
-        const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+        const request = http.sent.at(-1);
         assert.equal(request.kind, 'apply');
         assert.deepEqual(request.state, { placer: { [field]: value } });
     }
@@ -717,463 +615,336 @@ test('vase selectors send their options to the easy placer', () => {
 
 test('easy-place zoom mode has bilingual labels and uses existing state synchronization', () => {
     const gui = loadGui();
-    const ws = gui.bootstrap();
+    const http = gui.bootstrap();
     const zoom = gui.model.easyPlaceModeList.find(item => item.value === 'zoom');
     assert.equal(zoom.label, '放大模式');
     assert.equal(zoom.en, 'Zoom Mode');
     gui.model.setPlacerOption('easyPlaceMode', zoom.value);
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    const request = http.sent.at(-1);
     assert.equal(request.kind, 'apply');
     assert.deepEqual(request.state, { placer: { easyPlaceMode: 'zoom' } });
     gui.connection.refreshState();
-    const snapshot = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    ws.message({ action: 'results', results: [{ ...snapshot, ok: true, value: {
+    const snapshot = http.sent.at(-1);
+    http.message({ action: 'results', results: [{ ...snapshot, ok: true, value: {
         action: 'sync', revision: 2, state: { placer: { easyPlaceMode: 'zoom', active: false } },
     } }] });
     gui.flush();
     assert.equal(gui.model.easyPlaceMode.value, 'zoom');
 });
 
-test('actions wait for actual completion and poll only while results are pending', () => {
-    const gui = loadGui();
-    const ws = gui.bootstrap();
-    gui.model.getLineupCode();
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    assert.equal(request.name, 'getLineup');
-    ws.message({ action: 'queued', id: request.id });
-    assert.equal(gui.model.lastResult.key, 'messages.sent');
-    gui.runTimer(100);
-    assert.equal(decodeCall(ws.sent.at(-1)).name, 'poll');
-    ws.message({ action: 'results', results: [] });
-    gui.runTimer(100);
-    ws.message({ action: 'results', results: [{ id: request.id, kind: 'action', name: 'getLineup', ok: true, value: 'base64-data' }] });
-    assert.equal(gui.model.lineupCode.value, 'base64-data');
-    assert.equal(gui.model.lastResult.key, 'messages.lineupOk');
-    assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
-});
-
-test('action errors are shown and stop polling the failed request', () => {
-    const gui = loadGui();
-    const ws = gui.bootstrap();
-    gui.model.sendAction('setSun', { value: 123 });
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    ws.message({ action: 'queued', id: request.id });
-    gui.runTimer(100);
-    ws.message({ action: 'results', results: [{ id: request.id, name: request.name, ok: false, errortype: 'RuntimeError', error: "can't access Board at C:\\test\n请进入关卡" }] });
-    assert.equal(gui.model.lastResult.ok, false);
-    assert.match(gui.model.lastResult.text, /can't access Board/);
-    assert.match(gui.model.lastResult.text, /请进入关卡/);
-    assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
-});
-
-test('concurrent actions share one result poll in flight', () => {
-    const gui = loadGui();
-    const ws = gui.bootstrap();
-    gui.model.sendAction('winLevel');
-    const first = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    ws.message({ action: 'queued', id: first.id });
-    gui.runTimer(100);
-    gui.model.sendAction('nextStage');
-    const second = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    ws.message({ action: 'queued', id: second.id });
-    assert.equal([...gui.timers.values()].filter(timer => timer.delay === 100).length, 0);
-    assert.equal(gui.timers.size, 0); // 等前一次 poll 响应，不启动第二个轮询或超时。
-    ws.message({ action: 'results', results: [{ ...first, ok: true, value: null }] });
-    gui.runTimer(100);
-    ws.message({ action: 'results', results: [{ ...second, ok: true, value: null }] });
-    assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
-});
-
 test('quoted strings and line breaks remain action data', () => {
     const gui = loadGui();
-    const ws = gui.bootstrap();
+    const http = gui.bootstrap();
     const code = "');globalThis.injected=true;#\\quoted\n\t中文";
     gui.model.lineupCode.value = code;
     gui.model.sendLineupCode();
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+    const request = http.sent.at(-1);
     assert.equal(request.name, 'applyLineup');
     assert.equal(request.args.code, code.trim());
     assert.equal(gui.context.injected, undefined);
 });
 
-test('disconnect cancels action polling and reconnect does not replay old actions', () => {
-    const gui = loadGui();
-    const ws = gui.bootstrap();
-    gui.model.sendAction('winLevel');
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    ws.message({ action: 'queued', id: request.id });
-    ws.close();
-    assert.equal([...gui.timers.values()].some(timer => timer.delay === 100), false);
-    gui.runTimer(3000);
-    const reconnect = gui.bootstrap();
-    const requests = reconnect.sent.filter(code => code.includes('gui_dispatcher.submit'))
-        .map(code => JSON.parse(decodeCall(code.split('\n').at(-1)).args[0]));
-    assert.equal(requests.some(request => request.kind === 'action'), false);
-});
+const sync = (revision, state) => ({ action: 'sync', revision, state });
+const completed = (request, value = null) => ({ ...request, ok: true, value });
 
-test('rejected sessions cannot submit actions; raw debug execution remains available', () => {
-    const gui = loadGui();
-    const ws = gui.bootstrap();
-    gui.model.sendAction('winLevel');
-    const action = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    ws.message({ action: 'results', results: [{ ...action, ok: false,
-        errortype: 'SessionRejected', error: 'session taken over' }] });
-    const count = ws.sent.length;
-    gui.model.sendAction('winLevel');
-    assert.equal(ws.sent.length, count);
-    gui.model.customCode.value = 'print(123)';
-    gui.model.sendCustomCode();
-    assert.equal(ws.sent.at(-1), 'print(123)');
-    ws.close();
-    assert.equal(gui.timers.size, 0);
-});
-
-test('failed initial synchronization clears queued commands and stops polling', () => {
-    const gui = loadGui();
-    const ws = gui.sockets[0];
-    ws.open();
-    gui.model.sendAction('winLevel');
-    ws.message({ action: 'bootstrapReady', ready: true });
-    ws.message(gameVersionProbe);
-    const connect = JSON.parse(decodeCall(ws.sent.at(-1).split('\n').at(-1)).args[0]);
-    ws.message({ action: 'queued', id: connect.id });
-    gui.runTimer(100);
-    ws.message({ action: 'results', results: [{ ...connect, ok: false, errortype: 'ValueError', error: 'bad initial option' }] });
-    assert.equal(gui.model.connected.value, false);
-    assert.equal(gui.model.lastResult.ok, false);
-    assert.equal(gui.timers.size, 0);
-    assert.equal(ws.sent.some(code => code.includes('winLevel')), false);
-});
-
-test('bootstrap import errors show the 1.4.3 result field and stop calls to the unavailable dispatcher', () => {
-    const gui = loadGui();
-    const ws = gui.sockets[0];
-    ws.open();
-    gui.model.sendAction('winLevel');
-    ws.message({ action: 'bootstrapReady', ready: true });
-    ws.message(gameVersionProbe);
-    assert.match(ws.sent.at(-1), /except Exception:\n    import traceback\n    raise RuntimeError\(traceback.format_exc\(\)\)/);
-    const traceback = "Traceback (most recent call last):\n  File 'mods/pgvztool/hook.py', line 60\nNameError: name 'missing_name' is not defined";
-    ws.onmessage({ data: JSON.stringify({ statuscode: 1, errortype: 'RuntimeError', result: traceback }) });
-    assert.equal(gui.model.lastResult.text, `RuntimeError: ${traceback}`);
-    assert.equal(gui.model.connected.value, false);
-    assert.equal(gui.connection.connectionState.value, 'error');
-    assert.equal(gui.model.gameVersion.value, gameVersionProbe.version);
-    assert.equal(gui.timers.size, 0);
-    assert.equal(ws.sent.some(code => /gui_dispatcher\.(poll|cancel)\(/.test(code)), false);
-    assert.equal(ws.sent.some(code => code.includes('winLevel')), false);
-    ws.onmessage({ data: JSON.stringify({ statuscode: 1,
-        errortype: 'IronPython.Runtime.UnboundNameException', result: "name 'gui_dispatcher' is not defined",
-    }) });
-    assert.equal(gui.model.lastResult.text, `RuntimeError: ${traceback}`);
-    gui.model.customCode.value = '1 / 0';
-    gui.model.sendCustomCode();
-    ws.onmessage({ data: JSON.stringify({ statuscode: 1, errortype: 'ZeroDivisionError', result: 'division by zero' }) });
-    assert.equal(gui.model.lastResult.text, 'ZeroDivisionError: division by zero');
-});
-
-test('idle pages send no traffic; release uses the request API without changing the banner', () => {
-    const gui = loadGui();
-    const ws = gui.bootstrap();
-    const banner = JSON.stringify(gui.model.lastResult);
-    const sent = ws.sent.length;
-    gui.advance(300000);
-    assert.equal(ws.sent.length, sent);
-    assert.equal(gui.timers.size, 0);
-    assert.equal(JSON.stringify(gui.model.lastResult), banner);
-    gui.listeners.beforeunload();
-    const release = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    assert.equal(release.kind, 'release');
-    ws.message({ action: 'queued', id: release.id });
-    assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
-});
-
-test('missing queue acknowledgement still polls; delayed results and lost acknowledgements do not replay actions', () => {
-    const gui = loadGui();
-    const ws = gui.bootstrap();
-    gui.model.sendAction('winLevel');
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    gui.runTimer(100); // queued acknowledgement was lost
-    assert.equal(decodeCall(ws.sent.at(-1)).name, 'poll');
-    const sent = ws.sent.length;
-    gui.advance(300000); // poll response is delayed while the game is in the background
-    assert.equal(ws.sent.length, sent);
-    assert.equal(decodeCall(ws.sent.at(-1)).name, 'poll');
-    assert.equal(ws.sent.filter(code => code.includes('winLevel')).length, 1);
-    const result = { ...request, ok: true, value: null };
-    ws.message({ action: 'results', results: [result] });
-    assert.equal(gui.model.lastResult.key, 'messages.success');
-    assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
-    gui.model.lastResult.key = 'later-banner';
-    ws.message({ action: 'results', results: [result] }); // ack was lost
-    assert.equal(gui.model.lastResult.key, 'later-banner');
-    assert.equal(decodeCall(ws.sent.at(-1)).name, 'acknowledge');
-    assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
-});
-
-test('actions survive a long background pause and complete once the game resumes', () => {
+test('HTTP startup waits for readiness and preserves PC restore and mobile pull', () => {
     for (const mobile of [false, true]) {
-        const gui = loadGui({ mobile });
-        const ws = gui.bootstrap();
-        gui.model.sendAction('winLevel');
-        const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
+        const saved = { cheat: { freePlant: true, autoCollect: false }, placer: { imitater: true } };
+        const gui = loadGui({ mobile, saved });
+        gui.respondStatus({ ...readyStatus, ready: false });
+        assert.equal(gui.http.sent.length, 0);
         gui.runTimer(100);
-        const sent = ws.sent.length;
-        gui.advance(600000);
-        assert.equal(ws.sent.length, sent);
-        assert.equal(gui.sockets.length, 1);
+        const request = gui.startInitialization();
+        assert.equal(request.kind, 'connect');
+        assert.equal(request._clientId, 'client-1');
+        assert.equal('state' in request, !mobile);
+        if (!mobile) {
+            assert.equal(request.state.cheat.freePlant, true);
+            assert.equal(request.state.cheat.autoCollect, false);
+            assert.equal(request.state.placer.imitater, true);
+        }
+        assert.equal(gui.model.connected.value, false);
+        assert.equal(gui.lastRequest('request').options.headers['X-PGvZ-Instance'], readyStatus.instance);
+        gui.http.message({ results: [completed(request, sync(1, { cheat: { freePlant: !mobile } }))] });
         assert.equal(gui.model.connected.value, true);
-        assert.equal(gui.model.pendingCount.value, 1);
-        assert.equal(gui.timers.size, 0);
-        ws.message({ action: 'results', results: [{ ...request, ok: true, value: null }] });
-        assert.equal(gui.model.lastResult.key, 'messages.success');
-        assert.equal(gui.model.pendingCount.value, 0);
-        assert.equal(ws.sent.filter(code => code.includes('winLevel')).length, 1);
-        assert.equal(ws.sent.some(code => code.includes('cancel')), false);
-        gui.model.setLanguage('zh');
-        assert.equal(gui.model.t('messages.sent'), '已发送，切回游戏后生效');
-        gui.model.setLanguage('en');
-        assert.equal(gui.model.t('messages.sent'), 'Sent. Takes effect when you switch back to the game');
+        assert.equal(gui.model.gameVersion.value, readyStatus.version);
+        assert.equal(gui.model.modVersion.value, readyStatus.modVersion);
+        assert.equal(gui.model.cheatOption.freePlant, !mobile);
+        assert.equal(gui.sockets.length, 0);
+        assert.ok(gui.requests.every(item => item.options.mode === 'same-origin'));
     }
 });
 
-test('unrelated debug errors do not discard concurrent action results', () => {
-    const gui = loadGui();
-    const ws = gui.bootstrap();
-    gui.model.getLineupCode();
-    const request = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    gui.runTimer(100);
-    ws.onmessage({ data: JSON.stringify({ statuscode: 1, errortype: 'SyntaxError', error: 'debug-only' }) });
-    assert.match(gui.model.lastResult.text, /debug-only/);
-    ws.message({ action: 'results', results: [{ ...request, ok: true, value: 'lineup-after-debug-error' }] });
-    assert.equal(gui.model.lineupCode.value, 'lineup-after-debug-error');
-    assert.equal(gui.model.lastResult.key, 'messages.lineupOk');
-    assert.equal([...gui.timers.values()].filter(timer => !timer.interval).length, 0);
-});
-
-test('business operations before initialization are rejected without a local send queue', () => {
-    const gui = loadGui();
-    const ws = gui.sockets[0];
-    ws.open();
-    gui.model.sendAction('winLevel');
-    assert.match(gui.errors.at(-1), /finish initializing/);
-    assert.equal(gui.model.pendingCount.value, 0);
-    gui.advance(600000);
-    gui.bootstrap();
-    assert.equal(ws.sent.some(code => code.includes('winLevel')), false);
-    assert.equal((html.match(/<el-form :disabled="!connected"/g) || []).length, 4);
-});
-
-test('real socket failures report uncertain results and reconnect once without replaying actions', () => {
-    for (const socketError of [false, true]) {
+test('startup failure shows the full traceback and exact supported versions without touching the queue', () => {
+    const traceback = 'Traceback (most recent call last):\nNameError: name missing_name is not defined';
+    for (const [version, supportedVersions, advice] of [
+        ['1.2.6', readyStatus.supportedVersions, 'Please update the game.'],
+        ['1.3.10', readyStatus.supportedVersions, 'Please download a newer version of the mod.'],
+        ['1.4.0', ['1.3.10', '1.3.4'], 'Please download a newer version of the mod.'],
+        ['1.3.9', ['1.3.10', '1.3.4'], 'Please update the game.'],
+        ['1.3.4-beta', readyStatus.supportedVersions, 'Please update the game.'],
+        ['1.3.4', readyStatus.supportedVersions, ''],
+        ['1.3.5', [], ''],
+        ['', readyStatus.supportedVersions, ''],
+    ]) {
         const gui = loadGui();
-        const ws = gui.bootstrap();
         gui.model.sendAction('winLevel');
-        const pending = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-        if (socketError) ws.onerror();
-        else ws.close();
+        gui.respondStatus({ ...readyStatus, version, supportedVersions, error: traceback });
+        assert.match(gui.errors.at(-1), /finish initializing/);
+        assert.equal(gui.model.lastResult.text, traceback);
+        assert.equal(gui.model.connected.value, false);
+        assert.equal(gui.model.gameVersion.value, version);
+        assert.equal(gui.model.modVersion.value, readyStatus.modVersion);
+        assert.equal(gui.model.unsupportedGameVersion.value, Boolean(advice));
+        assert.equal(gui.model.unsupportedGameVersionDetail.value,
+            advice ? `This mod supports game versions ${supportedVersions.join(', ')}. ${advice}` : '');
+        assert.equal(gui.timers.size, 0);
+        assert.equal(gui.requests.length, 1);
+    }
+});
+
+test('poll merges initialization, action results and game changes by field revision', () => {
+    const gui = loadGui();
+    const connect = gui.startInitialization();
+    gui.http.message({
+        results: [completed(connect, sync(1, {
+            cheat: { daisyMode: false, freePlant: true }, weather: { enabled: true, rain: false, storm: false },
+        }))],
+        updates: [sync(2, { cheat: { daisyMode: true } }), sync(3, { weather: { rain: true } })],
+    });
+    gui.flush();
+    assert.equal(gui.model.cheatOption.daisyMode, true);
+    assert.equal(gui.model.cheatOption.freePlant, true);
+    assert.equal(gui.model.weather.value, 'rain');
+    assert.equal(gui.http.sent.length, 1);
+
+    gui.model.cheatOption.danceMode = true;
+    gui.flush();
+    const action = gui.http.sent.at(-1);
+    const poll = gui.beginPoll();
+    assert.equal(poll.payload.revision, 3);
+    assert.deepEqual(poll.payload.acknowledged, [connect.id]);
+    poll.respond({
+        results: [completed(action, sync(5, { cheat: { danceMode: true } }))],
+        updates: [sync(4, { cheat: { freePlant: false, danceMode: false } }),
+            sync(6, { weather: { storm: true } })],
+    });
+    gui.settle();
+    gui.flush();
+    assert.equal(gui.model.cheatOption.freePlant, false);
+    assert.equal(gui.model.cheatOption.danceMode, true);
+    assert.equal(gui.model.weather.value, 'rainStorm');
+    assert.equal(gui.http.sent.length, 2);
+    assert.equal(JSON.parse(gui.storage.get(storageKey)).cheat.freePlant, false);
+});
+
+test('failed session initialization preserves saved settings and stops polling after acknowledgement', () => {
+    const saved = { cheat: { freePlant: true } };
+    const gui = loadGui({ saved });
+    const request = gui.startInitialization();
+    gui.http.message({ results: [{ ...request, ok: false, errortype: 'ValueError', error: 'bad setting' }] });
+    assert.equal(gui.model.connectionState.value, 'error');
+    assert.match(gui.model.lastResult.text, /bad setting/);
+    const receipt = gui.beginPoll();
+    assert.deepEqual(receipt.payload.acknowledged, [request.id]);
+    receipt.respond({ results: [], updates: [] });
+    gui.flush();
+    assert.equal(gui.timers.size, 0);
+    assert.deepEqual(JSON.parse(gui.storage.get(storageKey)), saved);
+    assert.equal(gui.http.sent.length, 1);
+});
+
+test('submissions stay ordered and share one poll even if a submit reply stalls', () => {
+    const gui = loadGui();
+    gui.bootstrap();
+    gui.deferSubmissions(true);
+    gui.model.sendAction('winLevel');
+    gui.model.sendAction('nextStage');
+    assert.equal(gui.model.pendingCount.value, 2);
+    const first = gui.lastRequest('request', true);
+    assert.equal(first.payload.name, 'winLevel');
+    const poll = gui.beginPoll();
+    const count = gui.requests.length;
+    gui.advance(600000);
+    assert.equal(gui.requests.length, count);
+    assert.equal(gui.model.connected.value, true);
+    first.respond({ action: 'queued', id: first.payload.id });
+    const second = gui.lastRequest('request', true);
+    assert.equal(second.payload.name, 'nextStage');
+    second.respond({ action: 'queued', id: second.payload.id });
+    poll.respond({ results: [completed(first.payload)], updates: [] });
+    gui.settle();
+    assert.equal(gui.model.pendingCount.value, 1);
+    gui.http.message({ results: [{ ...second.payload, ok: false, errortype: 'RuntimeError', error: 'No board' }] });
+    assert.equal(gui.model.pendingCount.value, 0);
+    assert.match(gui.model.lastResult.text, /No board/);
+    const receiptPoll = gui.beginPoll();
+    assert.deepEqual(receiptPoll.payload.acknowledged, [second.payload.id]);
+    receiptPoll.respond({ results: [], updates: [] });
+    gui.settle();
+    assert.equal(gui.timers.values().next().value.delay, 1000);
+});
+
+test('pending operations survive empty polls during a long game pause without replay', () => {
+    for (const mobile of [false, true]) {
+        const gui = loadGui({ mobile, saved: { cheat: { freePlant: false } } });
+        gui.bootstrap({ cheat: { freePlant: false } });
+        gui.model.cheatOption.freePlant = true;
+        gui.flush();
+        const request = gui.http.sent.at(-1);
+        assert.equal(JSON.parse(gui.storage.get(storageKey)).cheat.freePlant, !mobile);
+        for (let i = 0; i < 3; i++) gui.http.message({});
+        const blockedPoll = gui.beginPoll();
+        const count = gui.requests.length;
+        gui.advance(600000);
+        assert.equal(gui.requests.length, count);
+        assert.equal(gui.model.pendingCount.value, 1);
+        blockedPoll.respond({ results: [completed(request)], updates: [] });
+        gui.settle();
+        assert.equal(gui.model.pendingCount.value, 0);
+        assert.equal(gui.model.lastResult.key, 'messages.success');
+        gui.http.message({ results: [completed(request)] });
+        assert.deepEqual(gui.beginPoll().payload.acknowledged, [request.id]);
+        assert.equal(gui.http.sent.filter(item => item.kind === 'apply').length, 1);
+        assert.equal(gui.sockets.length, 0);
+    }
+});
+
+test('network failure or a stale game instance reconnects without replaying actions', () => {
+    for (const instanceChanged of [false, true]) {
+        const gui = loadGui();
+        gui.bootstrap();
+        gui.model.sendAction('winLevel');
+        const poll = gui.beginPoll();
+        if (instanceChanged) poll.respond({ error: 'The game instance changed' }, 409);
+        else poll.fail();
+        gui.settle();
         assert.equal(gui.model.connected.value, false);
         assert.equal(gui.model.hasUnconfirmedRequests.value, true);
         assert.equal(gui.model.lastResult.key, 'messages.resultsUnconfirmed');
         assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
-        const count = ws.sent.length;
-        gui.model.sendAction('nextStage');
-        assert.equal(ws.sent.length, count);
-        ws.onerror();
-        ws.close();
-        assert.deepEqual([...gui.timers.values()].map(timer => timer.delay), [3000]);
         gui.runTimer(3000);
-        const recovered = gui.bootstrap();
+        gui.bootstrap();
         assert.equal(gui.model.connected.value, true);
         assert.equal(gui.model.hasUnconfirmedRequests.value, true);
-        assert.equal(recovered.sent.some(code => code.includes('winLevel') || code.includes('nextStage')), false);
-        ws.message({ action: 'results', results: [{ ...pending, ok: true, value: null }] });
-        assert.equal(gui.model.lastResult.key, 'messages.syncOk');
+        assert.deepEqual(gui.http.sent.map(request => request.kind), ['connect', 'action', 'connect']);
     }
 });
 
-test('PC saves changed options immediately while the suspended game waits to apply them; mobile keeps storage untouched', () => {
-    for (const mobile of [true, false]) {
-        const saved = { cheat: { freePlant: false } };
-        const gui = loadGui({ mobile, saved });
-        const ws = gui.bootstrap({ cheat: { freePlant: false } });
-        gui.model.cheatOption.freePlant = true;
-        gui.flush();
-        const pending = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-        assert.equal(pending.kind, 'apply');
-        assert.equal(JSON.parse(gui.storage.get(storageKey)).cheat.freePlant, !mobile);
-        gui.advance(600000);
-        assert.equal(gui.sockets.length, 1);
-        assert.equal(gui.model.cheatOption.freePlant, true);
-        assert.equal(gui.model.pendingCount.value, 1);
-        ws.message({ action: 'results', results: [{ ...pending, ok: true, value: null }] });
-        assert.equal(gui.model.pendingCount.value, 0);
-        assert.equal(gui.model.lastResult.key, 'messages.success');
-    }
+test('two pages stay connected and apply shared changes without sending them back', () => {
+    const first = loadGui();
+    const second = loadGui({ clientId: 'client-2' });
+    first.bootstrap({ cheat: { freePlant: false } });
+    second.bootstrap({ cheat: { freePlant: false } });
+
+    first.model.cheatOption.freePlant = true;
+    first.flush();
+    const request = first.http.sent.at(-1);
+    const update = sync(2, { cheat: { freePlant: true } });
+    first.http.message({ results: [completed(request, update)], updates: [update] });
+    second.http.message({ updates: [update] });
+    second.flush();
+    assert.equal(first.model.connected.value, true);
+    assert.equal(second.model.connected.value, true);
+    assert.equal(second.model.cheatOption.freePlant, true);
+    assert.equal(second.http.sent.length, 1);
+    assert.equal(second.http.sent[0]._clientId, 'client-2');
+    assert.equal('takeover' in second.http.sent[0], false);
+
+    first.listeners.beforeunload();
+    second.model.cheatOption.freePlant = false;
+    second.flush();
+    assert.equal(first.http.sent.at(-1).kind, 'release');
+    assert.equal(second.http.sent.at(-1).kind, 'apply');
+    assert.equal(second.model.connected.value, true);
 });
 
-test('only the WebSocket handshake has a timeout; bootstrap probes can wait indefinitely', () => {
-    const handshake = loadGui();
-    handshake.runTimer(30000);
-    assert.equal(handshake.connection.connectionState.value, 'reconnecting');
-    handshake.runTimer(3000);
-    handshake.bootstrap();
-    assert.equal(handshake.model.connected.value, true);
-    for (const blockedStage of ['ready', 'version', 'connect']) {
-        const gui = loadGui({ saved: { cheat: { freePlant: true } } });
-        const ws = gui.sockets[0];
-        ws.open();
-        if (blockedStage !== 'ready') ws.message({ action: 'bootstrapReady', ready: true });
-        if (blockedStage === 'connect') ws.message(gameVersionProbe);
-        gui.advance(600000);
-        assert.equal(gui.sockets.length, 1);
-        assert.equal(ws.readyState, 1);
-        assert.equal(gui.connection.connectionState.value, 'initializing');
-        assert.equal(JSON.parse(gui.storage.get(storageKey)).cheat.freePlant, true);
-        if (blockedStage === 'ready') ws.message({ action: 'bootstrapReady', ready: true });
-        if (blockedStage !== 'connect') ws.message(gameVersionProbe);
-        const connect = JSON.parse(decodeCall(ws.sent.findLast(code => code.includes('gui_dispatcher.submit')).split('\n').at(-1)).args[0]);
-        ws.message({ action: 'results', results: [{ ...connect, ok: true, value: {
-            action: 'sync', revision: 1, state: { cheat: { freePlant: true } },
-        } }] });
-        gui.flush();
-        assert.equal(gui.model.connected.value, true);
-        assert.equal(gui.model.cheatOption.freePlant, true);
-    }
-});
-
-test('initialization disconnects preserve PC restoration state and never push saved state on mobile', () => {
-    for (const mobile of [false, true]) {
-        const saved = { cheat: { freePlant: true, autoCollect: false }, placer: { imitater: true } };
-        const gui = loadGui({ mobile, saved });
-        for (let attempt = 0; attempt < 3; attempt++) {
-            const ws = gui.sockets.at(-1);
-            const connect = gui.startInitialization(ws);
-            assert.equal('state' in connect, !mobile);
-            if (!mobile) {
-                assert.equal(connect.state.cheat.freePlant, true);
-                assert.equal(connect.state.cheat.autoCollect, false);
-                assert.equal(connect.state.placer.imitater, true);
-            }
-            gui.advance(300000);
-            assert.deepEqual(JSON.parse(gui.storage.get(storageKey)), saved);
-            ws.close();
-            gui.runTimer(3000);
-        }
-        const ws = gui.bootstrap({ cheat: { freePlant: !mobile } });
-        assert.equal(gui.model.connected.value, true);
-        assert.equal(gui.model.cheatOption.freePlant, !mobile);
-        assert.equal(ws.sent.some(code => code.includes('winLevel')), false);
-    }
-});
-
-test('leaving the page cancels scheduled retries and rejected recovery sessions do not retry', () => {
-    const leaving = loadGui();
-    leaving.bootstrap().onerror();
-    leaving.listeners.beforeunload();
-    assert.equal(leaving.timers.size, 0);
-    const occupied = loadGui();
-    occupied.bootstrap().onerror();
-    occupied.runTimer(3000);
-    const ws = occupied.sockets.at(-1);
-    ws.open();
-    ws.message({ action: 'bootstrapReady', ready: true });
-    ws.message(gameVersionProbe);
-    const connect = JSON.parse(decodeCall(ws.sent.at(-1).split('\n').at(-1)).args[0]);
-    ws.message({ action: 'results', results: [{ ...connect, ok: true,
-        value: { action: 'sessionRejected', accepted: false },
-    }] });
-    assert.equal(occupied.connection.connectionState.value, 'occupied');
-    assert.equal(occupied.timers.size, 0);
-    ws.close();
-    assert.equal(occupied.timers.size, 0);
-});
-
-
-test('explicit takeover works on an open or closed occupied socket and uses bilingual controls', () => {
-    for (const closeSocket of [false, true]) {
-        const gui = loadGui();
-        let ws = gui.sockets[0];
-        const request = gui.startInitialization(ws);
-        ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
-            action: 'sessionRejected', accepted: false,
-        } }] });
-        assert.equal(gui.model.sessionRejected.value, true);
-        assert.equal(gui.timers.size, 0);
-        if (closeSocket) ws.close();
-        gui.model.takeoverSession();
-        assert.equal(gui.model.connected.value, false);
-        if (closeSocket) {
-            ws = gui.sockets.at(-1);
-            gui.startInitialization(ws);
-        }
-        const takeover = JSON.parse(decodeCall(ws.sent.at(-1).split('\n').at(-1)).args[0]);
-        assert.equal(takeover.kind, 'connect');
-        assert.equal(takeover.takeover, true);
-        ws.message({ action: 'results', results: [{ ...takeover, ok: true, value: { action: 'sync', revision: 1, state: {} } }] });
-        assert.equal(gui.model.connected.value, true);
-        assert.equal(gui.model.sessionRejected.value, false);
-        gui.model.setLanguage('zh');
-        assert.equal(gui.model.t('messages.takeoverSession'), '接管控制权');
-        assert.equal(gui.model.t('messages.sessionOccupiedDetail'), '可以继续使用原页面，或接管控制权以使用当前页面');
-        gui.model.setLanguage('en');
-        assert.equal(gui.model.t('messages.takeoverSession'), 'Take Control');
-        assert.equal(gui.model.t('messages.sessionOccupiedDetail'), 'Continue using the other page, or take control to use this page');
-    }
-});
-
-test('remote PC snapshots save only after successful synchronization and never echo apply requests', () => {
-    const saved = { cheat: { freePlant: true } };
-    const gui = loadGui({ saved });
-    const request = gui.startInitialization();
-    const ws = gui.sockets[0];
-    ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
-        action: 'sync', revision: 1, state: { cheat: { freePlant: false }, placer: { imitater: true } },
-    } }] });
-    assert.deepEqual(JSON.parse(gui.storage.get(storageKey)), saved);
-    const sent = ws.sent.length;
-    gui.flush();
-    const stored = JSON.parse(gui.storage.get(storageKey));
-    assert.equal(stored.cheat.freePlant, false);
-    assert.equal(stored.placer.imitater, true);
-    assert.equal(ws.sent.length, sent);
-});
-
-test('page exit during bootstrap ignores late responses and does not acquire a new session', () => {
-    for (const stage of ['handshake', 'ready', 'connect']) {
-        const gui = loadGui();
-        const ws = gui.sockets[0];
-        if (stage !== 'handshake') ws.open();
-        if (stage === 'connect') {
-            ws.message({ action: 'bootstrapReady', ready: true });
-            ws.message(gameVersionProbe);
-        }
-        gui.listeners.beforeunload();
-        const sent = ws.sent.length;
-        ws.open();
-        ws.message({ action: 'bootstrapReady', ready: true });
-        ws.message(gameVersionProbe);
-        gui.advance(600000);
-        assert.equal(ws.sent.length, sent);
-        assert.equal(gui.model.pendingCount.value, 0);
-        assert.equal(gui.timers.size, 0);
-    }
-});
-
-test('lost takeover replies do not automatically repeat a forced takeover on reconnection', () => {
+test('page exit releases a ready session and ignores late startup replies', () => {
     const gui = loadGui();
-    const ws = gui.sockets[0];
-    const request = gui.startInitialization();
-    ws.message({ action: 'results', results: [{ ...request, ok: true, value: {
-        action: 'sessionRejected', accepted: false,
-    } }] });
-    gui.model.takeoverSession();
-    const takeover = JSON.parse(decodeCall(ws.sent.at(-1)).args[0]);
-    assert.equal(takeover.takeover, true);
-    ws.close();
-    gui.runTimer(3000);
-    const reconnect = gui.startInitialization();
-    assert.equal('takeover' in reconnect, false);
-    assert.equal('state' in reconnect, true);
-    assert.equal(gui.sockets.length, 2);
+    gui.startInitialization();
+    gui.listeners.beforeunload();
+    const request = gui.lastRequest('request');
+    assert.equal(request.payload.kind, 'release');
+    assert.equal(request.options.keepalive, true);
+    assert.equal(gui.model.pendingCount.value, 0);
+    assert.equal(gui.timers.size, 0);
+
+    const loading = loadGui();
+    loading.listeners.beforeunload();
+    loading.respondStatus();
+    assert.equal(loading.http.sent.length, 0);
+    assert.equal(loading.timers.size, 0);
+});
+
+test('debug WebSocket opens on demand and its errors do not affect HTTP results', () => {
+    const gui = loadGui();
+    gui.bootstrap();
+    gui.model.getLineupCode();
+    const action = gui.http.sent.at(-1);
+    assert.equal(gui.sockets.length, 0);
+    gui.model.customCode.value = '1 / 0';
+    gui.model.sendCustomCode();
+    const socket = gui.sockets[0];
+    socket.open();
+    assert.match(socket.sent.at(-1), /from pgvztool import/);
+    socket.message({ eventtype: 'execution', statuscode: 0, result: null });
+    assert.equal(socket.sent.at(-1), '1 / 0');
+    socket.message({ eventtype: 'execution', statuscode: -1, errortype: 'ZeroDivisionError', result: 'division by zero' });
+    assert.match(gui.model.lastResult.text, /division by zero/);
+    socket.close();
+    assert.equal(gui.model.connected.value, true);
+    assert.equal(gui.model.pendingCount.value, 1);
+    gui.http.message({ results: [completed(action, 'lineup')] });
+    assert.equal(gui.model.lineupCode.value, 'lineup');
+});
+
+test('custom Python remains available before HTTP initialization finishes', () => {
+    const gui = loadGui();
+    gui.model.customCode.value = '1 + 2';
+    gui.model.sendCustomCode();
+    const socket = gui.sockets[0];
+    socket.open();
+    assert.deepEqual(socket.sent, ['1 + 2']);
+    socket.message({ eventtype: 'execution', statuscode: 0, result: '3' });
+    assert.equal(gui.model.lastResult.text, '3');
+    assert.equal(gui.http.sent.length, 0);
+});
+
+test('the Debug tab validates the entered port and switches connections on the next send', () => {
+    const gui = loadGui();
+    const { model, sockets } = gui;
+    gui.context.location.search = '?ws=ws://localhost:9000/Py';
+    assert.match(html, /<el-input-number v-model="debugPort" :min="debugPortMin" :max="debugPortMax"/);
+    assert.equal(model.debugPort.value, 8080);
+    assert.equal(model.debugPortMin, 8080);
+    assert.equal(model.debugPortMax, 65535);
+    assert.equal(model.t('fields.debugPort'), 'Python debug port');
+    model.setLanguage('zh');
+    assert.equal(model.t('fields.debugPort'), 'Python 调试端口');
+    model.customCode.value = '1 + 2';
+    for (const port of [null, 8079, 8080.5, 65536]) {
+        model.debugPort.value = port;
+        assert.match(model.debugPortError.value, /8080–65535/);
+        model.sendCustomCode();
+    }
+    assert.equal(sockets.length, 0);
+
+    model.debugPort.value = 8080;
+    model.sendCustomCode();
+    assert.equal(sockets[0].url, 'ws://localhost:8080/Py');
+    sockets[0].open();
+    assert.deepEqual(sockets[0].sent, ['1 + 2']);
+
+    model.debugPort.value = 65535;
+    model.customCode.value = '2 + 3';
+    model.sendCustomCode();
+    assert.equal(sockets[0].readyState, 3);
+    assert.equal(sockets[1].url, 'ws://localhost:65535/Py');
+    sockets[1].open();
+    assert.deepEqual(sockets[1].sent, ['2 + 3']);
+    sockets[1].message({ eventtype: 'execution', statuscode: 0, result: '5' });
+    sockets[0].message({ eventtype: 'execution', statuscode: 0, result: '3' });
+    assert.equal(model.lastResult.text, '5');
+    model.sendCustomCode();
+    assert.equal(sockets.length, 2);
 });

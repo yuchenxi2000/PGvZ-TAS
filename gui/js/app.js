@@ -128,6 +128,9 @@ const app = createApp({
         const resultText = computed(() => lastResult.key ? t(lastResult.key) : lastResult.text);
         const customCode = ref('');
         const customCodeError = ref('');
+        const { MIN_PORT: debugPortMin, MAX_PORT: debugPortMax } = PGvZDebug;
+        const debugPort = ref(debugPortMin);
+        const debugPortError = computed(() => PGvZDebug.isValidPort(debugPort.value) ? '' : t('messages.invalidDebugPort'));
         const lineupCode = ref('');
         const selectedSetZbType = ref([]);
         const selectedScene = ref('pool');
@@ -156,14 +159,15 @@ const app = createApp({
         let syncedWeather = { enabled: false, rain: false, storm: false };
         const terrain = PGvZTerrain.create({ sendAction: (...args) => sendAction(...args) });
         const {
-            connected, sessionRejected, unsupportedGameVersion, supportedGameVersions,
+            connected, unsupportedGameVersion, supportedGameVersions,
             gameVersion, modVersion, connectionState,
             pendingCount, hasUnconfirmedRequests,
-            send, sendAction, applyState, connect, releaseSession, takeoverSession,
+            sendAction, applyState, connect, releaseSession,
         } = PGvZConnection.create({
             isMobile, t, setResult, getInitialState, applySyncState, lineupCode,
             onActionResult,
         });
+        const debug = PGvZDebug.create(setResult);
         watch(() => connected.value, ready => {
             if (ready) return;
             terrain.reset();
@@ -381,12 +385,13 @@ const app = createApp({
         }
 
         function sendCustomCode() {
+            if (debugPortError.value) return;
             if (!customCode.value.trim()) {
                 customCodeError.value = t('messages.emptyCode');
                 return;
             }
             customCodeError.value = '';
-            send(customCode.value.trim(), true);  // 不然没法调试了...
+            debug.send(debugPort.value, customCode.value.trim(), connected.value);
         }
 
         function sendLineupCode() {
@@ -448,11 +453,9 @@ const app = createApp({
             t,
             optionLabel,
             connected,
-            sessionRejected,
             connectionState,
             pendingCount,
             hasUnconfirmedRequests,
-            takeoverSession,
             unsupportedGameVersion,
             unsupportedGameVersionDetail,
             gameVersion,
@@ -506,6 +509,10 @@ const app = createApp({
             resultText,
             customCode,
             customCodeError,
+            debugPort,
+            debugPortMin,
+            debugPortMax,
+            debugPortError,
             lineupCode,
             selectedSetZbType,
             selectedScene,

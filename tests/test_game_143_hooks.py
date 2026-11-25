@@ -3,6 +3,7 @@ import ast
 import pathlib
 import types
 import unittest
+from unittest.mock import MagicMock, Mock
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -103,6 +104,79 @@ class Game143HookTests(unittest.TestCase):
         self.assertEqual(self.production(lambda _: 'blocked', self.plant), 'blocked')
         self.assertEqual(self.plant.mState, 'idle')
         self.assertFalse(self.voices)
+
+    def test_builtin_menu_speed_and_checkbox_sync_with_stash_font_methods(self):
+        tree = ast.parse((ROOT / 'pgvztool/hook.py').read_text(encoding='utf-8'))
+        install = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                       and node.name == '_install_builtin_cheat_menu_hooks')
+        menu_type = Mock()
+        menu_type.GetField.side_effect = lambda name: NS(GetValue=lambda menu: getattr(menu, name))
+        speed_format = Mock(side_effect=['1', '5', '0.25', '0.3333333333333333', '0.2'])
+        menu_type.GetMethod.side_effect = lambda name: (
+            NS(Invoke=speed_format) if name == 'GetGameSpeedString' else Mock()
+        )
+        checkbox_type = Mock()
+        set_checked = Mock(side_effect=lambda widget, args: setattr(widget, 'mChecked', args[0]))
+        checkbox_type.GetField.side_effect = lambda name: NS(GetValue=lambda widget: getattr(widget, name))
+        checkbox_type.GetMethod.return_value = NS(Invoke=set_checked)
+        assembly = NS(GetType=lambda name, *_: menu_type if name == 'Lawn.ZBCheatDialog' else checkbox_type)
+        label_type = object()
+        clr = NS(GetClrType=lambda _: NS(Assembly=assembly), Reference={label_type: NS})
+        system = MagicMock()
+        system.Object.ReferenceEquals.side_effect = lambda left, right: left is right
+        system.WeakReference.side_effect = lambda menu: NS(Target=menu)
+        system.Array[system.Object].side_effect = lambda values: values
+        globals_ = NS(gFastMo=False, gSlowMo=False, gFastSlowMoNum=0)
+        options = NS(autoCollect=True)
+        sync_reg = Mock()
+        log = Mock()
+        namespace = {
+            'Lawn': NS(LawnApp=object, Label=label_type),
+            'Sexy': NS(GlobalStaticVars=globals_, Debug=NS(Log=log), DebugType=NS(Error='error')),
+            'clr': clr, 'System': system, 'MonoMod': MagicMock(), 'ILHook': Mock(),
+            '_BUILTIN_CHEAT_FIELDS': {5: 'autoCollect'}, 'cheat_option': options, 'sync_reg': sync_reg,
+        }
+        exec(compile(ast.Module(body=[install], type_ignores=[]), 'built-in-cheat-menu', 'exec'), namespace)
+        namespace[install.name]()
+        refresh_menu = system.Action[system.Object].call_args.args[0]
+        click_checkbox = system.Func[system.Int32, system.Boolean, system.Boolean].call_args.args[0]
+
+        label = NS(mText='', mWidth=24, mFont=NS(StringWidth=len))
+        checkbox = NS(mId=5, mChecked=False)
+        checkbox_type.IsInstanceOfType.side_effect = lambda widget: widget is checkbox
+
+        def try_get_label(reference):
+            reference.Value = label
+            return True
+
+        menu = NS(mGameSpeedLabel=NS(TryGetTarget=try_get_label),
+                  mPanel=NS(mWidgets=[NS(mWidgets=[checkbox])]))
+        refresh_menu(menu)
+        self.assertEqual(label.mText, '速度控制 当前:1x')
+        set_checked.assert_called_once_with(checkbox, [True, False])
+        globals_.gFastMo = True
+        globals_.gFastSlowMoNum = 5
+        refresh_menu(menu)
+        self.assertEqual(label.mText, '速度控制 当前:5x')
+        refresh_menu(menu)
+        self.assertEqual(speed_format.call_count, 2)
+        globals_.gFastMo, globals_.gSlowMo, globals_.gFastSlowMoNum = False, True, 4
+        refresh_menu(menu)
+        self.assertEqual(label.mText, '速度控制 当前:0.25x')
+        globals_.gFastSlowMoNum = 3
+        refresh_menu(menu)
+        self.assertEqual(label.mText, '速度控制 当前:1/3x')
+        log.assert_not_called()
+
+        label.mFont.StringWidth = Mock(side_effect=RuntimeError('font unavailable'))
+        globals_.gFastSlowMoNum = 5
+        options.autoCollect = False
+        refresh_menu(menu)
+        set_checked.assert_called_with(checkbox, [False, False])
+        self.assertFalse(checkbox.mChecked)
+        self.assertTrue(click_checkbox(5, True))
+        sync_reg.set_local_state.assert_called_once_with('cheat', 'autoCollect', True)
+        log.assert_called_once()
 
 
 if __name__ == '__main__':

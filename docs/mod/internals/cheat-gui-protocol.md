@@ -4,140 +4,67 @@
 
 ```
 浏览器 (gui/index.html + gui/js/)
-    ├─ HTTP (localhost:58080) ─────→ cheat-gui.py ─→ gui/ 静态文件
-    └─ WebSocket (localhost:8080/Py) → 游戏 IronPython 引擎
-                                              ↕ Python 对象
-                            gui_dispatcher.submit / poll / acknowledge / cancel
-                                              ↕ 请求 / 结果队列
-                                    hook.py → 主线程 run_pending
-                                              ↕
-                      CheatActions / Placer / SyncRegistry
+    ├─ HTTP (localhost:58080) → 静态文件和 JSON API
+    │                                  ↕ 请求 / 结果
+    │                             GuiDispatcher
+    │                                  ↕ 游戏主线程 run_pending()
+    │                     CheatActions / Placer / SyncRegistry
+    └─ Python 调试（手动发送时）→ 游戏内置 WebSocket /Py
 ```
 
-## 网页代码分工
+- `gui/js/connection.js` 负责 HTTP 请求、页面会话和状态同步。
+- `gui/js/debug.js` 负责调试页的自定义 Python 代码。它只在用户发送代码时建立 WebSocket。
+- `gui/js/options.js` 定义开关分组、默认值和本地存储，`gui/js/app.js` 负责 Vue 界面与业务交互，
+  `gui/js/terrain.js` 负责地形草稿与拖选。
+- `pgvztool/gui_http.py` 提供静态文件、启动状态以及 JSON 请求和轮询接口。
+- `pgvztool/dispatcher.py` 管理请求队列、动作映射和结果，`pgvztool/sync.py` 管理会话与状态版本。
+- `pgvztool/hook.py` 提供主线程执行入口。动作在 `cheat_actions.py`、`placer.py` 和 `speed.py` 中同步执行。
 
-- `gui/js/protocol.js`：引导探测代码、固定接口调用的编码、Python 字符串转义和结果解析。
-- `gui/js/connection.js`：WebSocket 连接、引导、单客户端会话、显式接管、请求结果轮询和断线重连。
-- `gui/js/options.js`：开关分组、默认值和复选框状态的本地存储。
-- `gui/js/app.js`：Vue 界面、业务操作、状态同步和组装上述模块。
-- `gui/js/terrain.js`：当前关卡的地形草稿、单格编辑与矩形拖选；只在用户实施修改时提交。
+普通按钮调用 `sendAction(name, args)`，开关与放置器选项调用 `applyState(state)`。
+HTTP 线程只读已发布的响应数据。读取或修改游戏对象的业务逻辑均由主线程执行。
 
-这些文件按 `gui/index.html` 中的脚本顺序加载，不需要构建步骤。连接模块通过回调触发
-`app.js` 中的 `getInitialState()` 和 `applySyncState()` 获取初始状态及应用远端状态；
-PC 初始化携带本地设置，游戏端保证同一页面在一个游戏进程内只恢复一次；手机始终拉取。
-后台暂停允许长期等待，不通过心跳或业务请求超时判断连接失败。
+## 启动就绪探测
 
-常用按钮调用 `sendAction(name, args)`，开关与放置器选项调用 `applyState(state)`。
-`index.html` 和 `app.js` 不访问 `Lawn`、`Sexy` 或游戏字段，也不构造 Python 枚举表达式。
-后端分工：
+游戏在 `Main.Initialize()` 中执行顶层模组，随后才通过 `base.Initialize()` 进入
+`Main.LoadContent()`。正式入口 `cheat-gui.py` 在主线程配置搜索路径并启动后台线程。
+HTTP 模块加载、版本文件读取和端口监听均在后台进行。模组加载线程每 100 毫秒检查
+`Sexy.GlobalStaticVars.gSexyAppBase.mLoadingThreadStarted`。
+该标志晚于 `Constants.Load*()`、`GlobalStaticVars.initialize()` 和 `LawnApp.Init()/Start()`。
+观察到它之后才导入 `pgvztool`、加载 `pgvz` 和安装钩子。具体顺序见
+[启动阶段 Board 静态初始化](startup-board-static-initialization.md)。
 
-- `cheat.py`：`CheatOption` 持续选项、`WeatherControl` 天气状态及相关逐帧脚本。
-- `cheat_actions.py`：`CheatActions` 一次性作弊操作，显式持有 `CheatOption`。
-- `placer.py`：同步放置、移除和场地交互，包括罐子内容的换算。
-- `sync.py`：状态序列化、状态应用和 GUI 会话，运行时只由主线程访问。
-- `dispatcher.py`：`GuiDispatcher` 请求协议、动作映射、跨线程队列和结果交接。
-- `speed.py`：全局与关卡速度动作、只读状态和 Board 标识。
-- `hook.py`：调用分发器的主线程入口，集中声明所有修改器挂钩。
+`/api/status` 返回本次启动的 `instance`、加载是否结束的 `ready`、`error`（导入失败的完整调用栈）、
+`version`、`modVersion` 和 `supportedVersions`。版本声明从 `pgvz/version.py` 独立读取，因此包导入
+失败时仍可提示游戏与模组版本是否匹配。网页在 `ready:false` 时继续询问，加载失败时显示错误。
+调试入口收到首次状态请求后才启动同一加载流程。
 
-`CheatActions` 和 `Placer` 的方法都同步执行，不带调度装饰器。游戏钩子和主线程脚本可
-直接调用；WebSocket 代码必须通过分发器提交请求。调试区仍允许发送任意 Python，调用者
-同样需要遵守主线程约束。网页通过协议模块查询后台加载结果和版本，再使用分发器。
+## HTTP 接口
 
-## HTTP 服务器 (cheat-gui.py)
+同一个服务在 `127.0.0.1:58080` 提供静态文件和 JSON API。网页使用相对路径访问接口。
+`Host` 仅接受 `localhost` 和 `127.0.0.1` 的实际监听端口，并检查请求携带的 `Origin`。
+POST 接口要求 JSON 和 `X-PGvZ-Instance`，旧进程的请求到达新进程时返回 HTTP 409。
 
-位于 `cheat-gui.py`，使用 Python 标准库 `http.server`。启动时自动挂在 `localhost:58080`，将所有请求路由到 `gui/` 目录下的文件。根路径 `/` 返回 `gui/index.html`。
+| 接口 | 用途 |
+|---|---|
+| `GET /api/status` | 查询启动状态和版本 |
+| `POST /api/request` | 提交动作、设置、会话或快照请求，返回入队确认 |
+| `POST /api/poll` | 按 `_clientId` 领取结果和 `revision` 之后的状态更新，可附带 `acknowledged` 与 `cancelled` 请求 ID |
 
-游戏在启动时执行 `mods/` 顶层的 `cheat-gui.py`。正式入口配置模块搜索路径、启动 HTTP 服务，并启动后台线程等待游戏就绪后导入 `pgvztool`。包导入时也加载 `pgvz` 并注册钩子，逐帧脚本和 GUI 请求仍由游戏主线程处理。
+`/api/poll` 返回 `results` 和 `updates`。网页有待处理动作时每 100 毫秒轮询一次，
+已连接且空闲时每秒轮询一次，同一时刻最多一个轮询在途。
 
-`Cache-Control: no-store, no-cache, must-revalidate` 等响应头用于防止之后的页面加载复用缓存。它不能停止已经在页面内存中运行的旧 JavaScript、重连定时器或 WebSocket；通过 `file://` 直接打开文件时也不存在这些 HTTP 响应头。仍在运行的旧页面由下述 GUI 会话协议拦截。
+## Python 调试通道
 
-## WebSocket 服务 (localhost:8080/Py)
+调试页的自定义 Python 通过游戏的 `IronPyInteractive` 服务执行。`FindAvailablePort()` 从
+`8080` 开始逐个查找可用端口。网页调试端口默认填 `8080`，接受 `8080` 到 `65535` 的整数。
+发送代码时连接输入框指定的本机端口，端口变更后下一次发送会切换连接。
+普通 GUI 请求、启动和状态同步都走 HTTP。
 
-由游戏内 `IronPyInteractive` 启动（IronPyInteractive.cs:199-219）。行为类似 **Python 交互式控制台（REPL）**：
-
-- **表达式**（如 `1+1`、`gui_dispatcher.poll(client_id)`）：执行后返回 `repr()` 的字符串结果
-- **语句**（如 `cheat_option.xxx = True`）：执行后无返回值
-
-执行结果使用 `eventtype: "execution"`。以下示例省略 `timestamp`：
-
-```json
-// 表达式有返回值
-{"eventtype": "execution", "statuscode": 0, "result": "'repr-string'", "errortype": null}
-
-// 语句无返回值
-{"eventtype": "execution", "statuscode": 0, "result": null, "errortype": null}
-
-// 异常
-{"eventtype": "execution", "statuscode": -1, "result": "error message", "errortype": "ExceptionType"}
-```
-
-PGvZ 1.4.3 的原始执行异常正文位于 `result`，不是应用层请求结果中的 `error`。
-网页读取原始执行异常时依次使用 `error`、`result`，避免只显示异常类型。
-后台加载失败时，入口通过 `traceback.format_exc()` 保存 Python 调用栈，`BOOTSTRAP_CODE` 将其作为执行错误返回。调试入口中的首次导入错误也保留调用栈。
-此时分发器可能尚未导入，网页清理本地待处理请求和轮询，不发送 `cancel` 或继续
-调用 `poll`，以免 `gui_dispatcher` 未定义的二次错误覆盖原始导入错误。
-连接完成后的普通调试代码异常仍不取消其他业务请求。
-
-`PyHub` 允许多个 WebSocket 同时连接，所有连接共用同一个 IronPython `ScriptScope`。它本身没有客户端身份、认证或独占机制，因此直接连接 `/Py` 的其他程序可以执行任意 Python，也可以绕过下述 GUI 会话协议。若要拒绝所有来源的第二个 WebSocket 连接，需要修改游戏的 C# `PyHub` 服务端。
-
-PGvZ 1.4.3 的 `RunAllModules()` 在启动线程上用 `mPyEnj.CreateModule()` 为每个顶层模组创建独立的模块作用域。`PyHub.OnMessage()` 在 WebSocket 消息回调中用同一个 `mPyEnj` 执行代码，使用交互专用的 `mPyScope`。两条路径共享 Python 模块缓存 `sys.modules`，交互代码可通过导入顶层模组访问其中定义的变量。
-
-`PyHub.OnOpen()` 还会为连接订阅 IronPython 的标准输出和标准错误。输出缓冲刷新时，游戏主动发送 `eventtype: "output"` 事件，其中包含 `name`、`msg` 和 `timestamp`。网页忽略这类日志事件。
-
-### 启动就绪探测
-
-游戏在 `Main.Initialize()` 中先执行顶层模组，再启动 IronPython WebSocket，随后通过
-`base.Initialize()` 进入 `Main.LoadContent()`。场地尺寸等运行时常量由
-`SetupForResolution()` 中的 `Constants.Load*()` 设置，因此 WebSocket 可以在这些常量尚未
-完成初始化时就接受连接。
-
-正式入口的后台线程每 100 毫秒检查一次：
-
-```python
-app = Sexy.GlobalStaticVars.gSexyAppBase
-ready = app is not None and app.mLoadingThreadStarted
-```
-
-`mLoadingThreadStarted` 由 `Main.LoadContent()` 最后的 `StartLoadingThread()` 设置，晚于
-`Constants.Load*()`、`GlobalStaticVars.initialize()` 和 `LawnApp.Init()/Start()`。线程在就绪后
-导入 `pgvztool`，记录成功或失败，然后通过 `threading.Event` 发布结果。不能使用
-`Constants.Loaded` 作为标志，因为各 `Constants.Load*()` 会在函数前段设置它，后续仍有
-大量字段尚未赋值。
-
-完整的异常表现、静态初始化根因、历史版本差异和修复边界见
-[启动阶段 `Board` 静态初始化与墓碑关卡数组越界](startup-board-static-initialization.md)。
-
-网页建立 WebSocket 后，通过 `sys.modules["cheat-gui"].bootstrap_status()` 查询同一次加载，
-收到 `{"action":"bootstrapReady","ready":false}` 时每 100 毫秒重试。`ready:true` 表示尝试已结束。
-网页完成版本探测后，成功时将已缓存的模块导入交互作用域并申请 GUI 会话，失败时显示原始调用栈。
-调试入口在同一接口中报告游戏就绪状态，由网页触发首次导入，便于排查启动故障。
-自定义代码仍允许在引导失败时直接发送，以便调试。
-
-### 游戏版本警告
-
-启动就绪后，GUI 通过 `Lawn.LawnApp.AppVersionNumber` 获取游戏版本，再从 IronPython
-已缓存的 `pgvz.version` 读取 `MOD_VERSION` 和 `SUPPORTED_GAME_VERSIONS`。如果模块尚未缓存，
-例如启动导入提前失败或使用调试入口，探测会在独立命名空间执行纯常量文件 `mods/pgvz/version.py`，
-以便在包初始化前显示版本信息。探测返回 `gameVersion` 消息，
-包含实际游戏版本 `version`、修改器版本 `modVersion` 和支持列表 `supportedVersions`。
-
-网页页眉的两个版本号均来自探测。实际游戏版本不在列表中时，网页显示警告并列出受支持
-的版本。高于最高支持版本时提示下载新版修改器，其余不匹配情况提示更新游戏。随后网页
-继续尝试导入 `pgvz` 和 `pgvztool`。即使包导入失败，已获取的版本和警告仍会显示。探测
-缺少某个版本号时，页眉对应项显示占位符，网页继续引导。
-
-### JSON 编码和 Python 字符串
-
-游戏的 WebSocket 接收的是 Python 代码，因此请求需要先编码成 JSON，再编码成 Python
-字符串字面量。`PGvZProtocol.requestCode(clientId, id, kind, details)` 统一处理这些步骤；
-`index.html` 和 `app.js` 只调用 `sendAction()`、`applyState()` 等前端接口。
-
-编码器转义反斜杠、单引号和控制字符；JSON 布尔值也不会被误当作 Python 语法。
-服务端固定执行 `gui_dispatcher.submit(json_str)`，不能通过请求指定任意 Python 方法或字段。
-
-响应的 `result` 字段是 Python `repr()` 输出。`PGvZProtocol.parseResultMessage()` 先去掉
-外层引号、解码一层 Python 字符串转义，再解析 JSON，支持引号、反斜杠、换行和中文。
-不能只用 `slice(1, -1)` 去掉引号。
+PGvZ 1.4.3 的顶层模组由 `RunAllModules()` 创建独立作用域，`PyHub.OnMessage()` 在回调线程
+使用共享的交互作用域 `mPyScope`。两条路径共享 `sys.modules`。调试页可在修改器就绪后
+向交互作用域导入 `pgvz` 和 `pgvztool` 的辅助接口。调试服务返回 `execution` 事件，
+表达式结果是 Python 的 `repr()` 文本，异常正文在 `result`，另有独立的 `output` 日志事件。
+Python 调试代码调用游戏对象时仍需遵守主线程约束。
 
 ## 应用层协议
 
@@ -150,30 +77,20 @@ ready = app is not None and app.mLoadingThreadStarted
 目录检查不解析符号链接或 Windows junction，用户可自行通过链接访问其他位置的文件。
 路径段末尾的点、空格等由操作系统处理，不添加专门限制。
 
-### GUI 单客户端会话
+### GUI 多页面会话
 
-官方 GUI 的每个页面实例生成唯一 `_clientId`。连接和释放也作为请求排队，在主线程
-调用 `SyncRegistry.connect()` 和 `release()`。只允许一个页面拥有控制权，没有心跳或
-按时间过期的租约。游戏后台暂停、网页后台挂起和空闲都不释放所有权。
+同一设备可同时打开多个页面，每个页面实例生成唯一 `_clientId`。连接和释放在主线程
+调用 `SyncRegistry.connect()` 和 `release()`，释放只影响发起该请求的页面。游戏后台暂停、
+网页后台挂起和空闲期间，页面可以继续领取其结果。动作在主线程按服务器入队顺序执行，
+同一字段连续收到多个修改时，最后执行的值生效。
 
-后打开的页面收到 `sessionRejected` 后显示“另一个修改器页面已连接”，不再自动重连。
-用户可在被拒绝页面点击“接管控制权”，发送带 `takeover: true` 的 `connect` 请求。
-成功同步后才确认接管；失败时恢复此前的所有权。旧页面被加入撤销集合，即使新页面已
-退出，旧页面的迟到普通重连也不能自动夺回控制权，必须再次显式接管。
+每个游戏进程只在首个成功连接时应用随请求提交的 PC 恢复设置并生成快照。如果第一个页面
+未提交设置，所有页面从游戏当前状态开始。后续连接均读取快照，包括关掉所有页面后再打开。
+这一规则也适用于首次连接回包丢失后的重连。
 
-主线程在执行动作、应用选项或读取状态前调用 `require_client()`，因此排队期间失去会话的
-请求返回 `SessionRejected`，不会执行游戏操作。旧页面收到这一结果后进入占用状态并停止
-自动重连；空闲页面不主动探测是否被接管，下次请求时才发现。旧页面的迟到 `release`
-不能释放新页面的会话。网络线程不读取或修改 `SyncRegistry`。
-
-`SyncRegistry` 另有独立的初始化成功集合：第一次成功接受某页面时应用其 PC 恢复设置并
-生成快照，随后记录成功；同一页面的重复 `connect` 只读取当前快照。记录保留到游戏进程
-退出，不随断线、释放或请求结果缓存清理而丢失。因此初始化回包丢失不会造成重复恢复；
-首次恢复前断线也不会改变恢复策略。游戏重新启动后集合为空，同一页面会再次恢复设置。
-
-这是官方 GUI 的应用层保护，不是 `/Py` 服务的安全边界；直接发送任意 Python 的第三方
-客户端不受这些调用约定限制。结果队列按页面 ID 隔离，`poll()` 仅交接已生成的 JSON 数据，
-因此尚未获准的连接也能领取自己的初始化结果或拒绝消息。
+主线程在动作、选项和快照请求执行前校验页面是否已加入。未加入或已释放的页面收到
+`SessionRejected`。结果队列按页面 ID 隔离，各页可以领取自己的初始化和动作结果。
+网络线程只领取已生成的共享状态更新与页面结果。
 
 ### 请求、执行和结果交接
 
@@ -188,7 +105,7 @@ ready = app is not None and app.mLoadingThreadStarted
 
 | kind | 附加数据 | 主线程处理 |
 |---|---|---|
-| `connect` | PC 每次携带 `state`，手机省略；显式接管带 `takeover: true` | 申请或接管会话，仅首次成功初始化应用恢复选项，返回状态快照或会话拒绝 |
+| `connect` | PC 携带 `state`，手机省略 | 加入会话并返回状态快照，仅首个成功连接可恢复设置 |
 | `apply` | `state` | 验证会话并应用选项，返回请求字段的实际状态 |
 | `snapshot` | 无 | 验证会话并读取完整状态 |
 | `action` | `name`、`args` | 按白名单转换参数，同步调用业务方法 |
@@ -207,7 +124,7 @@ ready = app is not None and app.mLoadingThreadStarted
 `connected` 为真后才开始轮询。结果格式如下，`value` 为可 JSON 序列化的返回值：
 
 ```json
-{"action":"results","results":[{"id":"client-id:1","kind":"action","name":"placeZombie","ok":true,"value":null}]}
+{"action":"results","results":[{"id":"client-id:1","kind":"action","name":"placeZombie","ok":true,"value":null}],"updates":[]}
 ```
 
 执行异常保留请求 ID、kind 和 name，并返回 `ok: false`、`errortype` 和 `error`。
@@ -221,41 +138,24 @@ ready = app is not None and app.mLoadingThreadStarted
 请求、重发操作或重置初始化。首次同步完成前，业务控件禁用；即使调用前端 API 也会拒绝
 发送，不建立引导期间的本地待发队列。调试代码仍允许在未初始化时直接发送。
 
-网页在提交后就开始轮询，不依赖 `queued` 回包必达；一次 `poll()` 响应返回前不再提交
-第二次轮询，也不设置轮询响应超时。响应返回后，如果仍有待完成请求，100 毫秒后继续
-轮询；没有请求时停止全部轮询。重复或迟到的结果会确认但不再次更新界面。原始调试代码
-异常没有请求 ID，只展示错误，不清空其他业务请求的等待状态。
+提交按页面顺序发送。网页在提交后开始轮询，结果回包附带请求 ID，重复或迟到的结果会确认，
+界面仅应用一次。页面退出时用 `fetch(..., {keepalive: true})` 尽力发送 `release`。
+服务器在收到退出请求时同时撤销该页面已排队的动作，并拒绝随后才到达的普通请求。
+主线程随后释放该页面的会话。已经开始执行的游戏操作继续完成，其他页面仍可操作。
 
-页面正常退出时尽力发送 `cancel` 和 `release`；后者清理该页面未领取结果及后续排队请求。
-已经执行中的游戏调用不能安全中断，取消只会放弃其后续回包。异常关闭且没有释放的页面
-可能留下请求和未确认结果，游戏进程退出后清空；不能用超时清理来假定页面或游戏已经失效。
-已确认结果缓存清理仍使用单调时钟。
+### 后台暂停等待与连接恢复
 
-### 后台暂停等待与真正断线
+手机网页在前台、游戏在后台暂停，或 PC 关闭后台运行时，HTTP 服务可能仍可接收请求，
+但游戏主线程暂时不会推进 `run_pending()`。排队中的请求可长期等待，空轮询不触发重连或重发。
+手机系统也可能挂起整个游戏进程，此时正在进行的 HTTP 请求可能停住，至恢复后继续。
 
-手机网页在前台、游戏在后台暂停，或 PC 关闭后台运行时，WebSocket 可能仍能接受请求，
-但主线程没有推进 `run_pending()`，因此返回 `queued` 并不代表游戏能及时执行。
-WebSocket 打开仅表示通道建立，不表示游戏主线程正在推进。
+HTTP 连接失败或服务实例变更时，网页约 3 秒后重新查询状态，并用原有页面 ID 重新申请会话。
+旧动作不自动重放，已经提交但没有回包的动作显示为执行结果未确认。
+PC 的恢复设置只在每个游戏进程的首个成功连接时应用，手机通过会话快照获取状态。
+启动导入和会话初始化错误直接显示，便于排查。
 
-本地 PGvZ 1.4.3 中，`LawnMod/IronPyInteractive.cs` 的 `PyHub.OnMessage()` 执行收到的
-Python，业务请求通过分发器转入主线程；`Sexy/Main.cs` 的 `Update()` 在游戏未激活且
-`RunWhenLocked` 为 false 时提前返回。手机还可能挂起整个进程，连网络代码也无法处理。
-因此协议不假定后台一定能返回 `queued` 或 `poll`，也不通过无响应判断是否断线。
-
-- 握手阶段最多等待 30 秒；socket 打开就取消握手计时器。就绪探测、版本探测、初始化
-  和业务请求都可以一直等待，游戏恢复后在原连接上继续处理。
-- 只有 socket 的 `close/error`、发送异常或握手超时才安排 3 秒后重连；同一时刻只保留
-  一个重连计时器。页面退出或会话被拒绝后停止重试，显式接管可重新建立已关闭的连接。
-- 真正断线时，停止等待原连接结果；如果存在未确认的动作或设置请求，单独保留“执行
-  结果未确认”警告，不能声称指令未执行。重连后不补发这些操作，也不依赖旧连接的取消
-  消息一定送达。旧 socket 的迟到结果、关闭或错误事件不影响新连接。
-- 自动重连保留 `_clientId`，PC 仍携带恢复设置，由游戏端的初始化记录决定是否应用；
-  手机始终不携带。成功后使用 `connect` 的当前状态快照更新网页，不另发 `snapshot`。
-- Python 导入失败仍保留调用栈并停止轮询，便于诊断；明确的初始化业务错误保留错误，
-  与正常的后台等待分开处理。
-
-队列使用一个普通 `threading.Lock`。网络线程交接请求、结果或确认信息时、主线程交换请求队列
-或提交结果时短暂持锁；会话检查、参数转换、游戏调用和状态序列化期间均不持锁。
+网络线程入队、读取或确认回包时短暂持有队列锁。主线程执行会话校验、参数转换、游戏调用和
+状态序列化期间不持此锁。
 
 ### 状态快照和选项应用
 
@@ -305,17 +205,22 @@ sync_reg.push_state(cheat=('daisyMode', 'danceMode'), weather=None)
 
 未注册的组，以及未知、私有或不可序列化的字段自动跳过。没有活动网页会话时不读取状态，也不缓存推送。已有网页重新连接时，会通过 `connect` 取得完整快照。新增组可沿用 `SyncRegistry.register()`，若要影响官方网页的控件，还需在 `applySyncState()` 接入相应的界面状态。
 
-推送通过游戏的 `/Py` 广播，复用 `PyHub.ExecutionEventJSON()` 和网页的 `parseResultMessage()`。载荷沿用 `sync` 结构，额外带活动页面的 `_clientId`。网页检查页面 ID 后按组、按字段比较 `revision`，使乱序的完整快照、推送和 `apply` 回包可以合并。首次同步期间收到的推送暂存，网页收到连接快照后再应用合并结果。部分天气字段会与上一次收到的天气字段合并。
-
-推送不触发额外轮询，网页更新也不回发 `apply`。PC 按现有规则保存收到的复选框状态，手机只更新当前页面。
+主线程保存每个字段最近一次更新及其原始 `revision`，包括网页提交的选项及速度变化。
+所有活动网页各自按 HTTP 轮询的修订号领取变化，按组和字段比较版本，再与快照、动作回包合并。
+部分天气状态沿用之前收到的字段。
+远端更新不回发 `apply`。PC 保存收到的复选框状态，手机只更新当前页面。
 
 ### 内置作弊菜单同步
 
 PGvZ-TAS 在游戏主线程安装 `ZBCheatDialog` 的 IL 钩子。复选框 5（自动收集资源）、8（房主无敌）和 11（后台运行）分别写入 `cheat.autoCollect`、`cheat.wontLose` 和 `cheat.runBackground`，在状态生效后推送该字段。菜单刷新时也从 `CheatOption` 读取这三个状态，设置复选框时关闭监听回调。
 
-接管时关闭已有的原生自动收集、房主无敌钩子。玩家资料载入时尝试重新开启原生自动收集的调用也会被拦截。后台运行字段立即写入 `Main.RunWhenLocked`，失焦时仍通过现有钩子应用。三个内置复选框沿用 PGvZ-TAS 的同步和保存规则，PC 由网页保存收到的状态。
+挂钩内置菜单时关闭已有的原生自动收集、房主无敌钩子。玩家资料载入时尝试重新开启原生自动收集的调用也会被拦截。后台运行字段立即写入 `Main.RunWhenLocked`，失焦时仍通过现有钩子应用。三个内置复选框沿用 PGvZ-TAS 的同步和保存规则，PC 由网页保存收到的状态。
 
 `SyncRegistry.set_local_state()` 记录本次游戏进程中经内置菜单操作过的字段。网页第一次连接时，恢复的本地设置跳过这些字段，快照返回游戏中的实际值。之后网页主动发送的 `apply` 照常生效。
+
+内置菜单更新时也检查全局速度字段。网页或脚本改速后，菜单用游戏原有的 `GetGameSpeedString()` 刷新“速度控制 当前”标签。
+慢速档小数超出原标签宽度时，显示精确的倒数分数，例如 `1/3x`。测量使用 `StashFont` 实现的
+`StringWidth()`，因为 IronPython 在该类型上无法调用 `Font.MeasureString()` 的默认接口实现。
 
 ### 彩蛋状态
 
@@ -398,8 +303,8 @@ PGvZ-TAS 在游戏主线程安装 `ZBCheatDialog` 的 IL 钩子。复选框 5（
 
 GUI 会将修改选项和放置器中的布尔开关保存到 `localStorage` 的 `pgvz-gui-checkbox-state` 项。
 PC 页面启动时先读取保存值；缺失字段使用代码默认值。每次初始化（包括断线重连）都通过
-`getInitialState()` 获取 `cheatOption` 和 `placer`，作为 `connect` 的 `state`。游戏端按
-页面 ID 只在该游戏进程内首次成功初始化时应用它们，随后重复连接只读取游戏当前状态。
+`getInitialState()` 获取 `cheatOption` 和 `placer`，作为 `connect` 的 `state`。每个游戏进程
+仅接受首个成功连接随附的恢复设置，后续页面都读取游戏当前状态。
 因此首次初始化前长期暂停或断线不会丢失恢复设置，回包丢失也不会导致重复覆盖。
 
 用户修改需要持久化的开关时立即保存，不等待游戏执行。`applySyncState()` 处理成功的
@@ -414,7 +319,9 @@ applyState({ cheat: { [key]: value } });
 
 ### 手机端：拉取模式
 
-手机浏览器可能被系统杀死后台页面，导致 GUI 内存状态丢失。手机端不读取或写入上述 `localStorage` 项，并始终将游戏内状态视为权威状态。网页不需要预先判断游戏进程是否运行：WebSocket 连接成功本身就表示游戏的 `/Py` 服务正在运行；连接建立后，GUI 通过不带 `state` 的 `connect` 请求拉取游戏内的完整状态。若游戏尚未运行，网页保持重连，直到连接成功后再同步。
+手机浏览器可能被系统杀死后台页面，导致 GUI 内存状态丢失。手机端不读取或写入上述
+`localStorage` 项，并始终将游戏内状态视为权威状态。HTTP 服务就绪后，GUI 通过不带
+`state` 的 `connect` 请求拉取游戏状态。如果 HTTP 服务暂时不可访问，页面会重试。
 
 ## 如何新增一个修改选项
 
@@ -455,8 +362,7 @@ def xxx(self, value):
   → Vue watch 检测 cheatOption.xxx 变化
   → setCheatOption('xxx', true)
   → applyState({cheat: {xxx: true}})
-  → PGvZProtocol.requestCode(clientId, id, "apply", {state}) 编码固定接口调用
-  → WebSocket → IronPython 执行
+  → POST /api/request 提交 JSON
   → gui_dispatcher.submit(...) 将 apply 请求入队
   → hook.py 主线程入口 → SyncRegistry.apply(...)
   → json.loads → obj.from_dict → setattr(cheat_option, 'xxx', True)

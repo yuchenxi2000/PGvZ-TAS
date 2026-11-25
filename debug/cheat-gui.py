@@ -33,13 +33,6 @@ sys.path.append(pyLibPath)
 sys.path.append(modsDirPath)
 
 
-def bootstrap_status():
-    # 调试入口等网页触发导入，以便区分游戏启动问题和修改器导入问题。
-    import Sexy
-    app = Sexy.GlobalStaticVars.gSexyAppBase
-    return app is not None and app.mLoadingThreadStarted, None
-
-
 # 先启动 HTTP 服务，再访问任何游戏类型。Android 上游戏类型或弹窗不可用时，
 # 诊断页面仍应当可访问。
 try:
@@ -83,9 +76,21 @@ try:
     class _ThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
         daemon_threads = True
 
-    _server = _ThreadingServer(('127.0.0.1', _GUI_PORT), _GUIHandler)
+    _http_path = os.path.join(modsDirPath, 'pgvztool', 'gui_http.py')
+    _http_module = {'__name__': '_pgvz_gui_http'}
+    try:
+        with open(_http_path, 'rb') as _source:
+            exec(compile(_source.read(), _http_path, 'exec'), _http_module)
+    except Exception as error:
+        _server = _ThreadingServer(('127.0.0.1', _GUI_PORT), _GUIHandler)
+        _http_status = 'HTTP {}: 仅静态文件，GUI API 加载失败（{}）'.format(_GUI_PORT, error)
+    else:
+        # 调试入口通过 /api/status 触发首次加载。
+        _server = _http_module['create_server'](
+            modsDirPath, _GUI_PORT, System.Guid.NewGuid().ToString('N'), load_on_request=True,
+        )
+        _http_status = 'HTTP {}: OK'.format(_server.server_port)
     threading.Thread(target=_server.serve_forever, daemon=True).start()
-    _http_status = 'HTTP {}: OK'.format(_server.server_port)
 except Exception as error:
     _http_status = 'HTTP {}: 失败（{}）'.format(_GUI_PORT, error)
 
@@ -131,6 +136,7 @@ _pgvztool_files = (
     'pgvztool/cheat.py',
     'pgvztool/cheat_actions.py',
     'pgvztool/dispatcher.py',
+    'pgvztool/gui_http.py',
     'pgvztool/hook.py',
     'pgvztool/keybinds.py',
     'pgvztool/overlay.py',
@@ -147,7 +153,7 @@ _gui_files = [
     'gui/js/data.js',
     'gui/js/i18n.js',
     'gui/js/options.js',
-    'gui/js/protocol.js',
+    'gui/js/debug.js',
     'gui/js/terrain.js',
 ]
 _gui_index_path = _join_mod_path('gui/index.html')
@@ -204,9 +210,9 @@ def _get_websocket_port():
 
 try:
     _websocket_port = _get_websocket_port()
-    _websocket_status = 'WebSocket 端口: {}'.format(_websocket_port)
+    _websocket_status = 'Python 调试端口: {}'.format(_websocket_port)
 except Exception as error:
-    _websocket_status = 'WebSocket: 读取失败（{}）'.format(error)
+    _websocket_status = 'Python 调试端口: 读取失败（{}）'.format(error)
 
 
 _message = (

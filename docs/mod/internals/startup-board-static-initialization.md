@@ -97,10 +97,11 @@ Main.Initialize()
 
 ## 当前修改器的规避流程
 
-正式入口启动后台线程，只导入 `Sexy` 并每 100 毫秒检查游戏就绪标志。观察到
-`gSexyAppBase` 已创建且 `mLoadingThreadStarted` 为 `true` 后，后台线程才导入 `pgvztool`，
-加载 `pgvz` 并注册 Hook。浏览器稍后连接时查询这次加载的结果。调试入口在网页连接时使用
-相同的游戏就绪条件，再由 WebSocket 回调导入。协议详见 [启动就绪探测](cheat-gui-protocol.md#启动就绪探测)。
+正式入口在主线程配置搜索路径并启动 HTTP 后台线程。HTTP 服务在后台加载，
+模组加载线程只导入 `Sexy` 并每 100 毫秒检查游戏就绪标志。观察到
+`gSexyAppBase` 已创建且 `mLoadingThreadStarted` 为 `true` 后，加载线程才导入 `pgvztool`，
+加载 `pgvz` 并注册 Hook。浏览器通过 `/api/status` 查询这次加载的结果。
+调试入口收到首次状态请求后，以相同的就绪条件启动加载。协议详见 [启动就绪探测](cheat-gui-protocol.md#启动就绪探测)。
 
 ## 修复边界
 

@@ -1,16 +1,13 @@
-// WebSocket 连接与统一请求结果回传。会话、状态和动作都由后端主线程分发器处理。
+// 普通请求和状态同步使用网页同源的 HTTP 接口。
 window.PGvZConnection = (() => {
-    const HANDSHAKE_TIMEOUT_MS = 30000;
-    const RECONNECT_DELAY_MS = 3000;
-    function create({ isMobile, t, setResult, getInitialState, applySyncState, lineupCode, onActionResult = () => {} }) {
+    const ACTIVE_POLL_MS = 100;
+    const IDLE_POLL_MS = 1000;
+    const RECONNECT_MS = 3000;
+
+    function create({ isMobile, t, setResult, getInitialState, applySyncState, lineupCode, onActionResult }) {
         const { computed, ref } = Vue;
-        const wsParams = new URLSearchParams(location.search);
-        const SERVER_URL = wsParams.get('ws') || 'ws://localhost:8080/Py';
-        const clientId = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
-            ? globalThis.crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const clientId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
         const connected = ref(false);
-        const sessionRejected = ref(false);
         const gameVersion = ref('');
         const supportedGameVersions = ref([]);
         const unsupportedGameVersion = computed(() => Boolean(gameVersion.value)
@@ -20,107 +17,130 @@ window.PGvZConnection = (() => {
         const pendingCount = ref(0);
         const hasUnconfirmedRequests = ref(false);
 
-        let ws = null;
-        let bootstrapProbeTimer = null;
-        let bootstrapStarted = false;
-        let bootstrapFailed = false;
-        let takeoverOnConnect = false;
-        let reconnectTimer = null;
-        let connectionAttemptTimer = null;
-        let leavingPage = false;
-        let requestCounter = 0;
-        let resultPollTimer = null;
-        let resultPollInFlight = false;
+        const pending = new Map();
+        const acknowledged = new Set();
         const stateRevisions = new Map();
-        let initialSyncState = Object.create(null);
-        const pendingRequests = new Map();
+        let updateRevision = 0;
+        let instance = null;
+        let generation = 0;
+        let timer = null;
+        let pollInFlight = false;
+        let requestCounter = 0;
+        let submissions = Promise.resolve();
+        let leaving = false;
 
-        function showSessionRejected(showToast = true) {
-            stopReconnect();
-            stopConnectionAttempt();
-            stopBootstrapProbe();
-            sessionRejected.value = true;
-            stateRevisions.clear();
-            initialSyncState = Object.create(null);
-            connected.value = false;
-            connectionState.value = 'occupied';
-            stopResultPolling();
-            resultPollInFlight = false;
-            clearRequests();
-            setResult(false, 'messages.sessionOccupied');
-            if (showToast) ElementPlus.ElMessage.error(t('messages.sessionOccupied'));
+        async function api(path, payload, keepalive = false) {
+            const options = { mode: 'same-origin', cache: 'no-store' };
+            if (payload) Object.assign(options, {
+                method: 'POST', keepalive, body: JSON.stringify(payload),
+                headers: { 'Content-Type': 'application/json', 'X-PGvZ-Instance': instance },
+            });
+            const response = await fetch('/api/' + path, options);
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                const error = new Error(data.error || `HTTP ${response.status}`);
+                error.status = response.status;
+                throw error;
+            }
+            return response.json();
         }
 
-        function transmit(code, { allowBeforeReady = false, quiet = false } = {}) {
-            if (sessionRejected.value && !allowBeforeReady) {
-                showSessionRejected();
-                return false;
+        function makeRequest(kind, details) {
+            return { ...details, _clientId: clientId, id: `${clientId}:${++requestCounter}`, kind };
+        }
+
+        function clearTimer() {
+            clearTimeout(timer);
+            timer = null;
+        }
+
+        function schedule(fn, delay) {
+            clearTimer();
+            timer = setTimeout(() => {
+                timer = null;
+                fn();
+            }, delay);
+        }
+
+        function clearPending() {
+            pending.clear();
+            pendingCount.value = 0;
+        }
+
+        function handleFailure(error, expectedGeneration) {
+            if (leaving || expectedGeneration !== generation) return;
+            generation++;
+            clearTimer();
+            if ([...pending.values()].some(kind => kind === 'action' || kind === 'apply')) {
+                hasUnconfirmedRequests.value = true;
+                setResult(false, 'messages.resultsUnconfirmed');
             }
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
-                ElementPlus.ElMessage.error(t('messages.notConnected'));
-                return false;
+            clearPending();
+            acknowledged.clear();
+            connected.value = false;
+            instance = null;
+            pollInFlight = false;
+            submissions = Promise.resolve();
+            updateRevision = 0;
+            stateRevisions.clear();
+            if (connectionState.value === 'error') return;
+            if (error.status && error.status !== 409 && error.status !== 503) {
+                connectionState.value = 'error';
+                setResult(false, '', error.message);
+                return;
             }
-            if (connectionState.value === 'error' && !allowBeforeReady) {
-                ElementPlus.ElMessage.error(t('messages.notConnected'));
-                return false;
+            gameVersion.value = '';
+            modVersion.value = '';
+            supportedGameVersions.value = [];
+            connectionState.value = 'reconnecting';
+            schedule(connect, RECONNECT_MS);
+        }
+
+        async function connect() {
+            if (leaving) return;
+            connectionState.value = 'initializing';
+            const expectedGeneration = generation;
+            try {
+                const status = await api('status');
+                if (leaving || expectedGeneration !== generation) return;
+                gameVersion.value = status.version || '';
+                modVersion.value = status.modVersion || '';
+                supportedGameVersions.value = status.supportedVersions || [];
+                if (status.error) {
+                    connectionState.value = 'error';
+                    setResult(false, '', status.error);
+                } else if (!status.ready) {
+                    schedule(connect, ACTIVE_POLL_MS);
+                } else {
+                    instance = status.instance;
+                    const state = isMobile ? undefined : getInitialState();
+                    submit('connect', { state }, true);
+                }
+            } catch (error) {
+                handleFailure(error, expectedGeneration);
             }
-            if (!connected.value && !allowBeforeReady) {
+        }
+
+        function submit(kind, details = {}, initializing = false) {
+            if (!connected.value && !initializing) {
                 ElementPlus.ElMessage.error(t('messages.notReady'));
                 return false;
             }
-            try {
-                ws.send(code);
-            } catch {
-                retryConnection();
-                ElementPlus.ElMessage.error(t('messages.notConnected'));
-                return false;
-            }
-            if (!quiet) setResult(true, 'messages.sent');
+            if (leaving) return false;
+            const request = makeRequest(kind, details);
+            const expectedGeneration = generation;
+            pending.set(request.id, kind);
+            pendingCount.value = pending.size;
+            setResult(true, initializing ? 'messages.waiting' : 'messages.sent');
+            // HTTP 请求可能经不同连接抵达，按页面提交顺序入队。
+            submissions = submissions.then(() => {
+                if (leaving || expectedGeneration !== generation || !pending.has(request.id)) return;
+                return api('request', request);
+            }).catch(error => {
+                if (pending.has(request.id)) handleFailure(error, expectedGeneration);
+            });
+            if (pending.size === 1) schedulePoll();
             return true;
-        }
-
-        function send(code, allowBeforeReady = false) {
-            if (allowBeforeReady) bootstrapFailed = false;
-            return transmit(code, { allowBeforeReady });
-        }
-
-        function submit(kind, details = {}, options = {}) {
-            if (sessionRejected.value && !options.allowBeforeReady) {
-                showSessionRejected();
-                return;
-            }
-            const id = `${clientId}:${++requestCounter}`;
-            let code = PGvZProtocol.requestCode(clientId, id, kind, details);
-            if (options.bootstrap) code = `${PGvZProtocol.BOOTSTRAP_CODE}\n${code}`;
-            if (options.expectResult !== false) {
-                pendingRequests.set(id, { kind });
-                pendingCount.value = pendingRequests.size;
-            }
-            const sent = transmit(code, options);
-            if (!sent) finishRequest(id);
-            scheduleResultPoll();
-            return sent;
-        }
-
-        function finishRequest(id) {
-            const request = pendingRequests.get(id);
-            if (!request) return null;
-            pendingRequests.delete(id);
-            pendingCount.value = pendingRequests.size;
-            return request;
-        }
-
-        function cancelRequests(ids) {
-            if (ids.length && ws && ws.readyState === WebSocket.OPEN) {
-                try { ws.send(PGvZProtocol.cancelCode(clientId, ids)); } catch { /* socket closed */ }
-            }
-        }
-
-        function clearRequests(cancel = true) {
-            const ids = [...pendingRequests.keys()];
-            ids.forEach(finishRequest);
-            if (cancel) cancelRequests(ids);
-            resultPollInFlight = false;
         }
 
         function sendAction(name, args = {}) {
@@ -128,45 +148,50 @@ window.PGvZConnection = (() => {
         }
 
         function applyState(state) {
-            submit('apply', { state });
+            return submit('apply', { state });
         }
 
         function refreshState() {
-            submit('snapshot');
+            return submit('snapshot');
         }
 
-        function stopResultPolling() {
-            if (resultPollTimer !== null) {
-                clearTimeout(resultPollTimer);
-                resultPollTimer = null;
-            }
+        function schedulePoll() {
+            if (leaving || !instance || pollInFlight) return;
+            if (pending.size || acknowledged.size) schedule(poll, ACTIVE_POLL_MS);
+            else if (connected.value) schedule(poll, IDLE_POLL_MS);
         }
 
-        function scheduleResultPoll() {
-            stopResultPolling();
-            // connect 的结果也要轮询，所以这里不能依赖 connected。
-            if (!pendingRequests.size) {
-                resultPollInFlight = false;
-                return;
-            }
-            if (!bootstrapStarted || !ws || ws.readyState !== WebSocket.OPEN || resultPollInFlight) return;
-            resultPollTimer = setTimeout(() => {
-                resultPollTimer = null;
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    resultPollInFlight = true;
-                    // 后台暂停可能连 poll 都不能处理；收到响应前不再堆积轮询。
-                    try { ws.send(PGvZProtocol.pollCode(clientId)); } catch { retryConnection(); }
+        async function poll() {
+            pollInFlight = true;
+            const expectedGeneration = generation;
+            const delivered = [...acknowledged];
+            try {
+                const response = await api('poll', {
+                    _clientId: clientId, revision: updateRevision,
+                    acknowledged: delivered,
+                });
+                if (leaving || expectedGeneration !== generation) return;
+                delivered.forEach(id => acknowledged.delete(id));
+                applyRequestResults(response.results);
+                if (connected.value) {
+                    for (const message of response.updates) {
+                        if (receiveSync(message)) updateRevision = Math.max(updateRevision, message.revision);
+                    }
                 }
-            }, 100);
+            } catch (error) {
+                handleFailure(error, expectedGeneration);
+            } finally {
+                if (expectedGeneration === generation) {
+                    pollInFlight = false;
+                    schedulePoll();
+                }
+            }
         }
 
-        function receiveSync(message) {
-            const { state, revision } = message;
+        function receiveSync({ state, revision }) {
             if (!Number.isSafeInteger(revision) || revision < 1 || !state
                 || typeof state !== 'object' || Array.isArray(state)) return false;
-
-            // 较新的消息可能只包含部分字段，按字段比较版本。初始化期间先合并，再一次性应用。
-            const changes = connected.value ? Object.create(null) : initialSyncState;
+            const changes = Object.create(null);
             for (const [group, fields] of Object.entries(state)) {
                 if (!fields || typeof fields !== 'object' || Array.isArray(fields)) continue;
                 if (!stateRevisions.has(group)) stateRevisions.set(group, new Map());
@@ -177,47 +202,35 @@ window.PGvZConnection = (() => {
                     (changes[group] ??= Object.create(null))[key] = value;
                 }
             }
-            if (connected.value && Object.keys(changes).length) applySyncState(changes);
+            if (Object.keys(changes).length) applySyncState(changes);
             return true;
         }
 
-        function applyStateMessage(message) {
-            if (message.action === 'sessionRejected') {
-                showSessionRejected();
-            } else if (message.action === 'sync' && receiveSync(message)) {
-                setResult(true, 'messages.syncOk');
-                if (!connected.value) {
-                    applySyncState(initialSyncState);
-                    initialSyncState = Object.create(null);
-                }
-                markConnected();
-            }
-        }
-
         function applyRequestResults(results) {
-            const acknowledged = [];
             for (const result of results) {
-                acknowledged.push(result.id);
-                if (!finishRequest(result.id)) continue;
-                if (result.ok && (result.kind === 'action' || result.kind === 'apply')
-                    && result.value?.action === 'sync') {
-                    receiveSync(result.value);
+                acknowledged.add(result.id);
+                if (!pending.delete(result.id)) continue;
+                pendingCount.value = pending.size;
+                if (result.errortype === 'SessionRejected' && result.kind !== 'connect') {
+                    handleFailure(new Error(result.error), generation);
+                    return;
+                }
+                if (result.ok && result.value?.action === 'sync') {
+                    if (receiveSync(result.value) && result.kind === 'connect') {
+                        updateRevision = result.value.revision;
+                    }
                 }
                 const errorKey = result.kind === 'action' ? onActionResult(result) : '';
                 if (!result.ok) {
-                    if (result.errortype === 'SessionRejected') {
-                        showSessionRejected();
-                        break;
-                    }
                     setResult(false, errorKey || '', `${result.errortype}: ${result.error}`);
                     if (result.kind === 'connect') {
-                        stopConnectionAttempt();
-                        clearRequests();
                         connectionState.value = 'error';
+                        clearPending();
                     }
                 } else if (result.kind === 'connect' || result.kind === 'snapshot') {
-                    applyStateMessage(result.value);
-                    if (sessionRejected.value) break;
+                    connected.value = true;
+                    connectionState.value = 'connected';
+                    setResult(true, 'messages.syncOk');
                 } else if (result.kind === 'action' && result.name === 'getLineup') {
                     lineupCode.value = result.value;
                     setResult(true, 'messages.lineupOk');
@@ -225,218 +238,22 @@ window.PGvZConnection = (() => {
                     setResult(true, 'messages.success');
                 }
             }
-            if (acknowledged.length && ws && ws.readyState === WebSocket.OPEN) {
-                try { ws.send(PGvZProtocol.acknowledgeCode(clientId, acknowledged)); } catch { retryConnection(); }
-            }
-            scheduleResultPoll();
-        }
-
-        function markConnected() {
-            stopConnectionAttempt();
-            stopReconnect();
-            sessionRejected.value = false;
-            connected.value = true;
-            connectionState.value = 'connected';
         }
 
         function releaseSession() {
-            leavingPage = true;
-            stopReconnect();
-            stopConnectionAttempt();
-            stopBootstrapProbe();
-            stopResultPolling();
-            if (ws && ws.readyState === WebSocket.OPEN && bootstrapStarted && !bootstrapFailed) {
-                try {
-                    clearRequests();
-                    submit('release', {}, { allowBeforeReady: true, quiet: true, expectResult: false });
-                } catch {
-                    // 页面关闭期间 WebSocket 可能已经被浏览器释放。
-                }
+            if (leaving) return;
+            leaving = true;
+            clearTimer();
+            if (instance) {
+                api('request', makeRequest('release'), true).catch(() => {});
             }
-            clearRequests(false);
-        }
-
-        function stopBootstrapProbe() {
-            if (bootstrapProbeTimer !== null) {
-                clearTimeout(bootstrapProbeTimer);
-                bootstrapProbeTimer = null;
-            }
-        }
-
-        function requestBootstrapReady() {
-            stopBootstrapProbe();
-            if (!ws || ws.readyState !== WebSocket.OPEN || bootstrapStarted) return;
-            transmit(PGvZProtocol.BOOTSTRAP_READY_PROBE_CODE, { allowBeforeReady: true, quiet: true });
-        }
-
-        function retryBootstrapReady() {
-            stopBootstrapProbe();
-            bootstrapProbeTimer = setTimeout(requestBootstrapReady, 100);
-        }
-
-        function startBootstrap() {
-            if (bootstrapStarted || !ws || ws.readyState !== WebSocket.OPEN) return;
-            stopBootstrapProbe();
-            bootstrapStarted = true;
-            const state = isMobile ? undefined : getInitialState();
-            const details = takeoverOnConnect ? { state, takeover: true } : { state };
-            takeoverOnConnect = false;
-            submit('connect', details, { allowBeforeReady: true, bootstrap: true });
-        }
-
-        function takeoverSession() {
-            if (!sessionRejected.value) return;
-            sessionRejected.value = false;
-            connectionState.value = 'initializing';
-            if (ws && ws.readyState === WebSocket.OPEN && bootstrapStarted) {
-                submit('connect', { state: isMobile ? undefined : getInitialState(), takeover: true },
-                    { allowBeforeReady: true });
-            } else {
-                takeoverOnConnect = true;
-                connect();
-            }
-        }
-
-        function stopReconnect() {
-            if (reconnectTimer !== null) {
-                clearTimeout(reconnectTimer);
-                reconnectTimer = null;
-            }
-        }
-
-        function stopConnectionAttempt() {
-            if (connectionAttemptTimer !== null) {
-                clearTimeout(connectionAttemptTimer);
-                connectionAttemptTimer = null;
-            }
-        }
-
-        function retryConnection() {
-            stopConnectionAttempt();
-            stopBootstrapProbe();
-            stopResultPolling();
-            if ([...pendingRequests.values()].some(request => request.kind === 'action' || request.kind === 'apply')) {
-                hasUnconfirmedRequests.value = true;
-                setResult(false, 'messages.resultsUnconfirmed');
-            }
-            // 断线不等于执行失败；既不重放动作，也不假定 cancel 能送达。
-            clearRequests(false);
-            bootstrapStarted = false;
-            connected.value = false;
-            gameVersion.value = '';
-            modVersion.value = '';
-            const previousSocket = ws;
-            ws = null; // 旧连接的迟到消息及 close/error 事件不能干扰新连接。
-            if (previousSocket) {
-                try { previousSocket.close(); } catch { /* retry on a new socket */ }
-            }
-            if (sessionRejected.value || leavingPage) {
-                if (sessionRejected.value) connectionState.value = 'occupied';
-                return;
-            }
-            connectionState.value = 'reconnecting';
-            if (reconnectTimer === null) {
-                reconnectTimer = setTimeout(() => {
-                    reconnectTimer = null;
-                    connect();
-                }, RECONNECT_DELAY_MS);
-            }
-        }
-
-        function connect() {
-            if (leavingPage) return;
-            if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
-            stopReconnect();
-            stopConnectionAttempt();
-            stateRevisions.clear();
-            initialSyncState = Object.create(null);
-            const socket = new WebSocket(SERVER_URL);
-            ws = socket;
-            connectionState.value = 'connecting';
-            // 只限制 WebSocket 握手；打开后允许游戏无限期暂停。
-            connectionAttemptTimer = setTimeout(() => {
-                connectionAttemptTimer = null;
-                retryConnection();
-            }, HANDSHAKE_TIMEOUT_MS);
-            socket.onopen = () => {
-                if (ws !== socket || leavingPage) return;
-                stopConnectionAttempt();
-                stopBootstrapProbe();
-                bootstrapStarted = false;
-                bootstrapFailed = false;
-                connected.value = false;
-                gameVersion.value = '';
-                supportedGameVersions.value = [];
-                modVersion.value = '';
-                connectionState.value = 'initializing';
-                setResult(true, 'messages.waiting');
-                requestBootstrapReady();
-            };
-            socket.onmessage = event => {
-                if (ws !== socket || leavingPage) return;
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.eventtype === 'output') return;
-                    if (data.statuscode === 0) {
-                        const message = PGvZProtocol.parseResultMessage(data.result);
-                        if (message && message.action === 'bootstrapReady') {
-                            if (message.ready) {
-                                stopBootstrapProbe();
-                                transmit(PGvZProtocol.GAME_VERSION_PROBE_CODE, { allowBeforeReady: true, quiet: true });
-                            } else {
-                                retryBootstrapReady();
-                            }
-                        } else if (message && message.action === 'gameVersion') {
-                            gameVersion.value = String(message.version || '');
-                            modVersion.value = String(message.modVersion || '');
-                            supportedGameVersions.value = Array.isArray(message.supportedVersions) ? message.supportedVersions : [];
-                            startBootstrap();
-                        } else if (message && message.action === 'queued') {
-                            scheduleResultPoll();
-                        } else if (message && (message.action === 'acknowledged' || message.action === 'cancelled')) {
-                            // 仅确认传输层交接，不覆盖业务结果。
-                        } else if (message && message.action === 'results') {
-                            resultPollInFlight = false;
-                            applyRequestResults(message.results);
-                        } else if (message?.action === 'sync' && typeof message._clientId === 'string') {
-                            if (!sessionRejected.value && message._clientId === clientId) receiveSync(message);
-                        } else {
-                            setResult(true, data.result ? '' : 'messages.success', data.result || '');
-                        }
-                    } else {
-                        // 原始调试代码的错误没有请求 ID，不能清空其他动作的等待状态。
-                        if (bootstrapFailed) return; // 保留第一次导入错误，忽略已发出轮询的后续错误。
-                        // 首次导入失败时分发器可能还不存在，停止轮询且不发送 cancel。
-                        if (!connected.value && connectionState.value === 'initializing') {
-                            stopConnectionAttempt();
-                            stopBootstrapProbe();
-                            bootstrapFailed = true;
-                            clearRequests(false);
-                            stopResultPolling();
-                            connectionState.value = 'error';
-                        }
-                        if (data.errortype) setResult(false, '', `${data.errortype}: ${data.error ?? data.result ?? ''}`);
-                        else setResult(false, 'messages.unknownError');
-                    }
-                } catch {
-                    setResult(false, 'messages.unknownError');
-                }
-            };
-            socket.onclose = () => {
-                if (ws !== socket) return;
-                retryConnection();
-            };
-            socket.onerror = () => {
-                if (ws !== socket) return;
-                retryConnection();
-            };
+            clearPending();
         }
 
         return {
-            clientId, connected, sessionRejected, unsupportedGameVersion, supportedGameVersions,
-            gameVersion, modVersion, connectionState,
-            pendingCount, hasUnconfirmedRequests,
-            send, sendAction, applyState, refreshState, connect, releaseSession, takeoverSession,
+            clientId, connected, unsupportedGameVersion, supportedGameVersions,
+            gameVersion, modVersion, connectionState, pendingCount, hasUnconfirmedRequests,
+            sendAction, applyState, refreshState, connect, releaseSession,
         };
     }
 

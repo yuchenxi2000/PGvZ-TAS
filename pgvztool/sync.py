@@ -2,7 +2,7 @@
 Serializable 基类和集中同步管理
 """
 import json
-import traceback
+import threading
 import Sexy
 import System
 from pgvz import __game_version__
@@ -10,13 +10,14 @@ from pgvz.version import MOD_VERSION
 
 
 class SessionRejected(RuntimeError):
-    """页面没有当前 GUI 会话的所有权。"""
+    """页面尚未加入或已退出 GUI 会话。"""
     pass
 
 
 def _log_apply_error(json_str, object_name, field_name, client_id):
     """输出同步异常，但不让日志失败覆盖原异常。"""
     try:
+        import traceback
         message = (
             '[pgvztool.sync] apply failed\n'
             'client_id: {}\n'
@@ -54,22 +55,6 @@ def _serialize(v):
     if isinstance(v, str):
         return v
     return None              # 不序列化的类型
-
-
-def _broadcast_execution_result(value):
-    from System.Reflection import Assembly, BindingFlags
-
-    assembly = Assembly.GetAssembly(Sexy.SexyAppBase)
-    interactive = assembly.GetType('LawnMod.IronPyInteractive', True)
-    server = interactive.GetField('mWS', BindingFlags.NonPublic | BindingFlags.Static).GetValue(None)
-    if server is None or not server.IsListening:
-        return
-
-    # 与 PyHub.OnMessage 一样，用原生序列化器包装 Python repr，再发给 /Py 的连接。
-    serialize = interactive.GetNestedType('PyHub').GetMethod('ExecutionEventJSON')
-    status = System.Enum.Parse(serialize.GetParameters()[0].ParameterType, 'executed')
-    message = serialize.Invoke(None, System.Array[System.Object]([status, repr(value), None]))
-    server.WebSocketServices['/Py'].Sessions.BroadcastAsync(message, None)
 
 
 class Serializable:
@@ -113,15 +98,15 @@ class Serializable:
 
 
 class SyncRegistry:
-    """同步状态与 GUI 会话。除初始化注册外，运行时方法均在游戏主线程调用。"""
+    """同步状态与 GUI 会话。网络线程只能读取已序列化的状态更新。"""
     def __init__(self):
         self._objects = {}
         self._read_only_groups = set()
-        self._active_client_id = None
+        self._clients = set()
         self._revision = 0
-        # 游戏进程内保留；断线、release 和结果缓存清理都不能重新触发恢复。
-        self._initialized_clients = set()
-        self._revoked_clients = set()
+        self._update_lock = threading.Lock()
+        self._updates = {}
+        self._initial_sync_done = False
         self._local_fields = set()
 
     def register(self, name, obj, *, read_only=False):
@@ -133,7 +118,7 @@ class SyncRegistry:
 
     @property
     def has_active_client(self):
-        return self._active_client_id is not None
+        return bool(self._clients)
 
     def _sync_message(self, state):
         self._revision += 1
@@ -164,18 +149,35 @@ class SyncRegistry:
         return self._sync_message(state) if state else None
 
     def push_state(self, **groups):
-        """在游戏主线程向活动网页推送指定组和字段的当前值，None 表示整组。"""
-        if self._active_client_id is None:
+        """在游戏主线程保存指定字段的当前值，供活动网页领取。"""
+        if not self._clients:
             return
         try:
-            message = self.read_state(**groups)
-            if message is None:
-                return
-            message['_clientId'] = self._active_client_id
-            _broadcast_execution_result(json.dumps(message))
+            self.publish_state(self.read_state(**groups))
         except Exception:
-            # 推送失败不应中断游戏主线程的调用者。
+            import traceback
             Sexy.Debug.Log(Sexy.DebugType.Error, '[pgvztool.sync] push failed: ' + traceback.format_exc())
+
+    def publish_state(self, message):
+        """在游戏主线程发布已生成的同步消息，保留动作回包的修订号。"""
+        if message is None:
+            return
+        with self._update_lock:
+            for group, fields in message['state'].items():
+                for field, value in fields.items():
+                    self._updates[group, field] = message['revision'], value
+
+    def poll_updates(self, client_id, after_revision):
+        """按原修订号返回各字段最新的值，避免覆盖更新的动作回包。"""
+        with self._update_lock:
+            if client_id not in self._clients:
+                return []
+            updates = {}
+            for (group, field), (revision, value) in self._updates.items():
+                if revision > after_revision:
+                    updates.setdefault(revision, {}).setdefault(group, {})[field] = value
+        return [{'action': 'sync', 'revision': revision, 'state': updates[revision]}
+                for revision in sorted(updates)]
 
     def set_local_state(self, name, field, value):
         """应用游戏内的手动修改，并保护该字段免受网页的首次恢复覆盖。"""
@@ -183,53 +185,39 @@ class SyncRegistry:
         self._local_fields.add((name, field))
         self.push_state(**{name: field})
 
-    def connect(self, client_id, json_str=None, takeover=False):
-        """占用官方 GUI 会话；已有活动页面时拒绝第二个页面。"""
-        if not client_id or (not takeover and (
-            client_id in self._revoked_clients
-            or self._active_client_id not in (None, client_id)
-        )):
-            Sexy.Debug.Log(
-                '[pgvztool.sync] rejected client_id={} active_client_id={}'.format(
-                    client_id,
-                    self._active_client_id,
-                )
-            )
-            return json.dumps({'action': 'sessionRejected', 'accepted': False})
-
-        previous = self._active_client_id
-        self._active_client_id = client_id
-
-        try:
-            if client_id not in self._initialized_clients and json_str is not None:
-                self.apply(json_str, restoring=True)
-            result = self.serialize()
-        except Exception:
-            self._active_client_id = previous
-            raise
-        self._initialized_clients.add(client_id)
-        self._revoked_clients.discard(client_id)
-        if previous is not None and previous != client_id:
-            self._revoked_clients.add(previous)
+    def connect(self, client_id, json_str=None):
+        """加入会话并读取快照；每个游戏进程只有一次初始设置恢复。"""
+        if not client_id:
+            raise ValueError('client ID is required')
+        if not self._initial_sync_done and json_str is not None:
+            self._apply(json_str, restoring=True)
+        result = self.serialize()
+        with self._update_lock:
+            self._clients.add(client_id)
+        self._initial_sync_done = True
         return result
 
     def require_client(self, client_id):
-        """供官方 GUI 在每条指令前校验会话所有权。"""
-        if not client_id or client_id != self._active_client_id:
-            raise SessionRejected(
-                'another pgvztool GUI session is already active'
-            )
+        """供官方 GUI 在每条指令前校验该页面的会话。"""
+        if client_id not in self._clients:
+            raise SessionRejected('this pgvztool GUI page is not connected')
 
     def release(self, client_id):
-        if client_id == self._active_client_id:
-            self._active_client_id = None
+        with self._update_lock:
+            self._clients.discard(client_id)
+            if not self._clients:
+                self._updates.clear()
 
-    def apply(self, json_str, *, return_sync=False, restoring=False):
+    def apply(self, json_str, *, return_sync=False):
+        return self._apply(json_str, return_sync=return_sync)
+
+    def _apply(self, json_str, *, return_sync=False, restoring=False):
         name = field = client_id = None
         try:
             msg = json.loads(json_str)
             client_id = msg.get('_clientId')
-            self.require_client(client_id)
+            if not restoring:
+                self.require_client(client_id)
             groups = {}
             for name, obj in self._objects.items():
                 data = msg.get(name)

@@ -76,6 +76,7 @@ class GuiDispatcher:
         self._records = {}
         self._pending = []
         self._next_order = 0
+        self._closed_pages = set()
         seed = _enum(Lawn.SeedType)
         zombie = _enum(Lawn.ZombieType)
         grid_item = _enum(Lawn.GridItemType)
@@ -136,8 +137,8 @@ class GuiDispatcher:
                 ('grid', _terrain_grid), ('rows', _terrain_rows))),
         }
 
-    def submit(self, json_str):
-        """WebSocket 线程入口：仅解析和排队，不读取会话或游戏对象。"""
+    def submit(self, json_str, *, close_on_release=False):
+        """仅解析和排队，不读取会话或游戏对象。"""
         request = json.loads(json_str)
         if not isinstance(request, dict):
             raise TypeError('GUI request must be an object')
@@ -150,6 +151,11 @@ class GuiDispatcher:
         key = request['_clientId'], request_id
         with self._lock:
             self._cleanup_locked()
+            client_id = request['_clientId']
+            if close_on_release and client_id in self._closed_pages:
+                if request['kind'] == 'release':
+                    return json.dumps({'action': 'queued', 'id': request_id})
+                raise ValueError('GUI page has closed')
             record = self._records.get(key)
             if record is not None:
                 if record['request'] != request:
@@ -158,6 +164,12 @@ class GuiDispatcher:
                 record['acknowledged'] = False
                 record['abandoned'] = False
             else:
+                if close_on_release and request['kind'] == 'release':
+                    # 页面退出的 HTTP 请求可能比之前的提交先到。
+                    self._closed_pages.add(client_id)
+                    for other in self._records.values():
+                        if other['request']['_clientId'] == client_id:
+                            self._cancel_locked(other)
                 self._next_order += 1
                 record = {
                     'request': request, 'finished': None,
@@ -214,6 +226,10 @@ class GuiDispatcher:
             try:
                 result['value'] = self._execute(request)
                 json.dumps(result['value'])
+                value = result['value']
+                if (request['kind'] in ('action', 'apply') and isinstance(value, dict)
+                        and value.get('action') == 'sync'):
+                    sync_reg.publish_state(value)
                 result['ok'] = True
             except Exception as error:
                 result.update(ok=False, error=str(error), errortype=type(error).__name__)
@@ -224,7 +240,7 @@ class GuiDispatcher:
                         if other['request']['_clientId'] == request['_clientId']:
                             self._cancel_locked(other)
 
-    def poll(self, client_id):
+    def poll(self, client_id, *, revision=None):
         """未确认结果一直保留；页面回到前台后仍能领取。"""
         self._client_id(client_id)
         with self._lock:
@@ -233,7 +249,10 @@ class GuiDispatcher:
             results = [record['result'] for record in records
                        if record['request']['_clientId'] == client_id
                        and record['status'] == 'done' and not record['acknowledged']]
-        return json.dumps({'action': 'results', 'results': results})
+        message = {'action': 'results', 'results': results}
+        if revision is not None:
+            message['updates'] = sync_reg.poll_updates(client_id, revision)
+        return json.dumps(message)
 
     def _request_ids(self, client_id, json_ids):
         self._client_id(client_id)
@@ -284,9 +303,8 @@ class GuiDispatcher:
             if state is not None and not isinstance(state, dict):
                 raise TypeError('initial state must be an object')
             payload = dict(state, _clientId=client_id) if state is not None else None
-            takeover = _boolean(request.get('takeover', False))
             return json.loads(sync_reg.connect(
-                client_id, json.dumps(payload) if payload is not None else None, takeover))
+                client_id, json.dumps(payload) if payload is not None else None))
         if kind == 'release':
             return sync_reg.release(client_id)
 

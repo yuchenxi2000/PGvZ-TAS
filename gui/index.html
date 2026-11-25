@@ -29,17 +29,6 @@
 
         <main class="app-shell">
             <el-alert
-                v-if="sessionRejected"
-                :title="t('messages.sessionOccupied')"
-                type="error"
-                show-icon
-                :closable="false"
-                class="compatibility-alert"
-            >
-                <span>{{ t('messages.sessionOccupiedDetail') }}</span><br>
-                <el-button type="primary" @click="takeoverSession">{{ t('messages.takeoverSession') }}</el-button>
-            </el-alert>
-            <el-alert
                 v-if="hasUnconfirmedRequests"
                 :title="t('messages.resultsUnconfirmed')"
                 type="warning"
@@ -456,8 +445,13 @@
                 <el-tab-pane :label="t('tabs.custom')" name="custom">
                     <el-card shadow="never" class="tool-card">
                         <template #header>{{ t('sections.customCode') }}</template>
+                        <el-form label-position="top" class="debug-port">
+                            <el-form-item :label="t('fields.debugPort')" :error="debugPortError">
+                                <el-input-number v-model="debugPort" :min="debugPortMin" :max="debugPortMax" :step="1" :controls="false" />
+                            </el-form-item>
+                        </el-form>
                         <div class="button-grid two custom-actions">
-                            <el-button type="primary" @click="sendCustomCode">{{ t('actions.sendCode') }}</el-button>
+                            <el-button type="primary" :disabled="!!debugPortError" @click="sendCustomCode">{{ t('actions.sendCode') }}</el-button>
                             <el-button @click="customCode = ''">清空</el-button>
                         </div>
                         <el-input v-model="customCode" type="textarea" :rows="12" resize="vertical" :placeholder="t('placeholders.customCode')" />
@@ -484,7 +478,7 @@
     <script src="https://cdn.jsdelivr.net/npm/element-plus@2.14.8/dist/index.full.min.js"></script>
     <script src="./js/i18n.js"></script>
     <script src="./js/data.js"></script>
-    <script src="./js/protocol.js"></script>
+    <script src="./js/debug.js"></script>
     <script src="./js/options.js"></script>
     <script src="./js/connection.js"></script>
     <script src="./js/terrain.js"></script>

@@ -66,10 +66,14 @@ class SyncTests(unittest.TestCase):
 
         self.state = State()
         self.other = State()
-        self.registry = self.module.SyncRegistry()
-        self.registry.register('first', self.state)
-        self.registry.register('second', self.other)
+        self.registry = self.new_registry()
         self.registry.connect('client')
+
+    def new_registry(self):
+        registry = self.module.SyncRegistry()
+        registry.register('first', self.state)
+        registry.register('second', self.other)
+        return registry
 
     def apply(self, **objects):
         self.registry.apply(json.dumps(dict(objects, _clientId='client')))
@@ -99,17 +103,16 @@ class SyncTests(unittest.TestCase):
 
         self.registry.register('demand', OnDemand())
         self.state.choice = self.Choice.B
-        with patch.object(self.module, '_broadcast_execution_result') as broadcast:
-            self.registry.push_state(first=('choice', '_private', 'unknown'), demand='status', second=None)
-            self.registry.push_state(unknown=None)
-            self.registry.release('client')
-            self.registry.push_state(demand=None)
-        broadcast.assert_called_once()
-        event = json.loads(broadcast.call_args.args[0])
-        self.assertEqual((event['action'], event['_clientId']), ('sync', 'client'))
+        self.registry.push_state(first=('choice', '_private', 'unknown'), demand='status', second=None)
+        self.registry.push_state(unknown=None)
+        event, = self.registry.poll_updates('client', 0)
+        self.assertEqual(event['action'], 'sync')
         self.assertEqual(event['state'], {
             'first': {'choice': 'B'}, 'demand': {'status': 'available'}, 'second': self.other.to_dict(),
         })
+        self.registry.release('client')
+        self.registry.push_state(demand=None)
+        self.assertEqual(self.registry.poll_updates('client', 0), [])
 
     def test_apply_returns_current_values_only_for_requested_fields(self):
         message = json.dumps({'_clientId': 'client', 'first': {'guarded': '5', 'choice': 'Missing'},
@@ -119,23 +122,40 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(result['state'], {'first': {'guarded': 5, 'choice': 'A'}, 'second': {'flag': True}})
 
     def test_local_change_pushes_and_has_priority_over_initial_restore_only(self):
-        self.registry.release('client')
-        with patch.object(self.module, '_broadcast_execution_result') as broadcast:
-            self.registry.set_local_state('first', 'flag', True)
-            broadcast.assert_not_called()
-            payload = json.dumps({'_clientId': 'pc', 'first': {'flag': False, 'count': 8}})
-            snapshot = json.loads(self.registry.connect('pc', payload))
-            self.assertTrue(snapshot['state']['first']['flag'])
-            self.assertEqual(self.state.count, 8)
+        self.registry = self.new_registry()
+        self.registry.set_local_state('first', 'flag', True)
+        payload = json.dumps({'_clientId': 'pc', 'first': {'flag': False, 'count': 8}})
+        snapshot = json.loads(self.registry.connect('pc', payload))
+        self.assertTrue(snapshot['state']['first']['flag'])
+        self.assertEqual(self.state.count, 8)
+        self.assertEqual(self.registry.poll_updates('pc', 0), [])
 
-            self.registry.apply(payload)
-            self.assertFalse(self.state.flag)
-            self.registry.set_local_state('first', 'flag', True)
+        self.registry.apply(payload)
+        self.assertFalse(self.state.flag)
+        self.registry.set_local_state('first', 'flag', True)
 
-        broadcast.assert_called_once()
-        update = json.loads(broadcast.call_args.args[0])
-        self.assertEqual(update['_clientId'], 'pc')
+        update, = self.registry.poll_updates('pc', snapshot['revision'])
         self.assertEqual(update['state'], {'first': {'flag': True}})
+
+    def test_poll_coalesces_fields_and_shares_them_with_connected_pages(self):
+        self.state.flag = True
+        self.registry.push_state(first='flag')
+        first, = self.registry.poll_updates('client', 0)
+        self.state.count = 2
+        self.registry.push_state(first='count')
+        self.state.flag = False
+        self.registry.push_state(first='flag')
+        count, flag = self.registry.poll_updates('client', first['revision'])
+        self.assertLess(count['revision'], flag['revision'])
+        self.assertEqual(count['state'], {'first': {'count': 2}})
+        self.assertEqual(flag['state'], {'first': {'flag': False}})
+        self.assertEqual(self.registry.poll_updates('client', flag['revision']), [])
+        self.registry.connect('new')
+        self.assertEqual(self.registry.poll_updates('new', 0), [count, flag])
+        self.assertEqual(self.registry.poll_updates('unknown', 0), [])
+        self.registry.release('client')
+        self.assertEqual(self.registry.poll_updates('client', 0), [])
+        self.assertEqual(self.registry.poll_updates('new', count['revision']), [flag])
 
     def test_simple_fields_have_no_extra_type_or_range_validation(self):
         self.apply(first={'flag': 'direct assignment', 'count': -1})
@@ -176,16 +196,20 @@ class SyncTests(unittest.TestCase):
             self.registry.apply(json.dumps({'_clientId': 'other', 'first': {'flag': True}}))
         self.assertFalse(self.state.flag)
 
-    def test_failed_initial_snapshot_restores_session_owner(self):
-        self.registry.release('client')
+    def test_failed_initial_snapshot_does_not_register_page_or_consume_first_restore(self):
+        self.registry = self.new_registry()
         with patch.object(self.registry, 'serialize', side_effect=RuntimeError('snapshot unavailable')):
             with self.assertRaises(RuntimeError):
                 self.registry.connect('new')
-        self.assertIsNone(self.registry._active_client_id)
-        self.assertNotIn('new', self.registry._initialized_clients)
+        self.assertFalse(self.registry.has_active_client)
+        with self.assertRaises(self.module.SessionRejected):
+            self.registry.require_client('new')
+        payload = json.dumps({'_clientId': 'new', 'first': {'flag': True}})
+        result = json.loads(self.registry.connect('new', payload))
+        self.assertTrue(result['state']['first']['flag'])
 
     def test_restoration_runs_once_even_after_lost_reply_release_and_long_pause(self):
-        self.registry.release('client')
+        self.registry = self.new_registry()
         payload = json.dumps({'_clientId': 'pc', 'first': {'flag': True}})
         self.registry.connect('pc', payload)  # 首次结果丢失。
         self.assertTrue(self.state.flag)
@@ -203,34 +227,25 @@ class SyncTests(unittest.TestCase):
         registry.connect('client', payload)
         self.assertTrue(self.state.flag)
 
-    def test_background_pause_does_not_expire_ownership(self):
+    def test_background_pause_keeps_existing_pages_connected(self):
         with patch('time.monotonic', return_value=100000):
             result = json.loads(self.registry.connect('other'))
-        self.assertEqual(result['action'], 'sessionRejected')
-        self.assertEqual(self.registry._active_client_id, 'client')
-
-    def test_takeover_revokes_old_page_even_after_new_page_releases(self):
-        result = json.loads(self.registry.connect('new', takeover=True))
         self.assertEqual(result['action'], 'sync')
-        with self.assertRaises(self.module.SessionRejected):
-            self.registry.require_client('client')
-        self.registry.release('client')  # 旧页面迟到退出不释放新会话。
-        self.assertEqual(self.registry._active_client_id, 'new')
-        self.registry.release('new')
-        self.assertEqual(json.loads(self.registry.connect('client'))['action'], 'sessionRejected')
-        self.assertEqual(json.loads(self.registry.connect('client', takeover=True))['action'], 'sync')
+        self.registry.require_client('client')
+        self.registry.require_client('other')
 
-    def test_failed_takeover_keeps_previous_owner_and_can_retry_restoration(self):
+    def test_later_pages_pull_current_state_even_after_all_previous_pages_close(self):
         payload = json.dumps({'_clientId': 'new', 'first': {'flag': True}})
         with patch.object(self.registry, 'serialize', side_effect=RuntimeError('snapshot unavailable')):
             with self.assertRaises(RuntimeError):
-                self.registry.connect('new', payload, takeover=True)
-        self.assertEqual(self.registry._active_client_id, 'client')
-        self.assertNotIn('client', self.registry._revoked_clients)
-        self.assertNotIn('new', self.registry._initialized_clients)
-        self.state.flag = False
-        self.registry.connect('new', payload, takeover=True)
-        self.assertTrue(self.state.flag)
+                self.registry.connect('new', payload)
+        self.registry.require_client('client')
+        with self.assertRaises(self.module.SessionRejected):
+            self.registry.require_client('new')
+        self.registry.release('client')
+        self.assertFalse(self.registry.has_active_client)
+        result = json.loads(self.registry.connect('new', payload))
+        self.assertFalse(result['state']['first']['flag'])
 
 
 if __name__ == '__main__':

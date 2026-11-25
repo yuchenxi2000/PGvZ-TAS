@@ -117,7 +117,7 @@ class CheatOption(Serializable):
         self.showSeedPacketNumbers = False
         self.showCraterCooldown = False
         self.drawSquirrel = False
-        self.tasEnabled = True
+        self.tasEnabled = False
 
     @property
     def noSunLimit(self):

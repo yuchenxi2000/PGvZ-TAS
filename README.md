@@ -8,6 +8,8 @@
 
 ## 快速开始
 
+先下载适用于当前游戏版本的发布 ZIP。 [发布下载](https://github.com/yuchenxi2000/PGvZ-TAS/releases)
+
 **PC**：运行 `cp-cheat-mods.bat` 自动安装，或手动将 `pgvz/`、`pgvztool/`、`gui/`、`cheat-gui.py` 复制到 mods 目录。启动游戏，浏览器打开 `http://localhost:58080`。
 
 **安卓**：将以上文件复制到 mods 目录，启动游戏，浏览器打开 `http://localhost:58080`。（你可能需要一个文件管理器来复制文件，比如MT管理器）
@@ -19,17 +21,19 @@ mods 目录位置：
 | PC | `C:\Users\{用户名}\AppData\Roaming\ZBC\PlantGirlsVsZombies\mods` |
 | 安卓 | `/storage/emulated/0/Android/data/net.pvz.pgvz.zbcteam/files/mods` |
 
-详细安装步骤和故障排查见 [docs/mod/user-guide/install.md](docs/mod/user-guide/install.md)。
+将 `{用户名}` 替换为 `C:\Users` 下当前 Windows 账户的文件夹名。`AppData` 默认隐藏，可将完整路径粘贴到文件资源管理器地址栏打开。
+
+等网页页眉显示「可操作」后即可使用普通功能。 [安装步骤和故障排查](docs/mod/user-guide/install.md)
 
 ## 修改器功能、TAS 工具使用
 
 - **常用修改**：免费用卡、随意种植、植物/僵尸无敌、暂停出怪等几十项开关
 - **场地放置**：直接在网页里选择植物/僵尸/物品类型，点击按钮放置到场地
-- **轻松放置**：勾选“轻松放置”并选择放置模式。进入关卡后点击顶部的卷饼图标激活，铲子和手套同时显示时图标在菜单右侧。左键场地放置，右键退出。选择传送门模式可移动传送门位置。
-- **TAS 工具**：在"常用修改"中勾选"启用 TAS"后，右下角出现四个按钮——Save 存档、Undo 回到上一个存档点（live 状态下会先自动保存当前位置）、Redo 前进到下一个存档点、Adv 运行一帧后暂停。右下角还有帧计数器。利用这些功能可以精确控制操作时机，实现类似模拟器 TAS 的效果
+- **轻松放置**：在「场地」页打开「启用轻松放置」并设置「轻松放置模式」。进关后点击玉米饼（Taco）图标激活，铲子和手套同时显示时图标在菜单右侧。PC 左键放置、右键退出。安卓点按场地放置，再点图标退出。选择传送门模式可移动传送门。
+- **TAS 工具**：在「基础」页的「常用修改」中打开「启用 TAS」。右下角会显示 Save（存档）、Undo（回到上一个存档点，实时游玩时先存档）、Redo（前进到下一个存档点）、Adv（运行一帧后暂停）和帧计数器。
 - **自定义快捷键**：可重新绑定选择种子包、铲子、手套、轻松放置、TAS 按钮、暂停游戏等按键，已适配常见非英文输入法，详见 [docs/mod/user-guide/keybinds.md](docs/mod/user-guide/keybinds.md)
 
-下面是图片教程，轻松放置和 TAS 工具使用方法：
+下面的游戏截图以 PC 操作为例。
 
 ![轻松放置和 TAS 工具](docs/mod/user-guide/assets/PGvZTool_tips1.jpg)
 

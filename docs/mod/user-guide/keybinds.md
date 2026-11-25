@@ -2,12 +2,14 @@
 
 ## 配置文件
 
-位置：和 `user_config.json` 同级目录下的 `keybinds.txt`
+在 `mods/` 的上一级目录创建 `keybinds.txt`。
 
 | 平台 | 路径 |
 |---|---|
 | PC | `C:\Users\{用户名}\AppData\Roaming\ZBC\PlantGirlsVsZombies\keybinds.txt` |
 | 安卓 | `/storage/emulated/0/Android/data/net.pvz.pgvz.zbcteam/files/keybinds.txt` |
+
+将 `{用户名}` 替换为 `C:\Users` 下当前 Windows 账户的文件夹名。`AppData` 默认隐藏，可将文件所在目录的完整路径粘贴到文件资源管理器地址栏打开。
 
 格式：一行一个，`功能名 = 按键`，空行和 `#` 开头的行忽略。
 

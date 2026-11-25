@@ -435,14 +435,13 @@ class GuiDispatcherTests(unittest.TestCase):
 
         self.main_thread = True
         try:
-            with patch.object(self.sync_module, '_broadcast_execution_result') as broadcast:
-                self.assertIs(namespace['SexyAppBase__DoUpdateFrames'](original, self.app), False)
-                self.assertIs(namespace['SexyAppBase__DoUpdateFrames'](original, self.app), False)
+            self.assertIs(namespace['SexyAppBase__DoUpdateFrames'](original, self.app), False)
+            self.assertIs(namespace['SexyAppBase__DoUpdateFrames'](original, self.app), False)
         finally:
             self.main_thread = False
         self.assertEqual(installations, ['installed'])
-        broadcast.assert_called_once()
-        state = json.loads(broadcast.call_args.args[0])['state']
+        update, = json.loads(self.dispatcher.poll('client-1', revision=0))['updates']
+        state = update['state']
         self.assertEqual(tuple(state['speed']), ('board',))
         self.assertEqual(state['speed']['board']['numerator'], 0)
 
@@ -471,7 +470,7 @@ class GuiDispatcherTests(unittest.TestCase):
                 self.assertTrue(result['error'])
         self.assertEqual(self.board.mSunMoney, 0)
 
-    def test_another_client_is_rejected_on_main_thread_and_gets_own_result(self):
+    def test_unconnected_client_is_rejected_on_main_thread_and_gets_own_result(self):
         self.dispatch('setMoney', {'value': 77})
         self.dispatch('winLevel', client_id='another')
         self.run_tasks()
@@ -519,16 +518,19 @@ class GuiDispatcherTests(unittest.TestCase):
         self.assertEqual(board_fraction['value']['state']['speed']['board'],
                          {'id': board_id, 'numerator': 6, 'denominator': 4})
 
-    def test_speed_snapshot_tracks_board_changes_and_ignores_restore_writes(self):
+    def test_speed_snapshot_tracks_board_changes_and_rejects_state_writes(self):
         self.submit('snapshot')
         self.run_tasks()
         board_id = self.results()[0]['value']['state']['speed']['board']['id']
         self.dispatch('setBoardSpeed', {'boardId': board_id, 'value': '3'})
         self.app.mBoard = types.SimpleNamespace(mAccelerationNumerator=1, mAccelerationDenominator=1)
-        self.submit('connect', client_id='other', takeover=True, state={'speed': {'global': 8, 'board': 9}})
+        self.submit('connect', client_id='other')
+        self.submit('apply', client_id='other', state={'speed': {'global': 8, 'board': 9}})
         self.run_tasks()
         self.assertEqual(self.results()[0]['errortype'], 'SpeedBoardChanged')
-        new_speed = self.results('other')[0]['value']['state']['speed']
+        snapshot, ignored_apply = self.results('other')
+        self.assertIsNone(ignored_apply['value'])
+        new_speed = snapshot['value']['state']['speed']
         self.assertNotEqual(new_speed['board']['id'], board_id)
         self.assertEqual(new_speed['board']['numerator'], 1)
         self.assertEqual(new_speed['global'], {'numerator': 1, 'denominator': 1})
@@ -584,14 +586,17 @@ class GuiDispatcherTests(unittest.TestCase):
         self.assertTrue(results[1]['value']['state']['cheat']['noCooldown'])
 
     def test_connect_applies_pc_state_and_reads_mobile_state_on_main_thread(self):
-        self.submit('connect', client_id='pc', takeover=True,
-                    state={'cheat': {'noCooldown': True}}, request_id='pc')
-        self.assertFalse(self.state._value)
-        self.run_tasks()
-        self.assertTrue(self.results('pc')[0]['value']['state']['cheat']['noCooldown'])
-        self.submit('connect', client_id='mobile', takeover=True, request_id='mobile')
-        self.run_tasks()
-        self.assertTrue(self.results('mobile')[0]['value']['state']['cheat']['noCooldown'])
+        registry = self.sync_module.SyncRegistry()
+        registry.register('cheat', self.state)
+        with patch.object(self.dispatcher_module, 'sync_reg', registry):
+            self.submit('connect', client_id='pc',
+                        state={'cheat': {'noCooldown': True}}, request_id='pc')
+            self.assertFalse(self.state._value)
+            self.run_tasks()
+            self.assertTrue(self.results('pc')[0]['value']['state']['cheat']['noCooldown'])
+            self.submit('connect', client_id='mobile', request_id='mobile')
+            self.run_tasks()
+            self.assertTrue(self.results('mobile')[0]['value']['state']['cheat']['noCooldown'])
 
     def prepare_easter_egg_options(self):
         tree = ast.parse((ROOT / 'pgvztool/cheat.py').read_text(encoding='utf-8'))
@@ -693,13 +698,11 @@ class GuiDispatcherTests(unittest.TestCase):
         self.assertFalse(hooks['Board__LoadGame'](lambda board, path: False, self.board, 'bad.dat'))
         self.assertFalse(self.board.mDanceMode)
 
-        with patch.object(self.sync_module, '_broadcast_execution_result') as broadcast:
-            hooks['Board__DoTypingCheck'](lambda board, key: None, self.board, 'X')
-            hooks['Board__DoTypingCheck'](lambda board, key: board.SetFutureMode(True), self.board, 'E')
-            hooks['GameSelector__KeyDown'](lambda selector, key: setattr(self.app, 'mDaisyMode', True), object(), 'S')
-        self.assertEqual(broadcast.call_count, 2)
-        first, second = [json.loads(call.args[0]) for call in broadcast.call_args_list]
-        self.assertEqual((second['action'], second['_clientId']), ('sync', 'client-1'))
+        hooks['Board__DoTypingCheck'](lambda board, key: None, self.board, 'X')
+        hooks['Board__DoTypingCheck'](lambda board, key: board.SetFutureMode(True), self.board, 'E')
+        hooks['GameSelector__KeyDown'](lambda selector, key: setattr(self.app, 'mDaisyMode', True), object(), 'S')
+        first, second = self.registry.poll_updates('client-1', 0)
+        self.assertEqual(second['action'], 'sync')
         self.assertLess(first['revision'], second['revision'])
         self.assertTrue(options.futureMode and options.daisyMode)
         self.assertEqual(first['state'], {'cheat': {'futureMode': True}})
@@ -714,12 +717,12 @@ class GuiDispatcherTests(unittest.TestCase):
         self.assertTrue(self.results()[0]['ok'])
         self.assertEqual(self.calls, ['Drop'])
 
-    def test_rejected_connect_is_delivered_without_touching_state(self):
+    def test_later_connect_reads_state_without_applying_its_saved_settings(self):
         self.submit('connect', client_id='other', state={'cheat': {'noCooldown': True}})
         self.run_tasks()
         result = self.results('other')[0]
         self.assertTrue(result['ok'])
-        self.assertEqual(result['value']['action'], 'sessionRejected')
+        self.assertEqual(result['value']['action'], 'sync')
         self.assertFalse(self.state._value)
 
     def test_release_is_a_main_thread_control_request_and_cancels_later_work(self):
@@ -727,29 +730,58 @@ class GuiDispatcherTests(unittest.TestCase):
         self.run_tasks()
         self.submit('release', request_id='release')
         self.dispatch('placeMower', request_id='after-release')
-        self.assertEqual(self.registry._active_client_id, 'client-1')
+        self.registry.require_client('client-1')
         self.run_tasks()
-        self.assertIsNone(self.registry._active_client_id)
+        self.assertFalse(self.registry.has_active_client)
         self.assertEqual(self.results(), [])
         self.assertEqual(self.calls, [])
 
-    def test_takeover_blocks_queued_actions_and_late_reconnects_from_previous_owner(self):
-        self.submit('connect', client_id='new', takeover=True)
-        self.dispatch('winLevel', request_id='old-action')
-        self.submit('connect', request_id='old-reconnect')
+    def test_connected_pages_execute_in_order_and_poll_their_own_results(self):
+        self.submit('connect', client_id='new')
+        self.dispatch('setSun', {'value': 5}, request_id='same')
+        self.dispatch('setSun', {'value': 15}, client_id='new', request_id='same')
         self.run_tasks()
-        self.assertEqual(self.calls, [])
-        old_results = self.results()
-        self.assertEqual(old_results[0]['errortype'], 'SessionRejected')
-        self.assertEqual(old_results[1]['value']['action'], 'sessionRejected')
-        self.assertEqual(self.results('new')[0]['value']['action'], 'sync')
-        self.assertEqual(self.registry._active_client_id, 'new')
+        self.assertEqual(self.board.mSunMoney, 15)
+        self.assertEqual([result['id'] for result in self.results()], ['same'])
+        connect, action = self.results('new')
+        self.assertEqual(connect['value']['action'], 'sync')
+        self.assertTrue(action['ok'])
+        self.assertEqual(action['id'], 'same')
 
-    def test_takeover_flag_requires_a_boolean(self):
-        self.submit('connect', client_id='other', takeover='false')
+    def test_pages_receive_shared_state_and_closing_one_leaves_the_other_active(self):
+        self.submit('connect', client_id='new')
+        self.submit('apply', state={'cheat': {'noCooldown': True}})
         self.run_tasks()
-        self.assertEqual(self.results('other')[0]['errortype'], 'TypeError')
-        self.assertEqual(self.registry._active_client_id, 'client-1')
+        origin_result, = self.results()
+        update = origin_result['value']
+        origin_updates = json.loads(self.dispatcher.poll('client-1', revision=0))['updates']
+        other_updates = json.loads(self.dispatcher.poll('new', revision=0))['updates']
+        self.assertEqual(origin_updates, other_updates)
+        self.assertEqual(other_updates[0]['revision'], update['revision'])
+        self.assertEqual(other_updates[0]['state'], update['state'])
+
+        close = json.dumps({'_clientId': 'client-1', 'kind': 'release', 'id': 'release'})
+        self.dispatcher.submit(close, close_on_release=True)
+        self.submit('apply', client_id='new', state={'cheat': {'noCooldown': False}})
+        self.run_tasks()
+        self.assertFalse(self.state._value)
+        self.assertEqual(json.loads(self.dispatcher.poll('client-1', revision=0))['updates'], [])
+        newer, = json.loads(self.dispatcher.poll('new', revision=update['revision']))['updates']
+        self.assertEqual(newer['state'], {'cheat': {'noCooldown': False}})
+
+    def test_http_page_release_cancels_old_actions_and_rejects_late_submissions(self):
+        self.dispatch('placeMower', request_id='pending')
+        close = json.dumps({'_clientId': 'client-1', 'kind': 'release', 'id': 'release'})
+        self.dispatcher.submit(close, close_on_release=True)
+        self.dispatcher.submit(close, close_on_release=True)
+        late_connect = json.dumps({'_clientId': 'client-1', 'kind': 'connect', 'id': 'late'})
+        with self.assertRaisesRegex(ValueError, 'page has closed'):
+            self.dispatcher.submit(late_connect, close_on_release=True)
+        self.registry.require_client('client-1')
+        self.run_tasks()
+        self.assertFalse(self.registry.has_active_client)
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.results(), [])
 
     def test_business_execution_does_not_hold_the_queue_lock(self):
         def probe():
@@ -766,15 +798,13 @@ class GuiDispatcherTests(unittest.TestCase):
         self.assertEqual([item['id'] for item in self.results()], ['worker'])
 
 
-    def test_failed_connect_restores_previous_session_owner(self):
-        self.main_thread = True
-        self.registry.release('client-1')
-        self.main_thread = False
+    def test_failed_new_connection_leaves_existing_page_connected(self):
         with patch.object(self.registry, 'serialize', side_effect=RuntimeError('state unavailable')):
-            self.submit('connect')
+            self.submit('connect', client_id='new')
             self.run_tasks()
-        self.assertFalse(self.results()[0]['ok'])
-        self.assertIsNone(self.registry._active_client_id)
+        self.assertFalse(self.results('new')[0]['ok'])
+        self.registry.require_client('client-1')
+        self.assertTrue(self.registry.has_active_client)
 
     def test_option_class_only_contains_initialization_and_properties(self):
         tree = ast.parse((ROOT / 'pgvztool/cheat.py').read_text(encoding='utf-8'))

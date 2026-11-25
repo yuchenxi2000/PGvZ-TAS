@@ -39,6 +39,8 @@ def _install_builtin_cheat_menu_hooks():
     menu_type = assembly.GetType('Lawn.ZBCheatDialog', True)
     checkbox_type = assembly.GetType('Sexy.Checkbox', True)
     panel_field = menu_type.GetField('mPanel')
+    speed_label_field = menu_type.GetField('mGameSpeedLabel')
+    get_speed_string = menu_type.GetMethod('GetGameSpeedString')
     id_field = checkbox_type.GetField('mId')
     checked_field = checkbox_type.GetField('mChecked')
     set_checked = checkbox_type.GetMethod('SetChecked', (System.Boolean, System.Boolean))
@@ -47,6 +49,7 @@ def _install_builtin_cheat_menu_hooks():
 
     last_menu = None
     last_values = None
+    last_speed = None
 
     def apply_checkbox(checkbox_id, enabled):
         field = _BUILTIN_CHEAT_FIELDS.get(checkbox_id)
@@ -55,25 +58,46 @@ def _install_builtin_cheat_menu_hooks():
         sync_reg.set_local_state('cheat', field, enabled)
         return True
 
-    def refresh_checkboxes(menu):
-        nonlocal last_menu, last_values
+    def refresh_menu(menu):
+        nonlocal last_menu, last_values, last_speed
+        same_menu = last_menu is not None and System.Object.ReferenceEquals(last_menu.Target, menu)
         values = {key: getattr(cheat_option, field) for key, field in _BUILTIN_CHEAT_FIELDS.items()}
-        if values == last_values and System.Object.ReferenceEquals(last_menu.Target, menu):
+        if not same_menu or values != last_values:
+            for row in panel_field.GetValue(menu).mWidgets:
+                for widget in row.mWidgets:
+                    if not checkbox_type.IsInstanceOfType(widget):
+                        continue
+                    checkbox_id = id_field.GetValue(widget)
+                    if checkbox_id in values and checked_field.GetValue(widget) != values[checkbox_id]:
+                        set_checked.Invoke(widget, System.Array[System.Object]([values[checkbox_id], False]))
+            last_menu = System.WeakReference(menu)
+            last_values = values
+
+        global_state = Sexy.GlobalStaticVars
+        is_slow = global_state.gSlowMo
+        factor = global_state.gFastSlowMoNum
+        speed = global_state.gFastMo, is_slow, factor
+        if same_menu and speed == last_speed:
             return
-        for row in panel_field.GetValue(menu).mWidgets:
-            for widget in row.mWidgets:
-                if not checkbox_type.IsInstanceOfType(widget):
-                    continue
-                checkbox_id = id_field.GetValue(widget)
-                if checkbox_id in values and checked_field.GetValue(widget) != values[checkbox_id]:
-                    set_checked.Invoke(widget, System.Array[System.Object]([values[checkbox_id], False]))
-        last_menu = System.WeakReference(menu)
-        last_values = values
+        last_speed = speed
+        try:
+            # 网页和脚本直接写全局速度字段，不经过原生按钮的文字更新。
+            weak_label = speed_label_field.GetValue(menu)
+            label = clr.Reference[Lawn.Label]()
+            if weak_label is not None and weak_label.TryGetTarget(label):
+                widget = label.Value
+                speed_text = '速度控制 当前:{}x'.format(get_speed_string.Invoke(menu, None))
+                # StashFont 在 IronPython 中只暴露实现的 StringWidth，没有接口的默认 MeasureString。
+                if is_slow and factor > 0 and widget.mFont.StringWidth(speed_text) > widget.mWidth:
+                    speed_text = '速度控制 当前:1/{}x'.format(factor)
+                widget.mText = speed_text
+        except Exception as error:
+            Sexy.Debug.Log(Sexy.DebugType.Error, '[pgvztool] cannot refresh built-in speed label: {}'.format(error))
 
     click_type = System.Func[System.Int32, System.Boolean, System.Boolean]
     click_callback = click_type(apply_checkbox)
     refresh_type = System.Action[System.Object]
-    refresh_callback = refresh_type(refresh_checkboxes)
+    refresh_callback = refresh_type(refresh_menu)
 
     def route_checkbox_click(il):
         cursor = MonoMod.Cil.ILCursor(il)
@@ -89,7 +113,7 @@ def _install_builtin_cheat_menu_hooks():
         cursor.Emit(OpCodes.Ret)
         cursor.MarkLabel(original_switch)
 
-    def replace_checkbox_refresh(il):
+    def replace_menu_refresh(il):
         cursor = MonoMod.Cil.ILCursor(il)
         # Update 的前半段维护放大模式的按钮和可见性。后半段只刷新旧开关。
         set_disabled = next(ins for ins in il.Body.Instructions
@@ -112,7 +136,7 @@ def _install_builtin_cheat_menu_hooks():
     try:
         for method, edit in (
             (menu_type.GetMethod('CheckboxChecked'), route_checkbox_click),
-            (menu_type.GetMethod('Update'), replace_checkbox_refresh),
+            (menu_type.GetMethod('Update'), replace_menu_refresh),
             (native_auto_collect.GetSetMethod(), allow_native_auto_collect_disable_only),
         ):
             hooks.append(ILHook(method, MonoMod.Cil.ILContext.Manipulator(edit)))
