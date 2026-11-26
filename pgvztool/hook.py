@@ -991,15 +991,6 @@ def Board__Draw(orig, board: Lawn.Board, g: Sexy.Graphics):
         DrawTasButtons(board, g)
         DrawTasFrameCounter(board, g)
 
-# BUG FIX: 拖尾容器满时，AllocTrailFromDef直接返回null而不是扩容；大量猫尾草子弹是常见触发方式
-# 1.3.2 版本及以后被修复
-if tuple(int(part) for part in __game_version__.split('.')) < (1, 3, 2):
-    @LawnMod.MonoModUtils.HookTo(Sexy.TodLib.TrailHolder.AllocTrailFromDef)
-    def TrailHolder__AllocTrailFromDef(orig, trailHolder: Sexy.TodLib.TrailHolder, theRenderOrder: int, theDefinition: Sexy.TodLib.TrailDefinition):
-        if trailHolder.mTrails.Count == trailHolder.mTrails.Capacity:
-            trailHolder.mTrails.Capacity *= 2
-        return orig(trailHolder, theRenderOrder, theDefinition)
-
 @LawnMod.MonoModUtils.HookTo(Sexy.WidgetManager.SetFocus)
 def WidgetManager__SetFocus(orig, widget_manager: Sexy.WidgetManager, widget: Sexy.Widget):
     keybind_handler.set_focus(orig, widget_manager, widget)

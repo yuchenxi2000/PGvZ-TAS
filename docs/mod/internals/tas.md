@@ -76,7 +76,8 @@ S0(100) → S1(200) → S2(350) → [live frame 400]
 {playerId}_{crc8}_{frame}.dat
 ```
 
-复用游戏自身的 `board.SaveGame()` / `board.LoadGame()` 序列化，无需自己实现。
+复用游戏自身的 `board.SaveGame()` / `board.LoadGame()` 序列化，文件头和字段编码见
+[游戏存档格式](../../game-mechanics/other/save-format.md)。
 
 ### 生命周期
 

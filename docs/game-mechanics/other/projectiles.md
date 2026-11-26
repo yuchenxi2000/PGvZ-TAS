@@ -64,16 +64,16 @@ projectile = board.AddProjectile(x, y, render_order, row, projectile_type)
 
 | 类型 | 原生附加状态 |
 |---|---|
-| `Pea`、`Snowpea` | 直线运动；寒冰豌豆初始化寒冰拖尾 |
+| `Pea`、`Snowpea` | 直线运动。寒冰豌豆添加 `ParticleEffect.SnowpeaTrail` 粒子附件 |
 | `Cabbage`、`Melon`、`Wintermelon`、`Kernel`、`Butter` | 植物发射后改为 `Lobbed` 并设置弹道；黄油命中时施加黄油状态，瓜类造成溅射伤害 |
-| `Puff`、`PuffGreen` | 植物发射后改为 `Puff`；初始化烟雾拖尾 |
+| `Puff`、`PuffGreen` | 植物发射后改为 `Puff` 运动，添加 `ParticleEffect.PuffshroomTrail` 粒子附件 |
 | `Star` | 星星果发射后改为 `Star`，五颗子弹分别设置方向速度 |
 | `Spike` | 仙人掌发射后改为 `YAwareStraight` |
 | `Basketball` | 投石车僵尸设置向左的 `Lobbed` 弹道 |
 | `ZombiePea` | 普通豌豆头僵尸设置 `Backwards`，向左攻击植物 |
 | `ZombiePeaMindControl` | 被魅惑的豌豆头僵尸使用，向右攻击普通僵尸 |
-| `CattailSpike`、`HypnoCattailSpike` | 香蒲发射后改为 `Homing`，设置初速度和目标僵尸；初始化对应拖尾。共享拖尾容器的原版容量问题见[拖尾容器容量耗尽崩溃修复](../../mod/internals/trail-holder-capacity-crash.md) |
-| `EndoflameSpike` | 火红莲发射后改为 `EndoflameHoming`，设置目标并初始化附属 reanimation |
+| `CattailSpike`、`HypnoCattailSpike` | 香蒲发射后改为 `Homing`，设置初速度和目标僵尸，并初始化对应拖尾。共享拖尾容器从 PGvZ 1.3.2 起自动扩容。见[拖尾容器扩容与旧版崩溃](trail-holder-capacity-crash.md) |
+| `EndoflameSpike` | 火红莲发射后改为 `EndoflameHoming`，设置目标并初始化拖尾及附属 reanimation |
 | `Talisman`、`TalismanMove`、`TalismanSeal` | 保持直线运动；通用碰撞检查明确跳过这三类 |
 | `Cobbig` | 使用由起点、最高点和指定落点共同控制的特殊 `Lobbed` 弹道 |
 

@@ -1,5 +1,13 @@
 # 更新日志
 
+## [unreleased]
+
+### 改进
+
+- 移除旧版拖尾容器扩容钩子。PGvZ 自 1.3.2 起已原生修复，当前支持的 1.4.3 由游戏自动扩容。同步更新拖尾机制文档。
+- 补充 PGvZ 1.4.3 玩家进度、关卡续玩和 TAS 快照的存档格式文档。
+- 补充创意关卡 JSON 的 V1 类型编号表与关卡版本的关系。
+
 ## [1.18.2] - 2026-11-25
 
 ### 改进
@@ -532,6 +540,7 @@
 - 修复安卓部分区域无法自动收集、移除天尸诅咒不完整，以及过长命令结果挤出网页界面的问题。
 - 进入月夜无尽前检查屋顶无尽存档，避免未经提示直接覆盖。
 
+[unreleased]: https://github.com/yuchenxi2000/PGvZ-TAS/compare/v1.18.2...HEAD
 [1.18.2]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.18.2
 [1.18.1]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.18.1
 [1.18.0]: https://github.com/yuchenxi2000/PGvZ-TAS/releases/tag/v1.18.0

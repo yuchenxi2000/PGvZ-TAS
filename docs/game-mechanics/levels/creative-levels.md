@@ -162,6 +162,12 @@ CSVaseLevel      -> "Type": "VaseLevel"
 JSON 中的植物、僵尸、场景、子弹和音乐编号经过对应的 `*Convertor` 转换，不应直接假设它们
 等于当前 C# 枚举的底层值。
 
+PGvZ 1.4.3 的五个 `*ConvertorV1` 私有子类分别注册一套双向编号表。`CreativeLevel.Init()` 把
+根 JSON 的 `Version` 传给组件，组件再传给转换器。关卡加载器接受版本 `1`、`2`、`3`，
+但五个 `GetConvertor(version)` 都直接返回同一个 V1 实例，因此三种关卡版本共用这套编号。
+例如 `SuperChomper` 的运行时枚举值是 `48`，在 JSON 中用 `2000`。内置枚举扩充后，只有已注册
+的类型能通过这些表转换。新式 `.dat` 存档则使用 [`EnumSaver` 的枚举名称表](../other/save-format.md#玩家进度与关卡存档)。
+
 常用编号：
 
 | 类别 | 编号示例 |
