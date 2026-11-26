@@ -39,6 +39,9 @@ class GuiDispatcherTests(unittest.TestCase):
             'PlantRowType': {'Dirt': 0, 'Normal': 1, 'Pool': 2, 'HighGround': 3, 'Shallow': 4},
         }.items():
             setattr(self.lawn, name, enum.Enum(name, members))
+        self.lawn.MusicTune = enum.IntEnum('MusicTune', {
+            'DayGrasswalk': 1, 'TitleCrazyDaveMainTheme': 7, 'ZenGardenSH': 14, 'MainMusic': 15,
+        })
         self.lawn.LawnApp = self.lawn.Board = self.lawn.PlayerInfo = self.lawn.GardenType = self.lawn.GameSelector = object
         self.lawn.PottedPlant = types.SimpleNamespace(FacingDirection=object)
         test = self
@@ -76,6 +79,7 @@ class GuiDispatcherTests(unittest.TestCase):
         self.sexy.KeyCode = object
         self.sexy.Debug = types.SimpleNamespace(Log=lambda *args: None)
         self.sexy.DebugType = types.SimpleNamespace(Error='error')
+        self.sexy.MusicInterface = types.SimpleNamespace(USER_MUSIC_PLAYING=False)
         self.sexy.GlobalStaticVars = types.SimpleNamespace(
             gFastMo=False, gSlowMo=False, gFastSlowMoNum=0, gSlowMoCounter=0,
         )
@@ -86,8 +90,8 @@ class GuiDispatcherTests(unittest.TestCase):
             'none_of': lambda enum_type: getattr(enum_type, 'None'),
         }
         tree = ast.parse((ROOT / 'pgvztool/cheat_actions.py').read_text(encoding='utf-8'))
-        cls = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == 'CheatActions')
-        exec(compile(ast.Module(body=[cls], type_ignores=[]), 'cheat-actions', 'exec'), namespace)
+        classes = [node for node in tree.body if isinstance(node, ast.ClassDef)]
+        exec(compile(ast.Module(body=classes, type_ignores=[]), 'cheat-actions', 'exec'), namespace)
         self.options = types.SimpleNamespace(wontLose=False)
         self.operations = namespace['CheatActions'](self.options)
         tree = ast.parse((ROOT / 'pgvztool/placer.py').read_text(encoding='utf-8'))
@@ -411,18 +415,10 @@ class GuiDispatcherTests(unittest.TestCase):
         hook = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
                     and node.name == 'SexyAppBase__DoUpdateFrames')
         hook.decorator_list = []
-        installations = []
-
-        def install_hooks():
-            self.assertTrue(self.main_thread)
-            self.assertNotEqual(self.board.mSunMoney, 456)
-            installations.append('installed')
-            return tuple(installations)
 
         namespace = {
             'gui_dispatcher': self.dispatcher, 'Sexy': types.SimpleNamespace(SexyAppBase=object),
             'speed_control': self.speed_control, 'sync_reg': self.registry,
-            '_builtin_cheat_hooks': None, '_install_builtin_cheat_menu_hooks': install_hooks,
         }
         exec(compile(ast.Module(body=[hook], type_ignores=[]), 'gui-action-hook', 'exec'), namespace)
 
@@ -439,7 +435,6 @@ class GuiDispatcherTests(unittest.TestCase):
             self.assertIs(namespace['SexyAppBase__DoUpdateFrames'](original, self.app), False)
         finally:
             self.main_thread = False
-        self.assertEqual(installations, ['installed'])
         update, = json.loads(self.dispatcher.poll('client-1', revision=0))['updates']
         state = update['state']
         self.assertEqual(tuple(state['speed']), ('board',))
@@ -716,6 +711,44 @@ class GuiDispatcherTests(unittest.TestCase):
         self.run_tasks()
         self.assertTrue(self.results()[0]['ok'])
         self.assertEqual(self.calls, ['Drop'])
+
+    def test_background_music_uses_loaded_native_tracks_with_or_without_a_board(self):
+        tunes = self.lawn.MusicTune
+        self.lawn.Music = types.SimpleNamespace(MusicIsInMo3=lambda tune: tune == tunes.DayGrasswalk)
+        loaded = {int(tunes.TitleCrazyDaveMainTheme), int(tunes.MainMusic)}
+
+        def record(*args):
+            self.assertTrue(self.main_thread)
+            self.calls.append(args)
+
+        self.app.mLoadingThreadCompleted = True
+        self.app.mMusic = music = types.SimpleNamespace(
+            mMusicDisabled=False, mPaused=False,
+            mMusicInterface=types.SimpleNamespace(HasMusic=lambda song: song in loaded),
+            StopAllMusic=lambda: record('stop'), PlayMusic=lambda *args: record('play', *args),
+            GameMusicPause=lambda value: record('pause', value),
+        )
+        self.app.mBoard = None
+        self.dispatch('playBackgroundMusic', {'tune': 'TitleCrazyDaveMainTheme'})
+        self.assertEqual(self.calls, [])
+        self.run_tasks()
+        self.assertTrue(self.results()[0]['ok'])
+        self.assertEqual(self.calls, [('stop',), ('play', tunes.TitleCrazyDaveMainTheme, -1, -1)])
+
+        self.calls.clear()
+        self.app.mBoard = self.board
+        music.mPaused = True
+        self.dispatch('playBackgroundMusic', {'tune': 'DayGrasswalk'})
+        self.run_tasks()
+        self.assertTrue(self.results()[0]['ok'])
+        self.assertEqual(self.calls, [('stop',), ('play', tunes.DayGrasswalk, -1, -1), ('pause', True)])
+
+        self.calls.clear()
+        self.dispatch('playBackgroundMusic', {'tune': 'ZenGardenSH'})
+        self.dispatch('playBackgroundMusic', {'tune': 'MainMusic'})
+        self.run_tasks()
+        self.assertEqual([result['errortype'] for result in self.results()], ['MusicUnavailable', 'ValueError'])
+        self.assertEqual(self.calls, [])
 
     def test_later_connect_reads_state_without_applying_its_saved_settings(self):
         self.submit('connect', client_id='other', state={'cheat': {'noCooldown': True}})

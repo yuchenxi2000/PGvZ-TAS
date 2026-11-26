@@ -128,6 +128,7 @@ class GuiDispatcher:
             'setSurvivalStage': (cheat_actions.SetSurvivalStage, (('value', _integer),)),
             'enterMoonEndless': (cheat_actions.EnterMoonEndless, ()),
             'playKonamiSound': (cheat_actions.PlayKonamiSound, ()),
+            'playBackgroundMusic': (cheat_actions.PlayBackgroundMusic, (('tune', _enum(Lawn.MusicTune)),)),
             'setZombies': (cheat_actions.CheatSetZombies, (('types', _zombie_list), ('natural', _boolean))),
             'applyLineup': (cheat_actions.LineUpOnBoard, (('code', _string),)),
             'getLineup': (cheat_actions.GetLineup, ()),

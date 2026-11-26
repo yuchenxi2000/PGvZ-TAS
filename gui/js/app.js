@@ -93,6 +93,13 @@ const app = createApp({
             { scope: 'global', action: 'setGlobalSpeed', presets: ['0.1', '0.2', '0.5', '1', '2', '5', '10'] },
             { scope: 'board', action: 'setBoardSpeed', presets: ['0.5', '1', '2', '3'] },
         ].map(control => ({ ...control, current: null, draft: '', pending: null, errorKey: '' })));
+        const selectedMusicTune = ref('');
+        const musicTunes = [
+            'TitleCrazyDaveMainTheme', 'ChooseYourSeeds', 'DayGrasswalk', 'NightMoongrains',
+            'PoolWaterygraves', 'FogRigormormist', 'RoofGrazetheroof', 'PuzzleCerebrawl',
+            'MinigameLoonboon', 'Conveyer', 'FinalBossBrainiacManiac', 'FinalBoss2',
+            'ZenGarden', 'ZenGardenSH',
+        ];
         const weather = ref('default');
         const weatherOptions = computed(() => [
             { label: t('weather.default'), value: 'default' },
@@ -219,6 +226,9 @@ const app = createApp({
         }
 
         function onActionResult(result) {
+            if (result.name === 'playBackgroundMusic' && result.errortype === 'MusicUnavailable') {
+                return 'music.unavailable';
+            }
             terrain.receive(result);
             const control = speedControls.find(item => item.action === result.name);
             if (!control?.pending) return;
@@ -468,6 +478,8 @@ const app = createApp({
             combinedSpeed,
             speedControlDisabled,
             applySpeed,
+            selectedMusicTune,
+            musicTunes,
             weather,
             weatherOptions,
             sunValue,

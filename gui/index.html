@@ -285,34 +285,46 @@
                                 </div>
                             </el-card>
                         </div>
-                        <el-card shadow="never" class="tool-card">
-                            <template #header>{{ t('sections.speedControl') }}</template>
-                            <div v-for="control in speedControls" :key="control.scope" class="speed-control">
-                                <div class="speed-heading">
-                                    <h3>{{ t(`speed.${control.scope}.title`) }}</h3>
-                                    <output :aria-label="t(`speed.${control.scope}.current`)">{{ currentSpeedLabel(control) }}</output>
+                        <div class="card-stack">
+                            <el-card shadow="never" class="tool-card">
+                                <template #header>{{ t('sections.speedControl') }}</template>
+                                <div v-for="control in speedControls" :key="control.scope" class="speed-control">
+                                    <div class="speed-heading">
+                                        <h3>{{ t(`speed.${control.scope}.title`) }}</h3>
+                                        <output :aria-label="t(`speed.${control.scope}.current`)">{{ currentSpeedLabel(control) }}</output>
+                                    </div>
+                                    <div class="speed-scope">{{ t(`speed.${control.scope}.scope`) }}</div>
+                                    <div class="speed-presets" role="group" :aria-label="t(`speed.${control.scope}.presets`)">
+                                        <el-button v-for="preset in control.presets" :key="preset" size="small"
+                                            :type="speedPresetSelected(control, preset) ? 'primary' : 'default'"
+                                            :aria-pressed="speedPresetSelected(control, preset)"
+                                            :disabled="speedControlDisabled(control)" @click="applySpeed(control, preset)">{{ preset }}×</el-button>
+                                    </div>
+                                    <div class="speed-input">
+                                        <el-input v-model="control.draft" :disabled="speedControlDisabled(control)"
+                                            :aria-label="t(`speed.${control.scope}.custom`)" :placeholder="t(`speed.${control.scope}.placeholder`)"
+                                            @input="control.errorKey = ''" @keydown.enter.prevent="applySpeed(control)"></el-input>
+                                        <el-button :disabled="speedControlDisabled(control) || !control.draft.trim()"
+                                            type="primary" plain @click="applySpeed(control)">{{ t('actions.apply') }}</el-button>
+                                    </div>
+                                    <div v-if="control.pending" class="speed-scope" role="status">{{ t('speed.pending') }}</div>
+                                    <div v-if="control.errorKey" class="speed-error" role="alert">{{ t(control.errorKey) }}</div>
                                 </div>
-                                <div class="speed-scope">{{ t(`speed.${control.scope}.scope`) }}</div>
-                                <div class="speed-presets" role="group" :aria-label="t(`speed.${control.scope}.presets`)">
-                                    <el-button v-for="preset in control.presets" :key="preset" size="small"
-                                        :type="speedPresetSelected(control, preset) ? 'primary' : 'default'"
-                                        :aria-pressed="speedPresetSelected(control, preset)"
-                                        :disabled="speedControlDisabled(control)" @click="applySpeed(control, preset)">{{ preset }}×</el-button>
+                                <div v-if="combinedSpeed" class="speed-heading speed-total">
+                                    <span>{{ t('speed.combined') }}</span><output>{{ combinedSpeed }}</output>
                                 </div>
-                                <div class="speed-input">
-                                    <el-input v-model="control.draft" :disabled="speedControlDisabled(control)"
-                                        :aria-label="t(`speed.${control.scope}.custom`)" :placeholder="t(`speed.${control.scope}.placeholder`)"
-                                        @input="control.errorKey = ''" @keydown.enter.prevent="applySpeed(control)"></el-input>
-                                    <el-button :disabled="speedControlDisabled(control) || !control.draft.trim()"
-                                        type="primary" plain @click="applySpeed(control)">{{ t('actions.apply') }}</el-button>
+                            </el-card>
+                            <el-card shadow="never" class="tool-card">
+                                <template #header>{{ t('music.title') }}</template>
+                                <div class="music-input">
+                                    <el-select v-model="selectedMusicTune" :placeholder="t('music.choose')" :aria-label="t('music.choose')">
+                                        <el-option v-for="tune in musicTunes" :key="tune" :value="tune" :label="t(`music.tracks.${tune}`)" />
+                                    </el-select>
+                                    <el-button type="primary" plain :disabled="!selectedMusicTune"
+                                        @click="sendAction('playBackgroundMusic', { tune: selectedMusicTune })">{{ t('music.play') }}</el-button>
                                 </div>
-                                <div v-if="control.pending" class="speed-scope" role="status">{{ t('speed.pending') }}</div>
-                                <div v-if="control.errorKey" class="speed-error" role="alert">{{ t(control.errorKey) }}</div>
-                            </div>
-                            <div v-if="combinedSpeed" class="speed-heading speed-total">
-                                <span>{{ t('speed.combined') }}</span><output>{{ combinedSpeed }}</output>
-                            </div>
-                        </el-card>
+                            </el-card>
+                        </div>
                         <div class="card-stack">
                             <el-card shadow="never" class="tool-card">
                                 <template #header>{{ t('sections.level') }}</template>

@@ -167,6 +167,19 @@ window.PGvZI18n = (() => {
                 combined: '关卡逻辑合计', noBoard: '未进入关卡', unavailable: '速度值无效',
                 pending: '等待游戏执行', failed: '无法设置速度',
             },
+            music: {
+                title: '背景音乐', choose: '选择游戏曲目', play: '立即播放',
+                unavailable: '当前无法播放所选曲目。',
+                tracks: {
+                    TitleCrazyDaveMainTheme: '主菜单', ChooseYourSeeds: '选卡',
+                    DayGrasswalk: '白天草地', NightMoongrains: '黑夜草地',
+                    PoolWaterygraves: '泳池', FogRigormormist: '雾夜',
+                    RoofGrazetheroof: '屋顶', PuzzleCerebrawl: '砸罐子／我是僵尸',
+                    MinigameLoonboon: '坚果保龄球', Conveyer: '排山倒海',
+                    FinalBossBrainiacManiac: '僵王博士的复仇', FinalBoss2: '僵尸博士的复仇2',
+                    ZenGarden: '禅境花园', ZenGardenSH: '动态立绘',
+                },
+            },
             messages: {
                 waiting: '等待指令...',
                 sent: '已发送，切回游戏后生效',
@@ -422,6 +435,19 @@ window.PGvZI18n = (() => {
                 },
                 combined: 'Combined Level Speed', noBoard: 'No active level', unavailable: 'Invalid speed',
                 pending: 'Waiting for the game', failed: 'Could not set speed',
+            },
+            music: {
+                title: 'Background Music', choose: 'Choose a game track', play: 'Play Now',
+                unavailable: 'The selected track is currently unavailable.',
+                tracks: {
+                    TitleCrazyDaveMainTheme: 'Main Menu', ChooseYourSeeds: 'Choose Your Seeds',
+                    DayGrasswalk: 'Grasswalk', NightMoongrains: 'Moongrains',
+                    PoolWaterygraves: 'Watery Graves', FogRigormormist: 'Rigor Mormist',
+                    RoofGrazetheroof: 'Graze the Roof', PuzzleCerebrawl: 'Cerebrawl',
+                    MinigameLoonboon: 'Loonboon', Conveyer: 'Ultimate Battle',
+                    FinalBossBrainiacManiac: 'Brainiac Maniac', FinalBoss2: 'Zomboss’s Revenge 2',
+                    ZenGarden: 'Zen Garden', ZenGardenSH: 'Animated Portraits',
+                },
             },
             messages: {
                 waiting: 'Waiting for a command...',

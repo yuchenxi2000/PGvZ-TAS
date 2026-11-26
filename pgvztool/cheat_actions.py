@@ -8,6 +8,10 @@ from pgvz.lineup import LineUp
 from .cheat import cheat_option
 
 
+class MusicUnavailable(RuntimeError):
+    pass
+
+
 class CheatActions:
     def __init__(self, options):
         self.options = options
@@ -44,6 +48,26 @@ class CheatActions:
 
     def PlayKonamiSound(self):
         GetLawnApp().PlayFoley(Sexy.TodLib.FoleyType.Drop)
+
+    def PlayBackgroundMusic(self, tune: 'Lawn.MusicTune'):
+        tunes = Lawn.MusicTune
+        if not int(tunes.DayGrasswalk) <= int(tune) <= int(tunes.ZenGardenSH):
+            raise ValueError('expected a built-in background music tune')
+
+        app = GetLawnApp()
+        music = app.mMusic
+        if (not app.mLoadingThreadCompleted or music is None or music.mMusicDisabled
+                or Sexy.MusicInterface.USER_MUSIC_PLAYING):
+            raise MusicUnavailable('game music is not ready or is disabled')
+        song = tunes.MainMusic if Lawn.Music.MusicIsInMo3(tune) else tune
+        if not music.mMusicInterface.HasMusic(int(song)):
+            raise MusicUnavailable('the requested music resource is not loaded')
+
+        paused = music.mPaused
+        music.StopAllMusic()
+        music.PlayMusic(tune, -1, -1)
+        if paused:
+            music.GameMusicPause(True)
 
     def _WinLevel(self, lawnApp: Lawn.LawnApp, board: Lawn.Board):
         if lawnApp.mSeedChooserScreen is not None:

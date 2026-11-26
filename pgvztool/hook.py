@@ -11,7 +11,7 @@ import System
 import clr
 import MonoMod.Cil
 from Mono.Cecil.Cil import OpCodes
-from MonoMod.RuntimeDetour import ILHook
+from MonoMod.RuntimeDetour import Hook, ILHook
 from pgvz import *
 from pgvz.rng import rng_manip
 from .cheat import ApplyEasterEggModesToBoard, GetEasterEggModes, RestoreNormalMowerAnimation, cheat_option, weather
@@ -29,7 +29,6 @@ from .overlay import (
 )
 
 _BUILTIN_CHEAT_FIELDS = {5: 'autoCollect', 8: 'wontLose', 11: 'runBackground'}
-_builtin_cheat_hooks = None
 
 
 def _install_builtin_cheat_menu_hooks():
@@ -149,17 +148,70 @@ def _install_builtin_cheat_menu_hooks():
     return hooks
 
 
+_builtin_cheat_hooks = _install_builtin_cheat_menu_hooks()
+
+
+def _install_background_music_hooks():
+    kept_music = False
+    focus_transition = None
+
+    def run_focus_handler(orig, main, sender, args, transition):
+        nonlocal focus_transition
+        previous_transition = focus_transition
+        focus_transition = transition
+        try:
+            return orig(main, sender, args)
+        finally:
+            focus_transition = previous_transition
+
+    def deactivate(orig, main, sender, args):
+        nonlocal kept_music
+        kept_music = cheat_option.runBackground
+        return run_focus_handler(orig, main, sender, args, 'deactivate' if kept_music else None)
+
+    def activate(orig, main, sender, args):
+        nonlocal kept_music
+        transition = 'activate' if kept_music else None
+        kept_music = False
+        return run_focus_handler(orig, main, sender, args, transition)
+
+    def pause_all_music(orig, music):
+        if focus_transition != 'deactivate':
+            return orig(music)
+
+    def resume_all_music(orig, music):
+        if focus_transition != 'activate':
+            return orig(music)
+
+    def game_music_pause(orig, music, pause, force):
+        if focus_transition != 'deactivate' or not pause:
+            return orig(music, pause, force)
+
+    assembly = clr.GetClrType(Sexy.MusicInterface).Assembly
+    music_backend = assembly.GetType('Sexy.XNAMusicInterface', True)
+    music_type = clr.GetClrType(Lawn.Music)
+    mod_utils = LawnMod.MonoModUtils
+
+    def hook(method, handler):
+        return Hook(method, mod_utils.AsAction(mod_utils.GetGenericsForAction(method))(handler))
+
+    # 直接选中内部播放器的实现，以及单参数包装方法调用的双参数重载。
+    return (
+        hook(music_backend.GetMethod('PauseAllMusic'), pause_all_music),
+        hook(music_backend.GetMethod('ResumeAllMusic'), resume_all_music),
+        hook(music_type.GetMethod('GameMusicPause', (System.Boolean, System.Boolean)), game_music_pause),
+        mod_utils.HookTo(Sexy.Main.OnDeactivated)(deactivate),
+        mod_utils.HookTo(Sexy.Main.OnActivated)(activate),
+    )
+
+
+_background_music_hooks = _install_background_music_hooks()
+
+
 # 在 Board 暂停、尚无 Board 或全局慢速跳过逻辑更新时，也处理网页动作。
 # 选择包含加载收尾逻辑的基类实现，避免较短的 LawnApp.DoUpdateFrames 被内联。
 @LawnMod.MonoModUtils.HookTo(Sexy.SexyAppBase.DoUpdateFrames)
 def SexyAppBase__DoUpdateFrames(orig, app: Sexy.SexyAppBase):
-    global _builtin_cheat_hooks
-    if _builtin_cheat_hooks is None:
-        _builtin_cheat_hooks = ()
-        try:
-            _builtin_cheat_hooks = _install_builtin_cheat_menu_hooks()
-        except Exception as error:
-            Sexy.Debug.Log(Sexy.DebugType.Error, '[pgvztool] cannot hook built-in cheat menu: {}'.format(error))
     gui_dispatcher.run_pending()
     result = orig(app)
     if sync_reg.has_active_client:

@@ -216,7 +216,8 @@ body {
     margin-left: 0;
 }
 
-.speed-input {
+.speed-input,
+.music-input {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 6px;

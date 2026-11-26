@@ -105,10 +105,56 @@ class Game143HookTests(unittest.TestCase):
         self.assertEqual(self.plant.mState, 'idle')
         self.assertFalse(self.voices)
 
+    def test_background_music_hook_preserves_playback_during_focus_changes_and_autosave(self):
+        tree = ast.parse((ROOT / 'pgvztool/hook.py').read_text(encoding='utf-8'))
+        install = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                       and node.name == '_install_background_music_hooks')
+        registration = next(node for node in tree.body if isinstance(node, ast.Assign)
+                            and isinstance(node.targets[0], ast.Name)
+                            and node.targets[0].id == '_background_music_hooks')
+        callbacks = {}
+        main = NS(OnDeactivated='OnDeactivated', OnActivated='OnActivated')
+        backend = NS(GetMethod=lambda name: name)
+        native_type = NS(Assembly=NS(GetType=lambda *_: backend), GetMethod=lambda name, *_: name)
+        mod_utils = NS(HookTo=lambda target: lambda callback: callbacks.setdefault(target, callback),
+                       AsAction=lambda _: lambda callback: callback, GetGenericsForAction=lambda _: [])
+        options = NS(runBackground=True)
+        namespace = {
+            'Sexy': NS(Main=main, MusicInterface=object), 'Lawn': NS(Music=object), 'System': NS(Boolean=bool),
+            'LawnMod': NS(MonoModUtils=mod_utils), 'Hook': callbacks.setdefault,
+            'clr': NS(GetClrType=lambda _: native_type), 'cheat_option': options,
+        }
+        exec(compile(ast.Module(body=[install, registration], type_ignores=[]), 'background-music-hooks', 'exec'), namespace)
+        music = Mock()
+        save_board = Mock(side_effect=lambda: callbacks['GameMusicPause'](music.GameMusicPause, music, True, False))
+
+        def lose_focus(*_):
+            callbacks['PauseAllMusic'](music.PauseAllMusic, music)
+            save_board()
+
+        def gain_focus(*_):
+            callbacks['ResumeAllMusic'](music.ResumeAllMusic, music)
+
+        callbacks['OnDeactivated'](lose_focus, main, None, None)
+        options.runBackground = False
+        callbacks['OnActivated'](gain_focus, main, None, None)
+        save_board.assert_called_once_with()
+        self.assertEqual(music.mock_calls, [])
+        callbacks['GameMusicPause'](music.GameMusicPause, music, True, False)
+        music.GameMusicPause.assert_called_once_with(music, True, False)
+
+        music.reset_mock()
+        callbacks['OnDeactivated'](lose_focus, main, None, None)
+        callbacks['OnActivated'](gain_focus, main, None, None)
+        self.assertEqual([call[0] for call in music.mock_calls], ['PauseAllMusic', 'GameMusicPause', 'ResumeAllMusic'])
+
     def test_builtin_menu_speed_and_checkbox_sync_with_stash_font_methods(self):
         tree = ast.parse((ROOT / 'pgvztool/hook.py').read_text(encoding='utf-8'))
         install = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
                        and node.name == '_install_builtin_cheat_menu_hooks')
+        registration = next(node for node in tree.body if isinstance(node, ast.Assign)
+                            and isinstance(node.targets[0], ast.Name)
+                            and node.targets[0].id == '_builtin_cheat_hooks')
         menu_type = Mock()
         menu_type.GetField.side_effect = lambda name: NS(GetValue=lambda menu: getattr(menu, name))
         speed_format = Mock(side_effect=['1', '5', '0.25', '0.3333333333333333', '0.2'])
@@ -136,8 +182,8 @@ class Game143HookTests(unittest.TestCase):
             'clr': clr, 'System': system, 'MonoMod': MagicMock(), 'ILHook': Mock(),
             '_BUILTIN_CHEAT_FIELDS': {5: 'autoCollect'}, 'cheat_option': options, 'sync_reg': sync_reg,
         }
-        exec(compile(ast.Module(body=[install], type_ignores=[]), 'built-in-cheat-menu', 'exec'), namespace)
-        namespace[install.name]()
+        exec(compile(ast.Module(body=[install, registration], type_ignores=[]), 'built-in-cheat-menu', 'exec'), namespace)
+        self.assertEqual(len(namespace['_builtin_cheat_hooks']), 3)
         refresh_menu = system.Action[system.Object].call_args.args[0]
         click_checkbox = system.Func[system.Int32, system.Boolean, system.Boolean].call_args.args[0]
 

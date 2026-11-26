@@ -212,7 +212,7 @@ sync_reg.push_state(cheat=('daisyMode', 'danceMode'), weather=None)
 
 ### 内置作弊菜单同步
 
-PGvZ-TAS 在游戏主线程安装 `ZBCheatDialog` 的 IL 钩子。复选框 5（自动收集资源）、8（房主无敌）和 11（后台运行）分别写入 `cheat.autoCollect`、`cheat.wontLose` 和 `cheat.runBackground`，在状态生效后推送该字段。菜单刷新时也从 `CheatOption` 读取这三个状态，设置复选框时关闭监听回调。
+PGvZ-TAS 在模组导入时安装 `ZBCheatDialog` 的 IL 钩子。复选框 5（自动收集资源）、8（房主无敌）和 11（后台运行）分别写入 `cheat.autoCollect`、`cheat.wontLose` 和 `cheat.runBackground`，在状态生效后推送该字段。菜单刷新时也从 `CheatOption` 读取这三个状态，设置复选框时关闭监听回调。
 
 挂钩内置菜单时关闭已有的原生自动收集、房主无敌钩子。玩家资料载入时尝试重新开启原生自动收集的调用也会被拦截。后台运行字段立即写入 `Main.RunWhenLocked`，失焦时仍通过现有钩子应用。三个内置复选框沿用 PGvZ-TAS 的同步和保存规则，PC 由网页保存收到的状态。
 

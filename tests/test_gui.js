@@ -462,16 +462,42 @@ test('stage easter eggs use bilingual native-mode settings and one sound action'
 
     const stage = html.split('name="stage">')[1].split('</el-tab-pane>')[0];
     const columns = stage.split('<div class="card-stack">');
-    assert.equal(columns.length, 3);
+    assert.equal(columns.length, 4);
     assert.match(columns[0], /panel-grid three/);
-    assert.match(columns[1], /sections\.sceneCheats[\s\S]+sections\.weatherControl[\s\S]+<\/el-card>\s*<\/div>\s*<el-card[^>]+>\s*<template #header>.*sections\.speedControl/);
-    assert.match(columns[2], /sections\.level[\s\S]+switchGroups\.easterEggs[\s\S]+<\/check-group-card>\s*<\/div>\s*<\/section>/);
+    assert.match(columns[1], /sections\.sceneCheats[\s\S]+sections\.weatherControl[\s\S]+<\/el-card>\s*<\/div>/);
+    assert.match(columns[2], /sections\.speedControl[\s\S]+music\.title[\s\S]+<\/el-card>\s*<\/div>/);
+    assert.match(columns[3], /sections\.level[\s\S]+switchGroups\.easterEggs[\s\S]+<\/check-group-card>\s*<\/div>\s*<\/section>/);
     const sound = stage.match(/@click="([^"]+)"[^>]*>↑ ↑ ↓ ↓ ← → ← → B A/)[1];
     vm.runInNewContext(sound, { sendAction: gui.model.sendAction });
     const request = http.sent.at(-1);
     assert.equal(request.kind, 'action');
     assert.equal(request.name, 'playKonamiSound');
     assert.deepEqual(request.args, {});
+});
+
+test('background music sends a one-shot action only when Play Now is clicked', () => {
+    const gui = loadGui();
+    const http = gui.bootstrap();
+    const { musicTunes, selectedMusicTune, setLanguage, t, sendAction } = gui.model;
+    assert.equal(musicTunes.length, 14);
+    for (const language of ['en', 'zh']) {
+        setLanguage(language);
+        for (const tune of musicTunes) {
+            assert.notEqual(t(`music.tracks.${tune}`), `music.tracks.${tune}`);
+        }
+    }
+    const originalCount = http.sent.length;
+    selectedMusicTune.value = 'DayGrasswalk';
+    gui.flush();
+    assert.equal(http.sent.length, originalCount);
+
+    const play = html.match(/@click="(sendAction\('playBackgroundMusic'[^\"]+)"/)[1];
+    vm.runInNewContext(play, { selectedMusicTune: selectedMusicTune.value, sendAction });
+    const request = http.sent.at(-1);
+    assert.equal(http.sent.length, originalCount + 1);
+    assert.equal(request.kind, 'action');
+    assert.equal(request.name, 'playBackgroundMusic');
+    assert.deepEqual(request.args, { tune: 'DayGrasswalk' });
 });
 
 test('remote synchronization updates UI without echoing its changes', () => {

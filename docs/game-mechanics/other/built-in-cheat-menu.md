@@ -36,6 +36,8 @@ PGvZ-TAS 的同名选项 `CheatOption.noCooldown` 直接读写 `mEasyPlantingChe
 
 切换时同步写入 `PlayerInfo.mRunWhileLocked` 并保存玩家配置，加载玩家资料时恢复。
 
+PGvZ-TAS 开启「后台运行」时，跳过 `Main.OnDeactivated()` 的音乐暂停，以及 `AppEnteredBackground()` 自动存档时 `Board.TryToSaveGame()` 的音乐暂停。切回游戏时保留当前音乐暂停状态。其他存档路径和音效的失焦处理仍走原生流程。
+
 ## 速度控制
 
 `ChangeGameSpeed()` 写入全局的 `gFastMo`、`gSlowMo` 和 `gFastSlowMoNum`，并更新面板文字。[`LawnApp.UpdateFrames()` 的速度控制](speed-control.md)会在慢速档按计数器跳过部分应用更新。

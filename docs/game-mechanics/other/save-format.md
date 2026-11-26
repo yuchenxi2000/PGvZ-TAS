@@ -25,6 +25,10 @@
 
 TAS 文件名里的帧号用于快照排序。读档时，游戏从正文恢复 `mMainCounter`。快照覆盖的字段取决于游戏序列化，详见 [TAS 存档及限制](../../mod/internals/tas.md#存档数据)。
 
+## 失焦时保存
+
+窗口失焦时，`Main.OnDeactivated()` 调用 `LawnApp.AppEnteredBackground()`，记录恢复位置并保存当前玩家档案。存在 `Board` 时还会调用 `TryToSaveGame()`。只有处于战斗阶段、玩法通过 `NeedSaveGame()` 检查时，才会保存关卡续玩进度。关卡正在结算时，游戏先走结算流程。
+
 ## 玩家档案索引
 
 `users.dat` 使用 `Sexy.Buffer`。按写入顺序是 `int32` 版本 `1`、`int32` 玩家数量、每名玩家的 4 字节 ID、当前玩家名、`int32` 检查值 `555`。这里的玩家名使用 `int32` 字节数加 UTF-8 字节，Windows 下整数为小端。
@@ -34,7 +38,8 @@ TAS 文件名里的帧号用于快照排序。读档时，游戏从正文恢复 
 | 文件 | 相关入口 |
 | --- | --- |
 | `Lawn/GlobalMembersSaveGame.cs` | `LawnSaveGame()`、`InitializeGameEnum()`、`EnumSaver.Sync()` |
-| `Lawn/Board.cs` | `SaveGame()`、`Sync()` |
+| `Lawn/Board.cs` | `TryToSaveGame()`、`NeedSaveGame()`、`SaveGame()`、`Sync()` |
+| `Sexy/Main.cs`、`Lawn/LawnApp.cs` | `OnDeactivated()`、`AppEnteredBackground()` |
 | `Lawn/LawnCommon.cs` | `GetSavedGameName()` |
 | `Lawn/PlayerInfo.cs`、`Lawn/ProfileMgr.cs` | `SaveDetails()`、`SyncPlayer()`、`ProfileMgr.Save()` |
 | `Sexy/BufferNew.cs`、`Sexy/Buffer.cs`、`Sexy/SexyAppBase.cs` | 基础类型编码和磁盘读写 |
