@@ -65,8 +65,34 @@ class GuiHttpPathTests(unittest.TestCase):
                 mods_dir = str(self.mods / 'mods')
                 source.assert_called_once_with(os.path.join(mods_dir, 'pgvztool', 'gui_http.py'), 'rb')
                 probe.create_server.assert_called_once_with(mods_dir, 58080, 'instance')
+                self.assertIs(sys.modules['_pgvz_gui_http'].create_server, probe.create_server)
                 server.serve_forever.assert_called_once_with()
                 server.server_close.assert_called_once_with()
+
+    def test_port_selection_publishes_first_success_and_stops_after_ten_attempts(self):
+        for unavailable in (0, 1, 9, 10):
+            with self.subTest(unavailable=unavailable):
+                create_server = runpy.run_path(str(ROOT / 'pgvztool/gui_http.py'))['create_server']
+                module = create_server.__globals__
+                expected_port = 58080 + unavailable if unavailable < 10 else None
+                runtime = Mock()
+                runtime.start.side_effect = lambda: self.assertEqual(module['bound_port'], expected_port)
+
+                def bind(port, _runtime):
+                    if port < 58080 + unavailable:
+                        raise OSError('Port is occupied')
+                    return types.SimpleNamespace(server_port=port)
+
+                with patch.dict(module, GuiRuntime=Mock(return_value=runtime), _ThreadingServer=Mock(side_effect=bind)):
+                    if expected_port is None:
+                        with self.assertRaises(OSError):
+                            create_server(self.mods, 58080, 'instance')
+                    else:
+                        server = create_server(self.mods, 58080, 'instance')
+                        self.assertEqual(server.server_port, expected_port)
+                    attempts = [call.args[0] for call in module['_ThreadingServer'].call_args_list]
+                    self.assertEqual(attempts, list(range(58080, 58080 + min(unavailable + 1, 10))))
+                runtime.start.assert_called_once_with()
 
     def test_both_entries_reject_escaped_paths_and_serve_gui_files(self):
         for filename in ('cheat-gui.py', 'debug/cheat-gui.py'):

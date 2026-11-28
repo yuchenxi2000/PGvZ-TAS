@@ -3,7 +3,7 @@
 | 文件夹 | 内容 |
 |---|---|
 | [mod/user-guide/](mod/user-guide/) | 修改器安装、使用、快捷键配置和脚本编写。 |
-| [mod/internals/](mod/internals/) | 修改器通信、输入适配、TAS 存读档、[发布打包](mod/internals/release-packaging.md)及故障修复的内部实现。 |
+| [mod/internals/](mod/internals/) | 修改器通信、[主界面按钮](mod/internals/main-menu-button.md)、输入适配、TAS 存读档、[发布打包](mod/internals/release-packaging.md)及故障修复的内部实现。 |
 | [game-mechanics/plants/](game-mechanics/plants/) | 植物攻击、冷却、特殊能力及种植规则。 |
 | [game-mechanics/zombies/](game-mechanics/zombies/) | 僵尸行为、特殊能力及类型表示。 |
 | [game-mechanics/levels/](game-mechanics/levels/) | 关卡流程、出怪波次、[背景音乐](game-mechanics/levels/level-music.md)、结算及小游戏机制。 |

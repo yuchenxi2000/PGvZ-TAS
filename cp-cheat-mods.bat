@@ -35,7 +35,7 @@ call :copy_source_directory "gui"
 if errorlevel 1 goto :install_failed
 
 echo.
-echo Done. Start the game, then open http://localhost:58080 in browser.
+echo Done. Start the game, then use the modifier button below Online Levels or open http://localhost:58080 in your browser.
 pause >nul
 exit /b 0
 

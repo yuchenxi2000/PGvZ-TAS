@@ -41,6 +41,7 @@ try:
     import socketserver
     import threading
     import urllib.parse
+    from types import ModuleType
 
     class _GUIHandler(http.server.SimpleHTTPRequestHandler):
         def translate_path(self, path):
@@ -75,24 +76,35 @@ try:
 
     class _ThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
         daemon_threads = True
+        allow_reuse_address = os.name != 'nt'
+        allow_reuse_port = False
 
     _http_path = os.path.join(modsDirPath, 'pgvztool', 'gui_http.py')
-    _http_module = {'__name__': '_pgvz_gui_http'}
+    _http_module = ModuleType('_pgvz_gui_http')
     try:
         with open(_http_path, 'rb') as _source:
-            exec(compile(_source.read(), _http_path, 'exec'), _http_module)
+            exec(compile(_source.read(), _http_path, 'exec'), _http_module.__dict__)
     except Exception as error:
-        _server = _ThreadingServer(('127.0.0.1', _GUI_PORT), _GUIHandler)
-        _http_status = 'HTTP {}: 仅静态文件，GUI API 加载失败（{}）'.format(_GUI_PORT, error)
+        _ports = range(_GUI_PORT, _GUI_PORT + 10)
+        for _candidate in _ports:
+            try:
+                _server = _ThreadingServer(('127.0.0.1', _candidate), _GUIHandler)
+            except OSError:
+                if _candidate == _ports[-1]:
+                    raise
+            else:
+                break
+        _http_status = 'HTTP {}: 仅静态文件，GUI API 加载失败（{}）'.format(_server.server_port, error)
     else:
         # 调试入口通过 /api/status 触发首次加载。
-        _server = _http_module['create_server'](
+        sys.modules[_http_module.__name__] = _http_module
+        _server = _http_module.create_server(
             modsDirPath, _GUI_PORT, System.Guid.NewGuid().ToString('N'), load_on_request=True,
         )
         _http_status = 'HTTP {}: OK'.format(_server.server_port)
     threading.Thread(target=_server.serve_forever, daemon=True).start()
 except Exception as error:
-    _http_status = 'HTTP {}: 失败（{}）'.format(_GUI_PORT, error)
+    _http_status = 'HTTP {}–{}: 失败（{}）'.format(_GUI_PORT, _GUI_PORT + 9, error)
 
 
 def _join_mod_path(relative_path):

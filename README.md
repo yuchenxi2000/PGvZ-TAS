@@ -10,9 +10,9 @@
 
 先下载适用于当前游戏版本的发布 ZIP。 [发布下载](https://github.com/yuchenxi2000/PGvZ-TAS/releases)
 
-**PC**：运行 `cp-cheat-mods.bat` 自动安装，或手动将 `pgvz/`、`pgvztool/`、`gui/`、`cheat-gui.py` 复制到 mods 目录。启动游戏，浏览器打开 `http://localhost:58080`。
+**PC**：运行 `cp-cheat-mods.bat` 自动安装，或手动将 `pgvz/`、`pgvztool/`、`gui/`、`cheat-gui.py` 复制到 mods 目录。启动游戏后，在主界面点击「修改器」，或在浏览器中打开 `http://localhost:58080`。
 
-**安卓**：将以上文件复制到 mods 目录，启动游戏，浏览器打开 `http://localhost:58080`。（你可能需要一个文件管理器来复制文件，比如MT管理器）
+**安卓**：将以上文件复制到 mods 目录。启动游戏后，在主界面点击「修改器」，或在浏览器中打开 `http://localhost:58080`。（你可能需要一个文件管理器来复制文件，比如 MT 管理器）
 
 mods 目录位置：
 

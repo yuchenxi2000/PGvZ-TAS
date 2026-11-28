@@ -8,6 +8,9 @@ from pgvz.lineup import LineUp
 from .cheat import cheat_option
 
 
+_CHEAT_ERROR_DIALOG_ID = 902
+
+
 class MusicUnavailable(RuntimeError):
     pass
 
@@ -39,9 +42,8 @@ class CheatActions:
 
     def ShowErrorInGame(self, title: str, msg: str):
         lawnapp = GetLawnApp()
-        # ID为7的对话框点击ok按钮会直接关闭
-        lawnapp.KillDialog(7)
-        lawnapp.DoDialog(7, True, title, msg, '好的', 3)
+        lawnapp.KillDialog(_CHEAT_ERROR_DIALOG_ID)
+        lawnapp.DoDialog(_CHEAT_ERROR_DIALOG_ID, True, title, msg, '好的', 3)
 
     def ToggleFullscreen(self):
         GetLawnApp().ToggleFullscreen()

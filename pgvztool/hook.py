@@ -7,7 +7,9 @@ import Lawn.Creative
 import LawnMod
 import Sexy
 import Sexy.TodLib
+import sys
 import System
+from System.Runtime.CompilerServices import ConditionalWeakTable
 import clr
 import MonoMod.Cil
 from Mono.Cecil.Cil import OpCodes
@@ -206,6 +208,52 @@ def _install_background_music_hooks():
 
 
 _background_music_hooks = _install_background_music_hooks()
+
+_MODIFIER_BUTTON_ID = 58080
+_GUI_OPEN_FAILED_DIALOG_ID = 901
+_modifier_buttons = ConditionalWeakTable[Lawn.GameSelector, Lawn.MainMenuButton]()
+
+
+@LawnMod.MonoModUtils.HookTo(Lawn.GameSelector.UpdateSmallButtonPosition)
+def GameSelector__UpdateSmallButtonPosition(orig, selector: Lawn.GameSelector):
+    orig(selector)
+    online_button = selector.mOnlineLevelsButton
+    row_spacing = online_button.mY - selector.mCommunityButton.mY
+    x, y = online_button.mX, online_button.mY + row_spacing
+    found, button = _modifier_buttons.TryGetValue(selector)
+    if found:
+        button.Move(x, y)
+        return
+
+    # 缩小 atlas 子图并保留完整的采样区域，沿用原生按钮的图标绘制。
+    taco = Sexy.AtlasResources.IMAGE_BUNGEETARGET
+    icon_size = 54
+    icon = Sexy.Image(taco, taco.mS, taco.mT, icon_size, icon_size)
+    icon.mInvScale = taco.mInvScale * taco.mWidth / icon_size
+    button = Lawn.MainMenuButton.MakeNewButton(
+        _MODIFIER_BUTTON_ID, selector, '修改器', None, icon, 7, -5,
+    )
+    button.Move(x, y)
+    selector.AddWidget(button)
+    _modifier_buttons.Add(selector, button)
+
+
+@LawnMod.MonoModUtils.HookTo(Lawn.GameSelector.ButtonDepress)
+def GameSelector__ButtonDepress(orig, selector: Lawn.GameSelector, button_id: int):
+    if button_id != _MODIFIER_BUTTON_ID:
+        return orig(selector, button_id)
+    if selector.mApp.mPlayerInfo is not None and selector.mSlideCounter == 0:
+        port = getattr(sys.modules.get('_pgvz_gui_http'), 'bound_port', None)
+        if port is not None:
+            Lawn.LawnApp.OpenUrl('http://localhost:{}'.format(port))
+        else:
+            lawnapp = selector.mApp
+            # 2901 走 LawnApp.ButtonDepress 的默认关闭分支。
+            lawnapp.KillDialog(_GUI_OPEN_FAILED_DIALOG_ID)
+            lawnapp.DoDialog(
+                _GUI_OPEN_FAILED_DIALOG_ID, True, '无法打开网页',
+                '因端口绑定失败，无法打开修改器网页客户端！', '好的', 3,
+            )
 
 
 # 在 Board 暂停、尚无 Board 或全局慢速跳过逻辑更新时，也处理网页动作。

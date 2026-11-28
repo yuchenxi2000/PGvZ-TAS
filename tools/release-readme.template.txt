@@ -13,7 +13,7 @@ PGvZTool v{{MOD_VERSION}} for PGvZ v{{GAME_VERSION}}
 1. 解压本压缩包。
 2. 双击运行 cp-cheat-mods.bat。
 3. 启动游戏。
-4. 在浏览器打开 http://localhost:58080
+4. 在主界面点击「修改器」，或在浏览器中打开 http://localhost:58080。
 
 方法二：手动安装
 1. 打开 mods 目录：
@@ -26,7 +26,7 @@ PGvZTool v{{MOD_VERSION}} for PGvZ v{{GAME_VERSION}}
    pgvztool\
    gui\
 4. 启动游戏。
-5. 在本机浏览器打开 http://localhost:58080
+5. 在主界面点击「修改器」，或在浏览器中打开 http://localhost:58080。
 
 ===== 安卓安装 =====
 
@@ -39,7 +39,7 @@ PGvZTool v{{MOD_VERSION}} for PGvZ v{{GAME_VERSION}}
    pgvz\
    pgvztool\
    gui\
-5. 启动游戏，在同一台设备的浏览器打开 http://localhost:58080。
+5. 启动游戏后，在主界面点击「修改器」，或在浏览器中打开 http://localhost:58080。
 
 ===== 使用提示 =====
 
@@ -90,34 +90,39 @@ pause = Enter
 ===== 自定义代码 =====
 
 在「调试」页的「输入 Python 代码」卡片输入代码，点击「发送代码」后，游戏会在 IronPython 环境中执行。结果显示在页面下方的「执行结果」。
-「Python 调试端口」默认填 8080。游戏选用其他端口时，请在此填入实际端口。普通修改功能使用 58080。
+「Python 调试端口」默认填 8080。游戏选用其他端口时，请在此填入实际端口。
 
 脚本编写文档：https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/mod/user-guide/scripting.md
 项目源码：https://github.com/yuchenxi2000/PGvZ-TAS
 
 ===== 常见问题排查 =====
 
-1. 打不开 http://localhost:58080
+1. 游戏主界面没有「修改器」按钮
+   先确认安装或替换文件后已经完全重启游戏。
+   检查游戏版本是否是修改器支持的版本，如果不是请更新游戏至受支持的版本，或者下载支持该游戏版本的修改器。
+   检查 mods 目录下是否缺少文件，对比该目录下的 cheat-gui.py、pgvz/、pgvztool/ 和 gui/ 是否和发布包中的对应文件一致。
+
+2. 打不开修改器网页
    确认游戏正在运行，安装或替换文件后已经完全重启游戏。
-   确认地址是 http://localhost:58080，注意是 http 而不是 https，冒号是英文冒号。
+   在游戏主界面点击「修改器」打开实际端口。手动输入时，使用 http://localhost: 加上当前端口，默认是 58080。
    PC 上如果在 mods 同级的 user_config.json 中看到了 "ironpython_enabled": false，请改为 true 后重启。未设置时，游戏默认启用 IronPython。
    确认 mods 文件夹顶层存在且只存在一个作为入口使用的 cheat-gui.py；备份文件不要保留 .py 扩展名。
    Android 应使用同一台手机内的浏览器访问；PC 用户也应使用本机浏览器访问。
    Android 上可尝试重新解压并复制，必要时更换文件管理器。
    仍然打不开时，按下方“使用调试入口”操作，重点查看 HTTP 状态。
 
-2. 网页一直初始化、重连或显示「连接错误」
+3. 网页一直初始化、重连或显示「连接错误」
    显示「正在初始化修改器...」时，切回游戏等待加载完成，再回网页。
    显示「正在重连，3秒后重试...」时，确认游戏仍在运行。网页会自动尝试恢复连接。
-   显示「连接错误」时，查看「执行结果」中的具体错误。打开 http://localhost:58080/api/status 也可检查后台加载结果，ready 为 false 表示还在加载，error 非空时可查看错误。
+   显示「连接错误」时，查看「执行结果」中的具体错误。在当前修改器地址后加 /api/status 也可检查后台加载结果，ready 为 false 表示还在加载，error 非空时可查看错误。
    显示「当前游戏版本不受支持」时，核对页眉的游戏版本和发布包标注的适用版本。
    若状态地址返回 404，请确认 cheat-gui.py、pgvz/、pgvztool/ 和 gui/ 来自同一发布包并重启游戏。
 
-3. 网页空白或内容缺失
+4. 网页空白或内容缺失
    检查 gui 文件夹是否完整。完全退出游戏，删除 mods 中的旧 gui 目录，再从同一发布包完整复制。启动游戏后刷新所有旧的修改器标签页。
    仍有内容缺失时，按下方“使用调试入口”操作，重点查看 gui 文件检查结果。
 
-4. 按钮没有效果
+5. 按钮没有效果
    先确认页眉显示「可操作」。看到「已发送，切回游戏后生效」时，请切回游戏处理指令。看到「执行成功」时，游戏已返回结果。
    「速度控制」显示「等待游戏执行」时，也请切回游戏。
    如果网页提示部分指令的执行结果未确认，先回游戏检查是否生效，再决定是否重发。
@@ -126,18 +131,18 @@ pause = Enter
    仍然无效时，按下方“使用调试入口”操作，重点查看 pgvz 和 pgvztool 文件检查结果。若文件检查为 OK，请保留网页“执行结果”中的完整异常信息。
    如果只有某项功能无法使用，请核对游戏版本是否与发布包匹配。问题仍存在时，可附上两项版本和完整错误，到 GitHub 提交 issue（https://github.com/yuchenxi2000/PGvZ-TAS/issues）。
 
-5. 安卓上启动黑屏或闪退
+6. 安卓上启动黑屏或闪退
    如果同时安装了很多模组，可以暂时移出其他顶层 .py 文件，保留本修改器的 cheat-gui.py、pgvz/、pgvztool/ 和 gui/ 后重试。
 
-6. 文件复制后仍然异常
+7. 文件复制后仍然异常
    请重新解压并复制。某些安卓文件管理器在解压或覆盖复制时可能漏文件。
    仍然异常时，按下方“使用调试入口”操作，查看 pgvz、pgvztool 和 gui 文件检查结果。
 
-7. 自定义快捷键无效
+8. 自定义快捷键无效
    修改 keybinds.txt 后请重启游戏。
    本修改器已适配常见非英文输入法；如果当前输入法仍然拦截快捷键，请切换到英文输入法后再试。
 
-8. 修改器显示的状态与游戏内不一致
+9. 修改器显示的状态与游戏内不一致
    内置菜单的「自动收集资源」「房主无敌」「后台运行」会与网页同步，第一项在网页上显示为「自动收集」。
    内置菜单和网页各有一个「无冷却种植」开关。两个开关修改不同的游戏状态，互不同步。内置菜单会刷新冷却中的卡片，仍按原规则扣除阳光。网页开关会跳过卡片冷却检查，普通卡槽种植也会免除阳光消耗。
    网页「关卡与显示」的「全局速度」对应内置菜单的倍速。「关卡速度」只影响当前关卡的游戏逻辑。
@@ -164,10 +169,10 @@ pause = Enter
 2. 弹窗和 pgvztool-debug-report.txt 只出现其中一个
    调试入口发生内部错误。保留现有的弹窗内容或报告文件，并连同游戏版本、系统和设备信息提交给项目开发者。
 
-3. HTTP 58080: OK，但网页仍打不开
-   HTTP 服务本身已启动。确认使用 http://localhost:58080。Android 要在同一手机或模拟器的浏览器中访问。随后检查防火墙、代理、VPN、浏览器安全设置和本机网络环境。
+3. HTTP <端口>: OK，但网页仍打不开
+   在运行游戏的设备上使用 http://localhost: 加上报告中的实际端口。随后检查防火墙、代理、VPN、浏览器安全设置和本机网络环境。
 
-4. HTTP 58080: 失败（…）
+4. HTTP 58080–58089: 失败（…）
    根据括号内异常排查。端口占用时关闭其他游戏实例、本地服务和重复的 .py 入口后重启；权限或网络异常时检查安全软件和系统网络限制。
    如果提示“仅静态文件，GUI API 加载失败”，重新复制同一发布包的 pgvztool/ 并重启。
 
@@ -202,6 +207,7 @@ English Guide
 ============================================================
 
 PGvZTool v{{MOD_VERSION}} for PGvZ v{{GAME_VERSION}}
+User Guide
 
 This release bundles Vue {{VUE_VERSION}} and Element Plus {{ELEMENT_PLUS_VERSION}} locally.
 The web console works without an internet connection.
@@ -209,26 +215,26 @@ Before installing, make sure your game version is v{{GAME_VERSION}}.
 
 ===== PC Installation =====
 
-Fully exit the game before installing. Back up any files you changed before upgrading.
+Fully exit the game before installing or upgrading. Back up any files you modified before upgrading.
 
 Option 1: automatic install
 1. Extract this archive.
 2. Double-click cp-cheat-mods.bat.
 3. Start the game.
-4. Open http://localhost:58080 in your browser.
+4. Click 「修改器」 on the main menu or open http://localhost:58080 in your browser.
 
 Option 2: manual install
 1. Open the mods folder:
    C:\Users\{username}\AppData\Roaming\ZBC\PlantGirlsVsZombies\mods
    Replace {username} with your Windows account folder name under C:\Users. AppData is hidden by default. Paste the full path into File Explorer’s address bar to open it.
 2. When upgrading, remove the old pgvz/, pgvztool/, gui/, and cheat-gui.py. If you still have a legacy cheat.py, move it out of mods or give it a .disabled extension.
-3. Copy these files and folders from the extracted package:
+3. Copy these files and folders from the extracted package into mods.
    cheat-gui.py
    pgvz\
    pgvztool\
    gui\
 4. Start the game.
-5. Open http://localhost:58080 in a browser on the same computer.
+5. Click 「修改器」 on the main menu or open http://localhost:58080 in your browser.
 
 ===== Android Installation =====
 
@@ -236,12 +242,12 @@ Option 2: manual install
 2. Open the mods folder in your file manager:
    /storage/emulated/0/Android/data/net.pvz.pgvz.zbcteam/files/mods
 3. When upgrading, back up any files you changed and remove the old pgvz/, pgvztool/, gui/, cheat-gui.py, and cheat.py.
-4. Copy these files and folders from the extracted package:
+4. Copy these files and folders from the extracted package into mods.
    cheat-gui.py
    pgvz\
    pgvztool\
    gui\
-5. Start the game and open http://localhost:58080 in a browser on the same device.
+5. Start the game, then tap 「修改器」 on the main menu or open http://localhost:58080 in your browser.
 
 ===== Usage Notes =====
 
@@ -253,11 +259,11 @@ Option 2: manual install
 
 ===== Board Placement =====
 
-1. Open the Board tab and choose plant, zombie, grid item, drop type, and other properties.
-2. Choose row and column.
+1. In the Board tab, choose a plant, zombie, grid item, drop, or other object type.
+2. Choose the row, column, and any other properties.
 3. Click the corresponding button in the “Place” or “Remove” card.
 
-===== Quick Place =====
+===== Easy Place =====
 
 1. In the Board tab’s “Object Selection” card, turn on “Enable Easy Place.”
 2. Set “Easy Place Mode” and choose what to place.
@@ -270,56 +276,61 @@ Option 2: manual install
 
 In the Basics tab, turn on “Enable TAS” in “Common Cheats.” In supported levels, four buttons appear in the lower-right corner.
 
-Save: save the current game state
-Undo: return to the previous save point. The first undo from live play saves the current state before going back.
-Redo: move forward to the next save point
-Adv: advance exactly one frame and pause
+Save — save the current game state
+Undo — return to the previous save point. The first undo from live play saves the current state before going back.
+Redo — move forward to the next save point
+Adv — advance one frame, then pause
 
 A Frame counter is also shown for frame-precise play.
 
 ===== Custom Keybinds =====
 
-You can rebind seed packet selection, shovel, glove, quick place, TAS actions, pause, acceleration, cob cannons, and other shortcuts.
-Create keybinds.txt in the parent directory of mods and add one "action = key" entry per line, for example:
+You can rebind shortcuts for seed packet selection, shovel, glove, Easy Place, TAS actions, pause, speed-up, cob cannons, and more.
+Create keybinds.txt in the parent directory of mods and add entries in the “action = key” format, one per line.
 
 seed_1 = Q
 pause = Enter
 
-Restart the game after editing the file. The mod reads the keybinds during background loading.
+Restart the game to apply your keybinds.
 Letter and number shortcuts support common non-English input methods. On desktop, IME candidate windows are also dismissed automatically.
 Full configuration guide: https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/mod/user-guide/keybinds.md
 
 ===== Custom Code =====
 
 In the Debug tab’s “Python Code” card, enter code and click “Send Code” to run it in the game’s IronPython environment. The response appears under “Result” at the bottom of the page.
-The “Python debug port” defaults to 8080. If the game uses another port, enter the actual port in that field. Regular controls use port 58080.
+The “Python debug port” defaults to 8080. If the game uses another port, enter that port in the field.
 
 Scripting guide (Chinese): https://github.com/yuchenxi2000/PGvZ-TAS/blob/main/docs/mod/user-guide/scripting.md
 Project source: https://github.com/yuchenxi2000/PGvZ-TAS
 
 ===== Troubleshooting =====
 
-1. Cannot open http://localhost:58080
+1. The 「修改器」 button is missing from the main menu
+   Make sure you fully restarted the game after installing or replacing files.
+   Check that the mod supports your game version. If needed, update the game to a supported version or download a mod release that supports your version.
+   Check for missing files in mods by comparing cheat-gui.py, pgvz/, pgvztool/, and gui/ with their counterparts in the release package.
+
+2. Cannot open the modifier page
    Make sure the game is running and was fully restarted after installation or file replacement.
-   Make sure the address is http://localhost:58080, using http rather than https and an English colon.
+   Click 「修改器」 on the game’s main menu to open the page on the active port. For manual access, use http://localhost:<port> with the current port. The default is 58080.
    On PC, if user_config.json next to mods contains "ironpython_enabled": false, change it to true and restart the game. The game enables IronPython by default when the setting is absent.
    Make sure there is exactly one active cheat-gui.py entry in the top level of the mods folder. A backup must not retain the .py extension.
    On Android, use a browser on the same phone. On PC, use a browser on the same computer.
    On Android, extract and copy the package again, using another file manager if necessary.
    If the page still cannot open, follow “Using the Debug Entry” below and inspect the HTTP status.
 
-2. The page keeps initializing or reconnecting, or reports “Connection error”
+3. The page keeps initializing or reconnecting, or reports “Connection error”
    If the header shows “Initializing the mod...”, switch back to the game and let it finish loading, then return to the page.
    If it shows “Reconnecting, retrying in 3s...”, check that the game is still running. The page retries automatically.
-   If it shows “Connection error”, check “Result” for the full error. You can also open http://localhost:58080/api/status. A ready value of false means loading is still in progress. The error field shows any loading error.
+   If it shows “Connection error”, check “Result” for the full error. You can also append /api/status to the active modifier address. A ready value of false means loading is still in progress. The error field shows any loading error.
    If the page shows “Unsupported Game Version”, compare the game version in the header with the version supported by the release package.
    If the status URL returns 404, check that cheat-gui.py, pgvz/, pgvztool/, and gui/ all came from the same release, then restart the game.
 
-3. The page is blank or missing content
+4. The page is blank or missing content
    Check that the gui folder is complete. Fully exit the game, delete the old gui directory from mods, and copy it again from the same release package. After restarting the game, refresh all previously opened mod tabs.
    If content is still missing, follow “Using the Debug Entry” below and inspect the gui file check.
 
-4. Buttons do nothing
+5. Buttons do nothing
    Check that the header shows “Ready”. If “Result” says “Sent. Takes effect when you switch back to the game”, return to the game so it can process the command. “Command completed” confirms that the game returned a result.
    If “Speed Control” shows “Waiting for the game”, return to the game to let the command run.
    If the page says command results are unconfirmed, check the game before sending those commands again.
@@ -328,18 +339,18 @@ Project source: https://github.com/yuchenxi2000/PGvZ-TAS
    If buttons still do nothing, follow “Using the Debug Entry” below and inspect the pgvz and pgvztool file checks. If the check says OK, preserve the complete error shown in the page's execution result.
    If one feature does not work, check that the game version matches the release package. If the problem persists, report both versions and the full error at https://github.com/yuchenxi2000/PGvZ-TAS/issues.
 
-5. Android black screen or crash on startup
-   Too many mods can slow down initialization. Try removing other mods and keeping only this tool.
+6. Android black screen or crash on startup
+   If you have many mods installed, temporarily move the other top-level .py files out of mods. Keep this mod’s cheat-gui.py, pgvz/, pgvztool/, and gui/, then try again.
 
-6. Still broken after copying files
-   Extract and copy again. Some Android file managers may skip or damage files during extraction or overwrite.
+7. Still broken after copying files
+   Extract the archive and copy the files again. Some Android file managers may skip files during extraction or when overwriting them.
    If the problem remains, follow “Using the Debug Entry” below and inspect the pgvz, pgvztool, and gui file checks.
 
-7. Custom keybinds do not work
+8. Custom keybinds do not work
    Restart the game after editing keybinds.txt.
    Common non-English input methods are supported. If the current input method still intercepts shortcuts, switch to an English input method and try again.
 
-8. The web console’s state does not match the game
+9. The web console’s state does not match the game
    The built-in menu’s auto-collect, house invincibility, and background-run switches sync with “Auto Collect,” “House Invincible,” and “Run In Background” in the web console.
    The built-in “无冷却种植” switch and the web console’s “No Plant Cooldown” switch change different game settings and do not sync. The built-in switch refreshes cards on cooldown and keeps their usual sun costs. The web switch bypasses the cooldown check and waives sun costs when planting from regular seed slots.
    In Stage & Display, “Global Speed” corresponds to the built-in menu’s speed. “Level Speed” affects the current level’s game logic.
@@ -366,12 +377,12 @@ How to handle each diagnostic:
 2. Only one of the dialog and pgvztool-debug-report.txt exists
    The debug entry encountered an internal error. Preserve the available dialog contents or report file and send it to the project developer together with the game version, operating system, and device information.
 
-3. HTTP 58080: OK, but the page cannot open
-   The HTTP service is running. Confirm that you use http://localhost:58080. On Android, use a browser on the same phone. Then check the firewall, proxy, VPN, browser security settings, and local network environment.
+3. HTTP <port>: OK, but the page cannot open
+   On the device running the game, open http://localhost:<port> using the port shown in the report. Then check the firewall, proxy, VPN, browser security settings, and local network environment.
 
-4. HTTP 58080: 失败（...） (HTTP failed)
+4. HTTP 58080–58089: 失败（...） (HTTP failed)
    Use the exception in parentheses to diagnose it. For an occupied port, close other game instances, local services, and duplicate .py entries, then restart. For permission or network errors, check security software and system network restrictions.
-   If the report says the GUI API failed to load, recopy pgvztool/ from the same release and restart the game.
+   If the report says “仅静态文件，GUI API 加载失败” (static files only, GUI API failed to load), recopy pgvztool/ from the same release and restart the game.
 
 5. Python 调试端口: N (Python debug port)
    If “Send Code” reports “Could not connect to the game’s Python debug port”, enter the number from the report in the Debug tab’s “Python debug port” field, then click “Send Code” again.
@@ -380,10 +391,10 @@ How to handle each diagnostic:
    Confirm that the latest supported game version is installed and copy the debug script again. If the error remains, preserve the complete exception. It usually means the game's internal type or field no longer matches the debug entry and should be reported to the project maintainer.
 
 7. 文件检查：OK (File check: OK)
-   The key files for all three components exist. If the page or buttons still fail, restore the regular entry and retry. Keep the complete message shown under “Result” for troubleshooting.
+   The key files for all three components exist. If the page or buttons still fail, restore the regular entry and retry. Keep the complete error shown under “Result”. The file check verifies presence only.
 
 8. pgvz or pgvztool reports 目录缺失/缺 (missing directory/file)
-   Fully exit the game, delete the corresponding old directory from mods, and copy it completely from the same release package instead of overwriting it. Both packages must come from the same release.
+   Fully exit the game and delete the corresponding old directory from mods before copying the complete directory from the release package. Both packages must come from the same release.
 
 9. gui reports 目录缺失/缺 or index.html 读取失败 (missing/read failure)
    Fully exit the game, delete the old gui directory, and copy it completely from the same release package. On Android, extract again or use another file manager if necessary.

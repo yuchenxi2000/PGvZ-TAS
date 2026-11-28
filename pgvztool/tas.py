@@ -10,6 +10,9 @@ import Lawn.Creative
 from pgvz import GetLawnApp, GetBoard, script_manager, ScriptRunMode
 
 
+_TAS_ERROR_DIALOG_ID = 903
+
+
 class TasManager:
     ACTION_SAVE = 0
     ACTION_UNDO = 1
@@ -55,8 +58,8 @@ class TasManager:
             pass
         try:
             app = GetLawnApp()
-            app.KillDialog(7)
-            app.DoDialog(7, True, 'TAS error / TAS 错误', message, 'OK / 确定', 3)
+            app.KillDialog(_TAS_ERROR_DIALOG_ID)
+            app.DoDialog(_TAS_ERROR_DIALOG_ID, True, 'TAS error / TAS 错误', message, 'OK / 确定', 3)
         except Exception:
             pass
 

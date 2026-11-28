@@ -10,9 +10,9 @@ A scripting framework, cheat mod, and TAS tool for PlantGirls vs. Zombies (PGvZ)
 
 Download the release ZIP that matches your game version. [Releases](https://github.com/yuchenxi2000/PGvZ-TAS/releases)
 
-**PC**: Run `cp-cheat-mods.bat` for automatic installation, or manually copy `pgvz/`, `pgvztool/`, `gui/`, `cheat-gui.py` into the mods directory. Launch the game and open `http://localhost:58080` in your browser.
+**PC**: Run `cp-cheat-mods.bat` for automatic installation, or manually copy `pgvz/`, `pgvztool/`, `gui/`, `cheat-gui.py` into the mods directory. Launch the game, then click 「修改器」 on the main menu or open `http://localhost:58080` in your browser.
 
-**Android**: Copy the above files into the mods directory, launch the game, and open `http://localhost:58080` in your browser. (You may need a file manager app such as MT Manager to copy files.)
+**Android**: Copy the above files into the mods directory. Launch the game, then tap 「修改器」 on the main menu or open `http://localhost:58080` in your browser. (You may need a file manager app such as MT Manager to copy files.)
 
 Mods directory location:
 

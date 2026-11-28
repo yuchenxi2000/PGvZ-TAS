@@ -7,6 +7,9 @@ import threading
 import urllib.parse
 
 
+bound_port = None
+
+
 class GuiRuntime:
     def __init__(self, mods_dir, instance):
         self.mods_dir = mods_dir
@@ -163,6 +166,9 @@ class _GUIHandler(http.server.SimpleHTTPRequestHandler):
 
 class _ThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
+    # 每个端口只服务一个游戏进程。
+    allow_reuse_address = os.name != 'nt'
+    allow_reuse_port = False
 
     def __init__(self, port, runtime):
         self.runtime = runtime
@@ -170,7 +176,20 @@ class _ThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 def create_server(mods_dir, port, instance, *, load_on_request=False):
+    global bound_port
     runtime = GuiRuntime(mods_dir, instance)
-    if not load_on_request:
-        runtime.start()
-    return _ThreadingServer(port, runtime)
+    ports = range(port, port + 10)
+    try:
+        for candidate in ports:
+            try:
+                server = _ThreadingServer(candidate, runtime)
+            except OSError:
+                if candidate == ports[-1]:
+                    raise
+            else:
+                bound_port = server.server_port
+                return server
+    finally:
+        # 正式入口即使无法监听，仍加载游戏内功能。绑定成功时先公布端口。
+        if not load_on_request:
+            runtime.start()
